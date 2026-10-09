@@ -20,7 +20,9 @@ Aplicação web de gestão, criada para apoiar a organização e a visualizaçã
 > Não publique dados reais de clientes, credenciais, chaves de API ou informações comerciais privadas no repositório.
 
 ### 3. Comet Hunter
-Jogo independente com lógica de jogo e sistemas interativos.
+- **Jogar / acessar:** https://comet-hunter.vercel.app/
+- **Repositório atual:** https://github.com/kojomiguel445-svg/comet-hunter
+- **Status do código:** o repositório atual está privado; o código não fica visível publicamente por esse link.
 
 - **Repositório e demonstração:** ainda precisam ser identificados para que os links públicos apontem para os recursos corretos.
 
