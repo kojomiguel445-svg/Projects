@@ -87,7 +87,8 @@ def main():
         d, _, n = f.rpartition('/')
         groups.setdefault(d, []).append(n)
     plan = {'base': BASE_URL, 'release': release, 'baseFiles': ';'.join(d + ':' + ','.join(n) for d, n in groups.items()),
-            'patches': patches, 'uploaded': sorted(uploaded), 'removed': removed, 'oldReleases': old_releases}
+            'patches': patches, 'uploaded': sorted(uploaded), 'removed': removed, 'oldReleases': old_releases,
+            'sums': {rel: hashlib.sha1(open(os.path.join(ROOT, rel), 'rb').read()).hexdigest() for rel in sorted(uploaded)}}
     with open(os.path.join(ROOT, 'tools/deploy-plan.json'), 'w') as fh:
         json.dump(plan, fh, ensure_ascii=False, separators=(',', ':'))
     cfg = json.load(open(os.path.join(ROOT, 'vercel.json')))

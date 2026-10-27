@@ -40,7 +40,11 @@ await pool(plan.baseFiles.filter((f) => !plan.uploaded.includes(f) && !plan.remo
   put(rel, data);
 });
 // 2. arquivos novos ou substituídos enviados neste deploy
-for (const rel of plan.uploaded) put(rel, fs.readFileSync(path.join(root, rel)));
+for (const rel of plan.uploaded) {
+  const data = fs.readFileSync(path.join(root, rel));
+  if (plan.sums && plan.sums[rel] && sha1(data) !== plan.sums[rel]) throw new Error('arquivo enviado não confere: ' + rel);
+  put(rel, data);
+}
 // 3. ícones SVG avulsos (idênticos aos embutidos em icons-data.js)
 const ctx = { E: {} }; vm.runInNewContext(fs.readFileSync(path.join(out, 'js/gfx/icons-data.js'), 'utf8'), ctx);
 for (const [k, e] of Object.entries(ctx.E.IconCatalog)) put(`icons/ui/${k}.svg`, Buffer.from(e.src.split(',')[1], 'base64'));
