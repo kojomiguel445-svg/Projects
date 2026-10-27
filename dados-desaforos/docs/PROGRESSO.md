@@ -17,7 +17,7 @@ de produção 5.3.1 (`dpl_B1hjBGYCHBUraYPjSFCMqfxEdFXA`), conferido por SHA-1 (c
   transição cidade-natureza. **Pendente:** vila do Bosque continua na encosta (23 m) para não
   alterar a floresta; mudar exige trocar `w.reg.biome!=='forest'` em `villages.js` (layout).
 - [x] 2. HUD (5.4.0, em produção): HUD e menus translúcidos, marcador de interação, recuo quando parado, transições
-- [ ] 3. Pesca
+- [x] 3. Pesca (5.5.0, em produção): pesca sentada em bancos, tensão da linha, varas com atributos, raridades, peixes de mar aberto, revelação de raros
 - [ ] 4. Carteira de trabalho e entrevista
 - [ ] 5. Trabalho no caixa
 - [ ] 6. Moradias
