@@ -22,6 +22,9 @@ async function fetchBase(rel, optional = false, from = plan.base) {
 }
 async function pool(items, fn, n = 12) { const q = [...items]; await Promise.all(Array.from({ length: n }, async () => { while (q.length) await fn(q.shift()); })); }
 
+// lista da base compactada por pasta: "pasta:a,b;outra:c"
+plan.baseFiles = plan.baseFiles.split(';').flatMap((g) => { const [d, f] = g.split(':'); return f.split(',').map((n) => (d ? d + '/' : '') + n); });
+const releaseFiles = [...new Set([...plan.baseFiles, ...plan.uploaded])].filter((f) => /^(css|fonts|js|vendor)\//.test(f) || /^icons\/[^/]+\.png$/.test(f)).concat('index.html');
 fs.rmSync(out, { recursive: true, force: true });
 // 1. arquivos da base que não foram enviados nem removidos
 await pool(plan.baseFiles.filter((f) => !plan.uploaded.includes(f) && !plan.removed.includes(f)), async (rel) => {
@@ -48,5 +51,5 @@ for (const dir of ['css', 'fonts', 'js', 'vendor']) copyTree(path.join(out, dir)
 fs.mkdirSync(path.join(rel, 'icons'), { recursive: true });
 for (const f of fs.readdirSync(path.join(out, 'icons'))) if (f.endsWith('.png')) fs.copyFileSync(path.join(out, 'icons', f), path.join(rel, 'icons', f));
 fs.copyFileSync(path.join(out, 'index.html'), path.join(rel, 'index.html'));
-for (const [v, from] of plan.oldReleases) await pool(plan.releaseFiles.map((f) => `releases/${v}/${f}`), async (f) => { const data = await fetchBase(f, true, from); if (data) put(f, data); });
+for (const [v, from] of plan.oldReleases) await pool(releaseFiles.map((f) => `releases/${v}/${f}`), async (f) => { const data = await fetchBase(f, true, from); if (data) put(f, data); });
 console.log(`dist pronto: versão ${plan.release}, ${plan.baseFiles.length} da base, ${Object.keys(plan.patches).length} com diferenças, ${plan.uploaded.length} enviados`);

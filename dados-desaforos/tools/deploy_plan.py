@@ -10,7 +10,7 @@ import difflib, hashlib, json, os, subprocess, sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BASE_COMMIT = '6133d8e'
 BASE_URL = 'https://dados-desaforos-elarion-1w5dil8zl-kojomiguel445-5477.vercel.app'
-SKIP = ('releases/', 'tests/', 'tools/', 'icons/ui/', 'dist/')
+SKIP = ('releases/', 'tests/', 'tools/', 'icons/ui/', 'dist/', '.gitignore')
 CONFIG = {'vercel.json'}
 
 
@@ -43,9 +43,11 @@ def char_ops(a, b):
         if tag == 'equal':
             continue
         old, new, at = ''.join(la[i1:i2]), ''.join(lb[j1:j2]), starts[i1]
-        for t, a1, a2, b1, b2 in difflib.SequenceMatcher(None, old, new, autojunk=False).get_opcodes():
-            if t != 'equal':
-                ops.append([ia[at + a1], ia[at + a2] - ia[at + a1], new[b1:b2]])
+        fine = [o for o in difflib.SequenceMatcher(None, old, new, autojunk=False).get_opcodes() if o[0] != 'equal']
+        if sum(len(new[o[3]:o[4]]) + 12 for o in fine) > len(new):  # texto reescrito: um trecho único é menor
+            fine = [('replace', 0, len(old), 0, len(new))]
+        for t, a1, a2, b1, b2 in fine:
+            ops.append([ia[at + a1], ia[at + a2] - ia[at + a1], new[b1:b2]])
     return ops
 
 
@@ -79,9 +81,12 @@ def main():
             if rel.startswith(SKIP) or rel in CONFIG or rel in base:
                 continue
             uploaded.append(rel)
-    release_files = sorted(f for f in set(base) | set(uploaded) if f.startswith(('css/', 'fonts/', 'js/', 'vendor/')) or (f.startswith('icons/') and f.endswith('.png'))) + ['index.html']
-    plan = {'base': BASE_URL, 'release': release, 'baseFiles': base, 'patches': patches, 'uploaded': sorted(uploaded),
-            'removed': removed, 'oldReleases': old_releases, 'releaseFiles': release_files}
+    groups = {}
+    for f in base:
+        d, _, n = f.rpartition('/')
+        groups.setdefault(d, []).append(n)
+    plan = {'base': BASE_URL, 'release': release, 'baseFiles': ';'.join(d + ':' + ','.join(n) for d, n in groups.items()),
+            'patches': patches, 'uploaded': sorted(uploaded), 'removed': removed, 'oldReleases': old_releases}
     with open(os.path.join(ROOT, 'tools/deploy-plan.json'), 'w') as fh:
         json.dump(plan, fh, ensure_ascii=False, separators=(',', ':'))
     cfg = json.load(open(os.path.join(ROOT, 'vercel.json')))
