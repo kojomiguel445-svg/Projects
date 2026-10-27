@@ -196,10 +196,11 @@
       actions.push({label:atEmployer?'Começar meu trabalho aqui':'Mostrar meu local de trabalho',run:()=>atEmployer?work(it):W.guide(def.place,it.region)});
       actions.push({label:'Deixar este emprego',primary:false,run:()=>W.open({title:'Encerrar contrato de trabalho',icon:'journal',text:'Você pode escolher outro caminho. Um turno ainda não concluído não gera salário.',actions:[{label:'Encerrar meu contrato',run:()=>transaction(()=>S().resign(h,it.region),()=>jobListing(it,page))},{label:'Continuar neste emprego',primary:false,run:()=>jobListing(it,page)}]})});
     }
-    else actions.push({label:atEmployer?'Pedir uma entrevista aqui':'Encontrar este empregador',run:()=>atEmployer?transaction(()=>S().scheduleInterview(h,it.region,id,{atEmployer:true}),()=>jobs(it,page)):W.guide(def.place,it.region)});
+    else actions.push({label:atEmployer?'Perguntar sobre a vaga ao responsável':'Encontrar este empregador',run:()=>atEmployer?(E.Workplace?E.Workplace.invite(it,id):transaction(()=>S().scheduleInterview(h,it.region,id,{atEmployer:true}),()=>jobs(it,page))):W.guide(def.place,it.region)});
     if(list.length>1)actions.push({label:'Ler a próxima vaga',primary:false,run:()=>jobListing(it,page+1)});
     if(it.service==='guild')actions.push({label:'Quero um ofício por conta própria',primary:false,run:()=>professions(it)});
-    W.open({title:def.name,icon:def.icon,text:`${S().jobPay?S().jobPay(id,it.region):def.pay} po por turno · ${def.duration} segundos. ${S().placeName(def.place)}. ${j.contract===id?'Você já foi contratado para esta vaga.':atEmployer?'Peça emprego ao responsável desta loja; a entrevista acontece aqui.':'Visite a loja indicada e fale com o responsável ou com a placa VAGAS.'}${list.length>1?` Anúncio ${((page%list.length)+list.length)%list.length+1}/${list.length}.`:''}`,actions});
+    if(E.Work)actions.push({label:'Ver minha carteira de trabalho',primary:false,run:()=>E.Work.openCard()});
+    W.open({title:def.name,icon:def.icon,text:`${S().jobPay?S().jobPay(id,it.region):def.pay} po por turno · ${def.duration} segundos. ${S().placeName(def.place)}. ${j.contract===id?'Você já foi contratado para esta vaga.':atEmployer?'Pergunte ao responsável sobre a vaga; a entrevista acontece na sala dos fundos.':'Visite a loja indicada e fale com o responsável ou com a placa VAGAS.'}${list.length>1?` Anúncio ${((page%list.length)+list.length)%list.length+1}/${list.length}.`:''}`,actions});
   }
   function work(it){
     const h=hero(),d=S().data(h),j=S().jobData(h,it.region),def=S().JOBS[j.contract],shift=d.activeShift;

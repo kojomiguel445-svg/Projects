@@ -1,0 +1,17 @@
+{
+  "steps": [
+    {"name": "listing", "eval": "(()=>{const r=E.Settlements.region();E.WorldServices.use({service:'general',action:'jobs',region:r});return {r,txt:document.querySelector('.world-service-panel')&&document.querySelector('.world-service-panel').innerText.slice(0,300)};})()", "shot": "w1-listing"},
+    {"name": "invite", "eval": "(()=>{const r=E.Settlements.region();E.Workplace.invite({service:'general',region:r},'clerk');return document.querySelector('.world-service-panel').innerText.slice(0,300);})()", "shot": "w2-invite"},
+    {"name": "start", "eval": "(()=>{const r=E.Settlements.region();E.Workplace.start({service:'general',region:r},'clerk');return E.Interior.current&&E.Interior.current.kind;})()", "wait": 300, "shot": "w3-walk", "settle": 700},
+    {"name": "seated", "wait": 3500, "eval": "(()=>{const c=E.Interior.current;return {phase:c.phase,hero:[c.hero.x.toFixed(2),c.hero.z.toFixed(2)],boss:[c.boss.x.toFixed(2),c.boss.z.toFixed(2)]};})()", "shot": "w4-seated", "settle": 1500},
+    {"name": "a1", "eval": "(()=>{const t=document.querySelector('.iv-form textarea');t.value='Bom dia! Quero trabalhar aqui porque gosto de atender pessoas e quero aprender a cuidar de uma loja.';t.closest('form').requestSubmit();})()", "wait": 2600},
+    {"name": "a2", "eval": "(()=>{const t=document.querySelector('.iv-form textarea');t.value='Já ajudei meu tio na barraca da feira, contava o troco e atendia os clientes.';t.closest('form').requestSubmit();})()", "wait": 2600, "shot": "w5-chat", "settle": 200},
+    {"name": "a3", "eval": "(()=>{const t=document.querySelector('.iv-form textarea');t.value='Mantenho a calma, escuto o cliente, peço desculpas e reconto o troco com ele. Se a diferença for real, devolvo e anoto.';t.closest('form').requestSubmit();})()", "wait": 2600},
+    {"name": "a4", "eval": "(()=>{const t=document.querySelector('.iv-form textarea');t.value='Organizo as moedas antes de abrir, atendo um de cada vez e confiro o troco em voz alta.';t.closest('form').requestSubmit();})()", "wait": 2600},
+    {"name": "a5", "eval": "(()=>{const t=document.querySelector('.iv-form textarea');t.value='Posso de manhã e à tarde, sou pontual e honesto.';t.closest('form').requestSubmit();})()", "wait": 4200, "eval2": "", "shot": "w6-verdict", "settle": 300},
+    {"name": "card", "eval": "(()=>{const h=E.Store.hero();return {cur:E.Work.current(h)&&E.Work.current(h).id,card:h.settlement.card};})()"},
+    {"name": "stand", "eval": "(()=>{document.querySelector('[data-up]').click();return E.Interior.current.phase;})()", "shot": "w7-free", "settle": 900},
+    {"name": "leave", "eval": "(()=>{E.Interior.leave();E.Work.openCard();return !!E.Interior.current;})()", "shot": "w8-card", "settle": 700},
+    {"name": "again", "eval": "(()=>{E.WorldServices.close();const r=E.Settlements.region();E.Workplace.invite({service:'food',region:r},'cook');return document.querySelector('.world-service-panel').innerText.slice(0,200);})()"}
+  ]
+}

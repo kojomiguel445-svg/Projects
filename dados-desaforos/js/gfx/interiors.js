@@ -35,6 +35,7 @@
     const halfH=Math.max(6.8,8.2/aspect),camera=c.camera;camera.left=-halfH*aspect;camera.right=halfH*aspect;camera.top=halfH;camera.bottom=-halfH;camera.updateProjectionMatrix();camera.updateMatrixWorld(true);
   }
   I.physics={radius:FOOT,bounds:BOUNDS,free,move,recover};
+  I.decorators={};
   const busy=()=>!!(E.WorldServices&&E.WorldServices.active);
   const closeCard=()=>{if(E.WorldServices)E.WorldServices.close();};
   const note=r=>{if(r&&r.message)E.UI.toast(r.message,r.ok?'gold':'');return r;};
@@ -93,6 +94,8 @@
     for(const side of [-1,1])box(c,c.room,x,.06,z+side*(d/2-.22),w-.4,.015,.055,'#d6c195');
   }
   function decorateRoom(c){
+    // Cômodos de outros módulos (loja com expediente, sala de entrevista) montam a própria cena.
+    if(I.decorators[c.kind]){I.decorators[c.kind](c,I.kit);if(E.ScenePerf)E.ScenePerf.batch(c.room,{exclude:[...c.fixtures.map(f=>f.g).filter(Boolean),...c.flames].filter(Boolean)});return;}
     const S=E.Settlements,h=E.Store.hero(),property=S.property(h,c.region,c.kind==='player-shop'?'shop':c.kind),wall=property&&S.WALLS[property.wall]||S.WALLS.cream;
     const regional={costa:['#b38a5e','#699caa'],montanhas:['#8a786b','#8195a9'],astrolabio:['#81718e','#a08cbb'],abismo:['#76657f','#9485b0'],vazios:['#a27e58','#aa6e78'],jardins:['#9a7e5d','#8eaa85']}[c.region]||['#997651','#6f9391'];
     c.accent=regional[1];c.wall=wall;
@@ -146,6 +149,7 @@
     }
     if(E.ScenePerf)E.ScenePerf.batch(c.room,{exclude:[...c.fixtures.map(f=>f.g),...c.flames].filter(Boolean)});
   }
+  I.kit={box,cylinder,sprite,contact,fixture,plaque,rug,texture,mat,addFurniture,names,merchantNames};
   function property(c){return E.Settlements.property(E.Store.hero(),c.region,'home');}
   function owned(c,f){const p=property(c);return !!(c.kind==='home'&&f.furniture&&p&&(p.furniture||[]).some(v=>v.uid===f.furniture.uid));}
   function readBook(page=0){
@@ -218,7 +222,7 @@
   I.open=(opts)=>{
     closeCard();keyState.x=keyState.y=0;
     const previous=I.current,pos=opts.keepPosition&&previous?{...previous.hero}:null;
-    if(previous)dispose(previous);
+    if(previous){if(previous.onClose)previous.onClose(previous);dispose(previous);}
     const scene=new THREE.Scene();scene.background=new THREE.Color('#25364a');scene.fog=new THREE.Fog('#25364a',22,48);
     const camera=new THREE.OrthographicCamera(-10,10,6.8,-6.8,.1,65);camera.position.set(9.3,10.8,13.1);camera.lookAt(0,.65,0);
     const h=E.Store.hero();const c=I.current={...opts,scene,camera,room:new THREE.Group(),materials:{},textures:new Set(),textureCache:new WeakMap(),fixtures:[],colliders:[],flames:[],hero:pos||{x:0,z:2.5,dir:1,stride:0},moving:false,sprinting:false,t:0,hudAt:0,near:null};
@@ -238,10 +242,10 @@
   I.resize=()=>{if(I.current)fitCamera(I.current);};
   I.leave=()=>{const c=I.current;if(!c)return;if(c.kind==='room')return E.Settlements.enter('inn',c.region);I.close();};
   I.close=()=>{
-    const c=I.current;if(!c)return;closeCard();I.current=null;keyState.x=keyState.y=0;dispose(c);E.WG.input.keys={};E.WG.locked=false;E.WG.setMode('world');E.HUD.show(true);E.HUD.update();
+    const c=I.current;if(!c)return;closeCard();if(c.onClose)c.onClose(c);I.current=null;keyState.x=keyState.y=0;dispose(c);E.WG.input.keys={};E.WG.locked=false;E.WG.setMode('world');E.HUD.show(true);E.HUD.update();
   };
   I.update=(dt)=>{
-    const c=I.current;if(!c)return;dt=U.clamp(Number(dt)||0,0,.25);fitCamera(c);c.t+=dt;const h=c.hero,canMove=!E.UI.anyOpen()&&!document.querySelector('.modal-bg')&&!busy()&&!c.sleeping&&!c.edit;
+    const c=I.current;if(!c)return;dt=U.clamp(Number(dt)||0,0,.25);fitCamera(c);c.t+=dt;const h=c.hero,canMove=!E.UI.anyOpen()&&!document.querySelector('.modal-bg')&&!busy()&&!c.sleeping&&!c.edit&&!c.lockMove;
     const k=E.WG.input.move(),mx=keyState.x||k.x,my=keyState.y||k.y;
     c.moving=canMove&&(Math.abs(mx)+Math.abs(my)>.05);c.sprinting=false;
     if(c.edit){const e=c.edit,n=Math.max(1,Math.hypot(mx,my));e.x=U.clamp(e.x+(mx*.82-my*.57)/n*2.4*dt,-3.4,3.4);e.z=U.clamp(e.z+(-mx*.57-my*.82)/n*2.4*dt,-2.6,2.6);e.preview.g.position.set(e.x,.02,e.z);e.preview.g.rotation.y=e.turn*Math.PI/2;e.valid=canPlace(c,e);for(const m of e.materials)m.emissive.set(e.valid?'#3eaf81':'#be665b');e.bar.querySelector('[data-place]').disabled=!e.valid;if(c.t>=(e.nextText||0)){e.nextText=c.t+.2;e.status.textContent=e.valid?'Mova com WASD ou os botões · R gira · Enter coloca':'Este espaço está ocupado ou bloqueia a entrada';}}
@@ -256,14 +260,16 @@
     if(c.npc)c.npc.material.map=texture(c,c.npcFrames[Math.floor(c.t*1.4)%2]);
     for(const f of c.flames)f.scale.y=.85+Math.sin(c.t*8)*.12;
     if(E.Settlements.workTick)E.Settlements.workTick(dt,c);
+    if(c.onUpdate)c.onUpdate(dt,c);
     if(c.t>=c.hudAt){c.hudAt=c.t+.2;const cl=E.Sim.clock();c.clock.textContent=`${cl.text} · Saciedade ${Math.round(E.Sim.data(E.Store.hero()).hunger)}/100`;const lamps=c.fixtures.filter(f=>f.id==='lamp'&&f.furniture.lit!==false).length;c.ambient.intensity=(cl.night?1.15:1.65)+Math.min(.25,lamps*.10);
       let nearest=null,best=Infinity;for(const f of c.fixtures){const d=Math.hypot(h.x-f.x,h.z-f.z);if(d<f.r+1.05&&d<best){best=d;nearest=f;}}
       c.near=nearest;c.act.disabled=!nearest;c.act.innerHTML=nearest?`${icon(nearest.icon)} ${U.esc(nearest.label)}`:'Aproxime-se de um móvel';c.label.textContent=nearest?nearest.label:'';
     }
   };
   I.interact=async()=>{
-    const c=I.current,f=c&&c.near;if(!f||c.edit||c.sleeping||busy()||E.UI.anyOpen()||document.querySelector('.modal-bg'))return;
+    const c=I.current,f=c&&c.near;if(!f||c.edit||c.sleeping||c.lockMove||busy()||E.UI.anyOpen()||document.querySelector('.modal-bg'))return;
     const S=E.Settlements,h=E.Store.hero(),movable=owned(c,f),extra=movable?[{label:'Reposicionar este móvel',run:()=>{closeCard();I.beginPlacement(f.furniture.uid);}}]:[];
+    if(f.run)return f.run(f,c);
     if(f.id==='exit')return I.leave();
     if(f.id==='service')return c.kind==='inn'?reception(c):E.WorldServices&&E.WorldServices.service(c.kind,c.region);
     if(f.id==='room-door'){

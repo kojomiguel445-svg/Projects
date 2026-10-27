@@ -84,11 +84,10 @@
   G.whatsNew = async () => {
     E.state.seenVersion = E.Title.VERSION; E.Store.save();
     const html = `<div class="whatsnew"><ul>
-      <li><b>Pesca sentado:</b> nos pontos com banco à beira d'água, seu personagem se senta, lança, espera segurando a vara, reage à fisgada, recolhe e se levanta ao terminar.</li>
-      <li><b>Tensão da linha:</b> segure para recolher e solte quando o peixe correr. Linha frouxa demais solta o anzol; tensa demais, arrebenta.</li>
-      <li><b>Varas com atributos:</b> resistência, controle, alcance e velocidade de fisgada mudam a luta, a espera e o lançamento.</li>
-      <li><b>Raridades e mar aberto:</b> peixes Comuns a Lendários, cinco espécies novas no mar e uma apresentação especial para capturas épicas e lendárias. Todo lendário concede a Bênção das Águas.</li>
-      <li><b>Nova interface (5.4):</b> HUD e menus translúcidos, marcador de interação e transições suaves.</li>
+      <li><b>Carteira de trabalho:</b> no menu, veja seu emprego atual, estabelecimento, salário, turnos pagos e o histórico. Agora é um emprego por vez.</li>
+      <li><b>Entrevista de verdade:</b> pergunte sobre a vaga ao responsável da loja, siga-o até a sala dos fundos, sente-se e responda com suas próprias palavras. Ele faz perguntas de acompanhamento e explica a decisão.</li>
+      <li><b>Avaliação transparente:</b> a entrevista é avaliada por regras locais (coerência, comunicação, interesse, resolução de situações e confiabilidade). Não usa IA generativa e suas respostas não são guardadas.</li>
+      <li><b>Pesca sentado (5.5):</b> bancos à beira d'água, tensão da linha, varas com atributos e raridades de Comum a Lendário.</li>
     </ul></div>`;
     await UI.modal({ title: `✦ Novidades da versão ${E.Title.VERSION}`, html, buttons: [{ label: 'Ver o Oráculo', value: 'wish' }, { label: 'Bora jogar!', value: true, cls: 'primary' }] }).then((v) => { if (v === 'wish') E.Wish.open(); });
   };

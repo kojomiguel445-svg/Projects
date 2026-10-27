@@ -26,6 +26,7 @@
       ['oracle', 'Oráculo', () => E.Wish.open()],
       ['echoes', 'Ecos', () => E.EcoUI.open()],
       ['lifebook', 'Vida & Ofícios', () => E.LifeBook.open()],
+      ['journal', 'Carteira de trabalho', () => E.Work.openCard()],
       ['home', 'Encontrar moradia', () => E.WorldServices ? E.WorldServices.guide('home') : E.Settlements.open()],
       ['scales', 'Minha Loja', () => E.Vendor.open()],
       ['cooking', 'Comida & Viagem', () => E.WorldServices ? E.WorldServices.foodBag() : E.Sim.openFood()],

@@ -223,9 +223,9 @@
     const p = new E.SP.Px(W, H);
     // quadros de pesca podem levar o tipo da vara: 'fhold:2'
     let [f, rodTier] = (o.frame || 'idle0').split(':');
-    // sentado num banco: 's' antes do quadro de pesca ('sfhold:2'); o corpo desce e as pernas dobram
-    const seated = /^sf(cast0|cast1|hold|bite|reel0|reel1|catch)$/.test(f);
-    if (seated) f = f.slice(1);
+    // sentado: 's' antes do quadro de pesca ('sfhold:2') ou parado numa cadeira ('sit0'/'sit1'); o corpo desce e as pernas dobram
+    const seated = /^s(f(cast0|cast1|hold|bite|reel0|reel1|catch)|it[01])$/.test(f);
+    if (seated) f = f.startsWith('sit') ? 'idle' + f[3] : f.slice(1);
     const L = o.look, sp = o.species || 'humano';
     const skin = L.skin, hair = L.hair, c1 = L.c1, c2 = L.c2;
     const atk = f === 'atk';
@@ -258,7 +258,7 @@
     if (f === 'jump1') { lL = rL = -5; arms = 'up'; }
     if (f === 'jump2') { spread = 2; arms = 'out'; lL = -1; }
     if (twoHands) arms = rArm = 'grip';
-    if (seated) { lL = rL = 0; sway = Math.max(-1, Math.min(1, sway)); crouch = 0; bob = (f === 'freel1' ? 1 : 0) + 8; }
+    if (seated) { lL = rL = 0; sway = Math.max(-1, Math.min(1, sway)); crouch = 0; bob = (f === 'freel1' || f === 'idle1' ? 1 : 0) + 8; }
     bob += crouch;
     const bw = ({ magro: 0, medio: 1, forte: 3 }[L.build] ?? 1) + (sp === 'anao' ? 2 : sp === 'golias' ? 2 : sp === 'orc' ? 1 : 0);
     const shoulder = 9 + bw, waist = 7 + bw, legW = 5 + Math.round(bw / 2);
