@@ -84,12 +84,10 @@
   G.whatsNew = async () => {
     E.state.seenVersion = E.Title.VERSION; E.Store.save();
     const html = `<div class="whatsnew"><ul>
-      <li><b>A atualização chega inteira:</b> a entrada Jogar usa arquivos da mesma versão. O jogo avisa quando há uma versão nova e preserva o seu progresso antes de atualizar.</li>
-      <li><b>Ilhas com identidade:</b> as nove vilas ganharam arquitetura e acabamento próprios, com lojas abertas, empregos e contratação no seu ponto.</li>
-      <li><b>Aurenna cresceu:</b> bairros, avenidas, galerias, prédios altos e torre do relógio. Viver e comprar na metrópole custa mais; os salários e o comércio acompanham esses preços.</li>
-      <li><b>Pesque de verdade no mar:</b> compre varas e iscas melhores, alugue um barco por dois dias do jogo e procure espécies de águas abertas. Venda seus peixes no cais. O retorno ao porto está incluído no aluguel.</li>
-      <li><b>Seu próprio cassino:</b> alugue ou compre o salão, instale mesas, deposite a reserva e receba visitantes. Conduza as rodadas ou contrate equipe; os prêmios saem do caixa da casa.</li>
-      <li><b>Ecos redesenhados:</b> todos os Ecos e suas evoluções receberam silhuetas, cores e detalhes mais próximos das referências de JoJo, mantendo seus poderes e desbloqueios.</li>
+      <li><b>Casas no lugar certo:</b> as casas, tendas, caixotes, colunas e arcos espalhados pelas regiões assentam no terreno, sem flutuar nem afundar, com embasamento de pedra nas encostas.</li>
+      <li><b>Vilas niveladas:</b> as vilas que ficavam em ladeiras agora ocupam um terraço plano; as lojas não ficam mais sobre pedestais altos.</li>
+      <li><b>Bordas naturais:</b> o calçamento das vilas se desfaz aos poucos na grama e Aurenna ganhou jardins e árvores atrás dos prédios da periferia.</li>
+      <li><b>Placas legíveis:</b> letreiros de lojas, portais e postos não aparecem mais espelhados quando vistos por trás.</li>
     </ul></div>`;
     await UI.modal({ title: `✦ Novidades da versão ${E.Title.VERSION}`, html, buttons: [{ label: 'Ver o Oráculo', value: 'wish' }, { label: 'Bora jogar!', value: true, cls: 'primary' }] }).then((v) => { if (v === 'wish') E.Wish.open(); });
   };

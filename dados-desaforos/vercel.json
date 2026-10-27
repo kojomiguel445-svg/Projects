@@ -84,7 +84,7 @@
   "rewrites": [
     {
       "source": "/jogar.html",
-      "destination": "/releases/5.3.1/index.html"
+      "destination": "/releases/5.3.2/index.html"
     }
   ]
 }

@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="elarion-release" content="5.3.2">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#121624">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Elarion">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/png" href="/releases/5.3.2/icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="/releases/5.3.2/icons/apple-touch-icon.png">
+  <meta name="description" content="Dados & Desaforos — Crônicas de Elarion: RPG com regras de D&D 5.5, mundo 3D em pixel art e Oráculo de armas.">
+  <title>Dados &amp; Desaforos</title>
+  <link rel="stylesheet" href="/releases/5.3.2/fonts/fonts.css">
+  <link rel="stylesheet" href="/releases/5.3.2/css/main.css">
+  <link rel="stylesheet" href="/releases/5.3.2/css/living.css">
+  <link rel="stylesheet" href="/releases/5.3.2/css/settlements.css">
+  <link rel="stylesheet" href="/releases/5.3.2/css/vendor.css">
+  <link rel="stylesheet" href="/releases/5.3.2/css/worldservices.css">
+  <link rel="stylesheet" href="/releases/5.3.2/css/pixel-ui.css">
+</head>
+<body>
+  <canvas id="game" aria-label="Mundo de Elarion"></canvas>
+  <div id="vignette"></div>
+  <div id="ui"></div>
+  <div id="toasts" aria-live="polite"></div>
+  <div id="rotate" aria-live="polite"><div class="rot-phone"><span></span></div><div class="rot-t">Gire o celular</div><div class="rot-s">Elarion é jogado com a tela deitada.</div></div>
+  <div id="loading"><div class="lw"><div class="lsig"></div><div class="lt">CARREGANDO ELARION</div></div></div>
+
+  <script src="/releases/5.3.2/vendor/three.min.js"></script>
+  <script src="/releases/5.3.2/js/core/util.js"></script>
+  <script src="/releases/5.3.2/js/core/hosting.js"></script>
+  <script src="/releases/5.3.2/js/gfx/icons-data.js"></script>
+  <script src="/releases/5.3.2/js/gfx/icons.js"></script>
+  <script src="/releases/5.3.2/js/data/rules.js"></script>
+  <script src="/releases/5.3.2/js/data/heroes.js"></script>
+  <script src="/releases/5.3.2/js/data/subclasses.js"></script>
+  <script src="/releases/5.3.2/js/data/spells.js"></script>
+  <script src="/releases/5.3.2/js/data/monsters.js"></script>
+  <script src="/releases/5.3.2/js/data/weapons.js"></script>
+  <script src="/releases/5.3.2/js/data/lineage.js"></script>
+  <script src="/releases/5.3.2/js/data/ecos.js"></script>
+  <script src="/releases/5.3.2/js/data/world.js"></script>
+  <script src="/releases/5.3.2/js/data/life.js"></script>
+  <script src="/releases/5.3.2/js/data/content.js"></script>
+  <script src="/releases/5.3.2/js/data/lore.js"></script>
+  <script src="/releases/5.3.2/js/data/simulation.js"></script>
+  <script src="/releases/5.3.2/js/core/accounts.js"></script>
+  <script src="/releases/5.3.2/js/core/state.js"></script>
+  <script src="/releases/5.3.2/js/core/audio.js"></script>
+  <script src="/releases/5.3.2/js/engine/character.js"></script>
+  <script src="/releases/5.3.2/js/engine/gacha.js"></script>
+  <script src="/releases/5.3.2/js/engine/ecos.js"></script>
+  <script src="/releases/5.3.2/js/engine/encounter.js"></script>
+  <script src="/releases/5.3.2/js/engine/combat.js"></script>
+  <script src="/releases/5.3.2/js/engine/quests.js"></script>
+  <script src="/releases/5.3.2/js/engine/adventure.js"></script>
+  <script src="/releases/5.3.2/js/engine/life.js"></script>
+  <script src="/releases/5.3.2/js/engine/simulation.js"></script>
+  <script src="/releases/5.3.2/js/engine/settlements.js"></script>
+  <script src="/releases/5.3.2/js/engine/vendor.js"></script>
+  <script src="/releases/5.3.2/js/engine/business.js"></script>
+  <script src="/releases/5.3.2/js/engine/casino-business.js"></script>
+  <script src="/releases/5.3.2/js/engine/maritime.js"></script>
+  <script src="/releases/5.3.2/js/engine/chains.js"></script>
+  <script src="/releases/5.3.2/js/engine/forge.js"></script>
+  <script src="/releases/5.3.2/js/engine/wonders.js"></script>
+  <script src="/releases/5.3.2/js/gfx/sprites.js"></script>
+  <script src="/releases/5.3.2/js/gfx/chars.js"></script>
+  <script src="/releases/5.3.2/js/gfx/bestiary.js"></script>
+  <script src="/releases/5.3.2/js/gfx/dragons.js"></script>
+  <script src="/releases/5.3.2/js/gfx/dice3d.js"></script>
+  <script src="/releases/5.3.2/js/gfx/weaponsig.js"></script>
+  <script src="/releases/5.3.2/js/gfx/weaponart.js"></script>
+  <script src="/releases/5.3.2/js/gfx/weaponlegend.js"></script>
+  <script src="/releases/5.3.2/js/gfx/ecoart-v53.js"></script>
+  <script src="/releases/5.3.2/js/gfx/sceneperf.js"></script>
+  <script src="/releases/5.3.2/js/gfx/worldextra.js"></script>
+  <script src="/releases/5.3.2/js/gfx/wonders3d.js"></script>
+  <script src="/releases/5.3.2/js/gfx/explore3d.js"></script>
+  <script src="/releases/5.3.2/js/gfx/shopfronts.js"></script>
+  <script src="/releases/5.3.2/js/gfx/metropolis.js"></script>
+  <script src="/releases/5.3.2/js/gfx/water.js"></script>
+  <script src="/releases/5.3.2/js/gfx/villages.js"></script>
+  <script src="/releases/5.3.2/js/gfx/cycle.js"></script>
+  <script src="/releases/5.3.2/js/gfx/crowds.js"></script>
+  <script src="/releases/5.3.2/js/gfx/stalllife.js"></script>
+  <script src="/releases/5.3.2/js/gfx/maritime.js"></script>
+  <script src="/releases/5.3.2/js/gfx/casino-life.js"></script>
+  <script src="/releases/5.3.2/js/gfx/interiors.js"></script>
+  <script src="/releases/5.3.2/js/gfx/world3d.js"></script>
+  <script src="/releases/5.3.2/js/ui/ui.js"></script>
+  <script src="/releases/5.3.2/js/ui/title.js"></script>
+  <script src="/releases/5.3.2/js/ui/wardrobe.js"></script>
+  <script src="/releases/5.3.2/js/ui/creator.js"></script>
+  <script src="/releases/5.3.2/js/ui/hud.js"></script>
+  <script src="/releases/5.3.2/js/ui/interact.js"></script>
+  <script src="/releases/5.3.2/js/ui/wonders.js"></script>
+  <script src="/releases/5.3.2/js/ui/battle.js"></script>
+  <script src="/releases/5.3.2/js/ui/menu.js"></script>
+  <script src="/releases/5.3.2/js/ui/sheet.js"></script>
+  <script src="/releases/5.3.2/js/ui/arsenal.js"></script>
+  <script src="/releases/5.3.2/js/ui/armory.js"></script>
+  <script src="/releases/5.3.2/js/ui/wish.js"></script>
+  <script src="/releases/5.3.2/js/ui/ecos.js"></script>
+  <script src="/releases/5.3.2/js/gfx/atlasart.js"></script>
+  <script src="/releases/5.3.2/js/ui/map.js"></script>
+  <script src="/releases/5.3.2/js/ui/journal.js"></script>
+  <script src="/releases/5.3.2/js/ui/fishing.js"></script>
+  <script src="/releases/5.3.2/js/ui/trade.js"></script>
+  <script src="/releases/5.3.2/js/ui/casino.js"></script>
+  <script src="/releases/5.3.2/js/ui/guild.js"></script>
+  <script src="/releases/5.3.2/js/ui/craft.js"></script>
+  <script src="/releases/5.3.2/js/ui/lifebook.js"></script>
+  <script src="/releases/5.3.2/js/ui/places.js"></script>
+  <script src="/releases/5.3.2/js/ui/settlements.js"></script>
+  <script src="/releases/5.3.2/js/ui/vendor.js"></script>
+  <script src="/releases/5.3.2/js/ui/worldservices.js"></script>
+  <script src="/releases/5.3.2/js/ui/harbor.js"></script>
+  <script src="/releases/5.3.2/js/ui/casino-owner.js"></script>
+  <script src="/releases/5.3.2/js/net/net.js"></script>
+  <script src="/releases/5.3.2/js/net/world.js"></script>
+  <script src="/releases/5.3.2/js/net/coop.js"></script>
+  <script src="/releases/5.3.2/js/ui/online.js"></script>
+  <script src="/releases/5.3.2/js/core/app.js"></script>
+  <script src="/releases/5.3.2/js/core/updates.js"></script>
+  <script src="/releases/5.3.2/js/main.js"></script>
+</body>
+</html>
