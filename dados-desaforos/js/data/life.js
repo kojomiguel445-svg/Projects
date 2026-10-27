@@ -133,7 +133,14 @@
     {...F('peixe_espada_aurora','Peixe-Espada da Aurora',4,'#63829a','#e5d6a9',220,130,280,4,'fish','Vive nas correntes profundas, além dos píeres.'),seaOnly:true,minRod:2},
     {...F('lula_luar_marinho','Lula do Luar Marinho',4,'#a58ac1','#e7d9ee',250,70,160,4,'squid','Só visita a superfície no mar à noite.'),seaOnly:true,minRod:2,when:'noite'},
     {...F('marlin_coroa','Marlim da Coroa Celeste',5,'#416b94','#eacb78',680,180,360,5,'fish','Um troféu do mar aberto, atraído por equipamento de alto nível.'),seaOnly:true,minRod:3,when:'dia'},
+    {...F('tainha_espuma','Tainha-da-Espuma',1,'#9fb2bd','#eef4f2',14,25,45,1,'fish','Salta entre as cristas quando o vento vira.'),seaOnly:true},
+    {...F('cavala_corrente','Cavala da Corrente Fria',2,'#3f6f8a','#c9e2ea',34,30,60,2,'fish','Nada contra a corrente só para provar que consegue.'),seaOnly:true},
+    {...F('garoupa_recife','Garoupa do Recife Afundado',3,'#8a5a3a','#f0c890',96,60,140,3,'fish','Mora no casco de um galeão e não aceita visitas.'),seaOnly:true,minRod:1},
+    {...F('tubarao_lanterna','Tubarão-Lanterna',4,'#2b3f5a','#9fe8ff',240,140,260,4,'fish','Uma luz azul sob o queixo atrai cardumes inteiros à noite.'),seaOnly:true,minRod:2,when:'noite'},
+    {...F('lula_colossal_fossa','Lula-Colossal da Fossa',5,'#5a2440','#ff9ab8',720,300,520,5,'squid','Sobe da fossa nas noites sem lua. Os marinheiros contam os tentáculos e nunca chegam ao mesmo número.'),seaOnly:true,minRod:3,when:'noite'},
   ];
+  // Raridade: nome e cor (★1 a ★5). Os ★5 são lendários.
+  L.RARITY = [null, { name: 'Comum', color: '#c9d1d9' }, { name: 'Incomum', color: '#8fe39b' }, { name: 'Raro', color: '#6fb8ff' }, { name: 'Épico', color: '#c08bff' }, { name: 'Lendário', color: '#ffc457' }];
   L.FISH = {};
   for (const [b, list] of Object.entries(L.FISH_BY_BIOME)) for (const f of list) if (!L.FISH[f.id]) L.FISH[f.id] = Object.assign({ biome: b }, f);
   for (const list of Object.values(L.FISH_REGION)) for (const f of list) L.FISH[f.id] = f;
@@ -158,13 +165,16 @@
     { id: 'garrafa', name: 'Garrafa com Mensagem', icon: '🍾', w: 3, gems: 30, desc: 'Um mapa rabiscado e algumas Gemas Estelares!' },
     { id: 'bau_afogado', name: 'Baú Afogado', icon: '🧰', w: 2, gold: [30, 90], desc: 'Cheio de moedas molhadas.' },
   ];
+  // Atributos (1–10): resistência (tensão que a linha aguenta), controle (faixa segura e puxada suave),
+  // alcance (lançamento mais longe; peixes de águas fundas aparecem um pouco mais) e fisgada (espera menor e mais tempo para reagir).
   L.RODS = [
-    { id: 0, name: 'Vara de Bambu', bonus: 0, desc: 'Simples e honesta.' },
-    { id: 1, name: 'Vara de Carvalho', bonus: 1, retail:260, cost: { gold: 150, ore: { ferro: 2 } }, desc: 'Zona de captura maior. Já dá para tentar os lendários.' },
-    { id: 2, name: 'Vara Encantada', bonus: 2, retail:1100, cost: { gold: 600, ore: { prata: 3, cristal: 1 } }, desc: 'Atrai peixes raros.' },
-    { id: 3, name: 'Vara Lendária das Marés', bonus: 3, retail:4800, cost: { gold: 2500, ore: { cristal: 3, obsidiana: 2 } }, desc: 'Os peixes ★5 sonham com ela.' },
-    { id: 4, name: 'Vara de Dendê', bonus: 4, exclusive: 'Presente do Mestre Dendê (missão “Mestre dos Sete Mares”).', desc: 'A vara do maior pescador da Baía de Todos os Mares. Os lendários vêm sozinhos.' },
+    { id: 0, name: 'Vara de Bambu', bonus: 0, stats: { res: 3, ctl: 3, reach: 3, hook: 3 }, desc: 'Simples e honesta.' },
+    { id: 1, name: 'Vara de Carvalho', bonus: 1, stats: { res: 5, ctl: 4, reach: 4, hook: 4 }, retail:260, cost: { gold: 150, ore: { ferro: 2 } }, desc: 'Linha mais firme. Já dá para tentar os lendários.' },
+    { id: 2, name: 'Vara Encantada', bonus: 2, stats: { res: 6, ctl: 6, reach: 5, hook: 6 }, retail:1100, cost: { gold: 600, ore: { prata: 3, cristal: 1 } }, desc: 'Atrai peixes raros.' },
+    { id: 3, name: 'Vara Lendária das Marés', bonus: 3, stats: { res: 8, ctl: 7, reach: 7, hook: 7 }, retail:4800, cost: { gold: 2500, ore: { cristal: 3, obsidiana: 2 } }, desc: 'Os peixes ★5 sonham com ela.' },
+    { id: 4, name: 'Vara de Dendê', bonus: 4, stats: { res: 9, ctl: 9, reach: 8, hook: 9 }, exclusive: 'Presente do Mestre Dendê (missão “Mestre dos Sete Mares”).', desc: 'A vara do maior pescador da Baía de Todos os Mares. Os lendários vêm sozinhos.' },
   ];
+  L.ROD_STATS = { res: 'Resistência', ctl: 'Controle', reach: 'Alcance', hook: 'Fisgada' };
 
   // ------------------------------------------------------------ mercadorias (comércio entre regiões)
   // prod: região que produz (barato); want: regiões que pagam caro

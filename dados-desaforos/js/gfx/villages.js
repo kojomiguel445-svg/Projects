@@ -175,6 +175,7 @@
       if(moved){o.instanceMatrix.needsUpdate=true;o.computeBoundingSphere();}
     }
     for(const list of Object.values(w.propGroups||{}))for(const it of list){const q=weight(it.x,it.z);if(q){const dy=w.height(it.x,it.z)-original(it.x,it.z);it.h+=dy;if(it.y!==undefined)it.y+=dy;}}
+    for(const b of w.benches||[])if(weight(b.x,b.z)){const dy=w.height(b.x,b.z)-original(b.x,b.z);b.y+=dy;b.group.position.y+=dy;}
     plan.level={floorY,grade};
   }
   function road(w,group,a,b,width,mat,offset=.055,kind='street',edgeFade=0){

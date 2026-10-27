@@ -72,6 +72,10 @@
     return (artCache[key] = out.toDataURL());
   };
   FI.stars = (r) => '★'.repeat(r);
+  const rarity = (r) => (E.L.RARITY && E.L.RARITY[r]) || { name: '', color: '#ffffff' };
+  const rodOf = (d) => E.L.RODS[d.rod] || E.L.RODS[0];
+  const statsOf = (d) => rodOf(d).stats || { res: 3, ctl: 3, reach: 3, hook: 3 };
+  const ARC = Math.PI * 85; // comprimento do semicírculo do medidor de tensão
 
   // ------------------------------------------------------------ minijogo
   let active = null;
@@ -80,36 +84,48 @@
     const h = E.Store.hero(), w = E.WG.world;
     if(!h||!w||!spot||!Number.isFinite(spot.wx)||!Number.isFinite(spot.wz))return;
     if(spot.fromBoat&&(!E.Maritime||!E.Maritime.isSailing(w)))return E.UI.toast('Embarque antes de lançar no mar.');
-    const d = E.Life.data(h);
+    const d = E.Life.data(h), rod = rodOf(d), st = statsOf(d);
     const biome = spot.biome || w.reg.biome;
     const bait=E.Life.activeBait&&E.Life.activeBait(h,biome);
+    const seat = !spot.fromBoat && spot.bench;
     E.WG.locked = true;
     E.HUD.show(false);
+    const bars = Object.entries(E.L.ROD_STATS || {}).map(([k, n]) => `<span class="fi-stat" title="${n}: ${st[k]}/10"><i>${n}</i><b style="--v:${st[k] * 10}%"></b></span>`).join('');
     const el = U.h(`<div class="fishing"><div class="fi-panel">
-      <div class="fi-top"><span>🎣 ${E.L.RODS[d.rod].name}</span><span>Pesca Nv. ${E.Life.level(h, 'pesca')}</span>${bait ? `<span>${U.esc(bait.name)} ×${d[bait.key]}</span>` : ''}${spot.fromBoat?'<span>Barco de pesca · '+(biome==='sea'?'Mar aberto':'Lago')+'</span>':''}${E.Life.buff(h, 'pescador') ? '<span>🐟 Faro de Pescador</span>' : ''}</div>
+      <div class="fi-top"><span class="fi-rod">${U.esc(rod.name)}</span><span class="fi-stats">${bars}</span></div>
+      <div class="fi-chips"><span>Pesca Nv. ${E.Life.level(h, 'pesca')}</span>${bait ? `<span>${U.esc(bait.name)} ×${d[bait.key]}</span>` : ''}${spot.fromBoat?'<span>Barco de pesca · '+(biome==='sea'?'Mar aberto':'Lago')+'</span>':''}${seat ? '<span>Sentado no banco</span>' : ''}${E.Life.buff(h, 'pescador') ? '<span class="gold">Faro de Pescador</span>' : ''}</div>
       <div class="fi-stage"></div>
       <div class="fi-help"></div>
-      <div class="fi-btns"><button class="btn dark" data-a="quit"><span class="ico">✕</span>Sair</button><button class="btn primary fi-main" data-a="main"><span class="ico">🎣</span><b>Lançar</b></button></div>
+      <div class="fi-btns"><button class="btn dark" data-a="quit"><span class="ico">✕</span>${seat ? 'Levantar' : 'Sair'}</button><button class="btn primary fi-main" data-a="main"><span class="ico">🎣</span><b>Lançar</b></button></div>
     </div></div>`);
     document.body.appendChild(el);
     const stage = el.querySelector('.fi-stage'), help = el.querySelector('.fi-help'), main = el.querySelector('[data-a=main]');
     let quit = false, pressed = false, onMain = null;
     const setMain = (txt, icon, fn) => { main.innerHTML = `<span class="ico">${icon}</span><b>${txt}</b>`; onMain = fn; main.disabled = !fn; };
     el.querySelector('[data-a=quit]').onclick = () => { quit = true; close(); };
-    const press = (v) => { pressed = v; };
+    const press = (v) => { pressed = v; main.classList.toggle('held', v); };
     main.addEventListener('pointerdown', (e) => { e.preventDefault(); press(true); if (onMain) onMain(); });
-    addEventListener('pointerup', () => press(false));
+    const up = () => press(false);
+    addEventListener('pointerup', up); addEventListener('pointercancel', up);
     const key = (e) => { if (e.code === 'Space' || e.code === 'KeyF' || e.code === 'Enter') { e.preventDefault(); e.stopPropagation(); if (e.type === 'keydown') { if (!e.repeat) { press(true); if (onMain) onMain(); } } else press(false); } else if (e.code === 'Escape' && e.type === 'keydown') { e.stopPropagation(); quit = true; close(); } };
     addEventListener('keydown', key, true); addEventListener('keyup', key, true);
     const close = () => {
       quit=true;
       if (!active) return;
-      removeEventListener('keydown', key, true); removeEventListener('keyup', key, true);
-      el.remove(); active = null; w.fishFx && w.fishFx('end');
+      removeEventListener('keydown', key, true); removeEventListener('keyup', key, true); removeEventListener('pointerup', up); removeEventListener('pointercancel', up);
+      el.classList.add('out'); setTimeout(() => el.remove(), 220);
+      active = null; w.fishFx && w.fishFx('end');
       E.HUD.show(true); E.HUD.update();
-      setTimeout(() => { if (!E.UI.anyOpen() && !E.BattleUI.current && !(E.WorldServices&&E.WorldServices.active)) E.WG.locked = false; }, 200);
+      setTimeout(() => { if (!E.UI.anyOpen() && !E.BattleUI.current && !(E.WorldServices&&E.WorldServices.active)) E.WG.locked = false; }, 480);
     };
     active = { close };
+    const buzz = (ms) => { if (navigator.vibrate && E.state.settings.vibrate) try { navigator.vibrate(ms); } catch { /* sem vibração */ } };
+
+    // apresentação especial dos peixes épicos e lendários
+    const reveal = (f, R) => {
+      const fx = U.h(`<div class="fi-reveal r${f.r}" style="--rc:${R.color}"><div class="fv-rays"></div><img src="${FI.art(f, 6)}" alt=""><b>${f.r >= 5 ? 'LENDÁRIO!' : 'ÉPICO!'}</b><span>${U.esc(f.name)}</span></div>`);
+      document.body.appendChild(fx); setTimeout(() => fx.classList.add('out'), 2100); setTimeout(() => fx.remove(), 2600);
+    };
 
     const round = async () => {
       if (spot.left <= 0) { stage.innerHTML = '<div class="fi-msg">Os peixes daqui se espantaram. Volte em alguns minutos ou procure outro ponto.</div>'; setMain('Lançar', '🎣', null); return; }
@@ -119,30 +135,32 @@
       await new Promise((r) => setMain('Lançar', '🎣', r));
       if (quit) return;
       E.Audio.sfx('slash');
-      w.fishFx && w.fishFx('cast', spot);
+      w.fishFx && w.fishFx('cast', spot, { reach: st.reach });
       setMain('Aguarde…', '⏳', null);
-      stage.innerHTML = '<div class="fi-msg fi-wait">A boia balança na água… <span class="dots"></span></div>';
-      // 2. espera
-      const waitMs = 1400 + U.rand() * 3600;
-      await U.wait(waitMs);
+      stage.innerHTML = '<div class="fi-wait"><div class="fi-float"><i></i><u></u><u></u></div><div class="fi-msg">A boia balança na água…</div></div>';
+      // 2. espera (a fisgada vem antes com varas mais sensíveis)
+      await U.wait((1400 + U.rand() * 3600) * (1 - (st.hook - 3) * 0.06));
       if (quit) return;
       // 3. fisgada
       w.fishFx && w.fishFx('bite', spot);
-      E.Audio.sfx('aggro');
-      stage.innerHTML = '<div class="fi-bite">!</div>';
+      E.Audio.sfx('aggro'); buzz(70);
+      const winMs = 1150 + E.Life.level(h, 'pesca') * 40 + (st.hook - 3) * 90;
+      stage.innerHTML = `<div class="fi-bite"><div class="fb-ring"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="52" style="animation-duration:${winMs}ms"/></svg><b>!</b></div><span>Fisgou! Puxe agora</span></div>`;
       let hooked = false;
-      const winMs = 1150 + E.Life.level(h, 'pesca') * 40;
       await Promise.race([new Promise((r) => setMain('Fisgar!', '❗', () => { hooked = true; r(); })), U.wait(winMs)]);
       if (quit) return;
       if (!hooked) { const lost=E.Life.activeBait&&E.Life.activeBait(h,biome);if(lost)E.Life.spendBait(h,lost.key);stage.innerHTML = '<div class="fi-msg">Ah, não! O peixe roubou a isca e fugiu. Seja mais rápido!</div>'; E.Audio.sfx('fail'); w.fishFx && w.fishFx('escape', spot); setMain('Tentar de novo', '🎣', () => round()); return; }
-      // 4. puxar
+      // 4. luta com tensão na linha
       const res = E.Life.rollCatch(h, biome, w.id);
-      const diff = res.junk ? 1 : res.fish.diff;
-      const ok = await reel(diff);
+      const ok = await reel(res.junk ? null : res.fish);
       if (quit) return;
       spot.left--;
       if (spot.left <= 0) { E.state.world.fishDep = E.state.world.fishDep || {}; E.state.world.fishDep[`${w.id}:${spot.i}`] = Date.now(); }
-      if (!ok) { if(res.baitKey)E.Life.spendBait(h,res.baitKey);stage.innerHTML = '<div class="fi-msg">A linha arrebentou… o peixe escapou.</div>'; E.Audio.sfx('fail'); w.fishFx && w.fishFx('escape', spot); setMain('Pescar de novo', '🎣', () => round()); return; }
+      if (ok !== true) {
+        if(res.baitKey)E.Life.spendBait(h,res.baitKey);
+        stage.innerHTML = `<div class="fi-msg">${ok === 'break' ? 'A linha arrebentou com a tensão… solte quando o peixe correr.' : ok === 'slack' ? 'A linha ficou frouxa e o peixe se soltou do anzol.' : 'O peixe levou a linha e escapou.'}</div>`;
+        E.Audio.sfx('fail'); buzz(140); w.fishFx && w.fishFx('escape', spot); setMain('Pescar de novo', '🎣', () => round()); return;
+      }
       const caught = res.fish || res.junk;
       w.fishFx && w.fishFx('catch', spot, { art: FI.artCanvas(caught), r: res.fish ? res.fish.r : 1 });
       // 5. resultado
@@ -151,43 +169,58 @@
       E.Audio.sfx(res.fish && res.fish.r >= 4 ? 'crit' : 'chest');
       if (res.junk) stage.innerHTML = `<div class="fi-result"><div class="fr-ic">${res.junk.icon}</div><div><div class="fr-n">${res.junk.name}</div><div class="fr-d">${res.junk.desc}</div></div></div>`;
       else {
-        const f = res.fish;
-        stage.innerHTML = `<div class="fi-result r${f.r} ${f.legend ? 'legend' : ''}"><img src="${FI.art(f, 4)}" alt=""><div><div class="fr-s">${f.legend ? '✦ LENDÁRIO DA REGIÃO ✦' : FI.stars(f.r)}</div><div class="fr-n">${f.name}${first ? '<span class="fr-new">NOVO!</span>' : ''}</div><div class="fr-d">${res.cm} cm · vale ${f.price} po · ${f.desc}</div></div></div>`;
+        const f = res.fish, R = rarity(f.r);
+        if (f.r >= 4) { reveal(f, R); buzz([40, 60, 90]); if (f.r >= 5 && E.Audio.sfx) setTimeout(() => E.Audio.sfx('levelup'), 350); }
+        stage.innerHTML = `<div class="fi-result r${f.r} ${f.legend ? 'legend' : ''}" style="--rc:${R.color}"><img src="${FI.art(f, 4)}" alt=""><div><div class="fr-s">${R.name} <em>${FI.stars(f.r)}</em>${f.legend ? ' · Lendário da região' : ''}</div><div class="fr-n">${f.name}${first ? '<span class="fr-new">NOVO!</span>' : ''}</div><div class="fr-d">${res.cm} cm · vale ${f.price} po · ${f.desc}</div>${res.blessing ? '<div class="fr-bless">Bênção das Águas: Faro de Pescador por 20 minutos.</div>' : ''}</div></div>`;
       }
       setMain('Pescar de novo', '🎣', () => round());
     };
 
-    // barra de captura (segure para subir)
-    const reel = (diff) => new Promise((resolve) => {
-      const lv = E.Life.level(h, 'pesca');
-      const zoneH = 0.22 + lv * 0.006 + d.rod * 0.03;
-      stage.innerHTML = `<div class="fi-reel"><div class="fr-col"><div class="fr-zone"></div><div class="fr-fish">🐟</div></div><div class="fr-prog"><i></i></div><div class="fr-tip">Segure <b>Puxar</b> (ou Espaço) para subir a zona verde e mantenha o peixe dentro dela!</div></div>`;
-      const zoneEl = stage.querySelector('.fr-zone'), fishEl = stage.querySelector('.fr-fish'), progEl = stage.querySelector('.fr-prog i');
+    // tensão da linha: segure para recolher; quando o peixe corre, solte para a linha não arrebentar
+    const reel = (fish) => new Promise((resolve) => {
+      const lv = E.Life.level(h, 'pesca'), diff = fish ? fish.diff : 1, legend = !!(fish && fish.r >= 5);
+      const lo = 0.26, hi = Math.min(0.86, 0.7 + (st.ctl - 3) * 0.025), breakAt = 0.35 + st.res * 0.06, slackAt = 1.3 + st.ctl * 0.08;
+      const arc = (from, to, cls) => `<path class="${cls}" d="M15 100 A85 85 0 0 1 185 100" style="stroke-dasharray:${((to - from) * ARC).toFixed(1)} ${ARC.toFixed(1)};stroke-dashoffset:${(-from * ARC).toFixed(1)}"/>`;
+      stage.innerHTML = `<div class="fi-reel${legend ? ' legend' : ''}"><div class="ft-gauge"><svg viewBox="0 0 200 108">${arc(0, 1, 'ft-track')}${arc(lo, hi, 'ft-safe')}${arc(0.9, 1, 'ft-danger')}</svg><i class="ft-needle"></i><span class="ft-label">Tensão</span></div>
+        <div class="ft-side"><div class="ft-prog"><i></i><b></b></div><div class="ft-state"></div><div class="ft-tip">Segure <b>Puxar</b> (ou Espaço) para recolher e solte quando o peixe correr.</div></div></div>`;
+      const box = stage.querySelector('.fi-reel'), needle = stage.querySelector('.ft-needle'), bar = stage.querySelector('.ft-prog i'), fishMark = stage.querySelector('.ft-prog b'), state = stage.querySelector('.ft-state');
       setMain('Puxar!', '⬆', () => {});
-      let zone = 0.1, vz = 0, fish = 0.5, target = 0.5, prog = 0.3, last = performance.now(), tChange = 0;
-      const speed = 0.18 + diff * 0.11;
+      let T = 0.36, P = 0.18, last = performance.now(), surge = 0, next = 1 + U.rand() * 1.5, strain = 0, slack = 0, said = '';
+      const say = (txt, cls) => { if (said !== txt) { said = txt; state.textContent = txt; state.className = 'ft-state ' + (cls || ''); } };
       const step = (now) => {
         if (quit) return resolve(false);
         const dt = Math.min(0.1, (now - last) / 1000); last = now;
-        vz += (pressed ? 3.4 : -2.6) * dt; vz = U.clamp(vz, -1.6, 1.6);
-        zone += vz * dt; if (zone < 0) { zone = 0; vz = Math.max(0, vz) * 0.3; } if (zone > 1 - zoneH) { zone = 1 - zoneH; vz = Math.min(0, vz) * 0.3; }
-        tChange -= dt;
-        if (tChange <= 0) { target = U.rand(); tChange = 0.4 + U.rand() * (1.6 - diff * 0.2); }
-        fish += (target - fish) * Math.min(1, dt * speed * 3) + (U.rand() - 0.5) * dt * diff * 0.25;
-        fish = U.clamp(fish, 0.02, 0.98);
-        const inside = fish >= zone && fish <= zone + zoneH;
-        prog += (inside ? 0.34 : -0.15 - diff * 0.03) * dt;
-        zoneEl.style.bottom = (zone * 100) + '%'; zoneEl.style.height = (zoneH * 100) + '%';
-        zoneEl.classList.toggle('on', inside);
-        w.fishFx && w.fishFx('reel', spot, { prog: U.clamp(prog, 0, 1), fish, inside });
-        fishEl.style.bottom = `calc(${fish * 100}% - 12px)`;
-        progEl.style.height = (U.clamp(prog, 0, 1) * 100) + '%';
-        if (prog >= 1) return resolve(true);
-        if (prog <= 0) return resolve(false);
+        if (surge > 0) surge -= dt;
+        else if ((next -= dt) <= 0) { surge = (0.55 + U.rand() * (0.4 + diff * 0.18)) * (legend ? 1.35 : 1); next = Math.max(0.6, 2.8 - diff * 0.35 + U.rand() * 1.4); buzz(30); }
+        // soltar a linha sempre compensa uma corrida; segurar durante ela leva a tensão ao limite
+        const pull = surge > 0 ? (0.2 + diff * 0.07) * (legend ? 1.15 : 1) : 0.05 + diff * 0.015;
+        T = U.clamp(T + ((pressed ? 0.95 - st.ctl * 0.035 : -(0.55 + st.ctl * 0.02)) + pull) * dt + (U.rand() - 0.5) * dt * 0.12 * diff, 0, 1.08);
+        const safe = T >= lo && T <= hi;
+        if (pressed && safe) P += (0.24 + lv * 0.004 + st.ctl * 0.01 - diff * 0.012) * (surge > 0 ? 0.35 : 1) * dt;
+        if (!pressed && surge > 0) P -= (0.02 + diff * 0.006) * dt;
+        P = U.clamp(P, 0, 1);
+        strain = T > 1 ? strain + dt : Math.max(0, strain - dt * 0.8);
+        slack = T < lo ? slack + dt : Math.max(0, slack - dt * 1.5);
+        needle.style.transform = `rotate(${(-90 + Math.min(1, T) * 180).toFixed(1)}deg)`;
+        bar.style.width = (P * 100).toFixed(1) + '%'; fishMark.style.left = (P * 100).toFixed(1) + '%';
+        const tell = surge <= 0 && next < 0.4;
+        box.classList.toggle('strain', strain > 0); box.classList.toggle('surge', surge > 0); box.classList.toggle('tell', tell); box.classList.toggle('safe', safe && pressed);
+        if (strain > 0) say('A linha vai arrebentar! Solte!', 'bad');
+        else if (surge > 0) say('O peixe está correndo — solte a linha!', 'warn');
+        else if (tell) say('Ele vai puxar…', 'warn');
+        else if (T < lo) say('Linha frouxa — recolha!', 'warn');
+        else if (safe && pressed) say('Recolhendo…', 'good');
+        else say(T > hi ? 'Tensão alta' : 'Segure para recolher', '');
+        w.fishFx && w.fishFx('reel', spot, { prog: P, fish: T, inside: safe });
+        if (P >= 1) return resolve(true);
+        if (strain > breakAt) return resolve('break');
+        if (slack > slackAt) return resolve('slack');
+        if (P <= 0) return resolve('run');
         requestAnimationFrame(step);
       };
       requestAnimationFrame(step);
     });
+    if (seat && w.fishFx) { w.fishFx('sit', spot); stage.innerHTML = '<div class="fi-msg">Você se senta no banco…</div>'; setMain('Lançar', '🎣', null); await U.wait(850); if (quit) return; }
     round();
   };
 

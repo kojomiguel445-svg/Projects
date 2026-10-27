@@ -213,7 +213,8 @@
       const tot = L().JUNK.reduce((a, j) => a + j.w, 0); let r = U.rand() * tot;
       for (const j of L().JUNK) { r -= j.w; if (r <= 0) return finish({ junk: j }); }
     }
-    const rare = LF.level(h, 'pesca') * 0.04 + d.rod * 0.08 + (LF.buff(h, 'pescador') ? 0.35 : 0) + (bait ? bait.bonus : 0);
+    const reach = ((L().RODS[d.rod] || L().RODS[0]).stats || { reach: 3 }).reach;
+    const rare = LF.level(h, 'pesca') * 0.04 + d.rod * 0.08 + Math.max(0, reach - 3) * 0.02 + (LF.buff(h, 'pescador') ? 0.35 : 0) + (bait ? bait.bonus : 0);
     const w = { 1: 58, 2: 26, 3: 11 * (1 + rare), 4: 4 * (1 + rare * 1.5), 5: 1 * (1 + rare * 2) };
     const tot = list.reduce((a, f) => a + w[f.r], 0); let r = U.rand() * tot;
     let fish = list[0];
@@ -236,6 +237,8 @@
     const f = res.fish;
     if (res.usedLB && d.lbait > 0) d.lbait--;
     if (f.legend && !d.legends[f.id]) { d.legends[f.id] = Date.now(); d.stats.legend++; E.UI.toast(`✦ PEIXE LENDÁRIO: ${f.name}!`, 'gold big'); }
+    // Bênção das Águas: todo ★5 pescado concede Faro de Pescador por 20 minutos
+    if (f.r >= 5) { d.buffs.pescador = Math.max(Date.now(), d.buffs.pescador || 0) + 20 * 60e3; res.blessing = true; }
     d.fish[f.id] = (d.fish[f.id] || 0) + 1;
     const first = !d.dex[f.id];
     d.dex[f.id] = Math.max(d.dex[f.id] || 0, res.cm);

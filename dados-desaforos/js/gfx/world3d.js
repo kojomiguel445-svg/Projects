@@ -940,10 +940,15 @@
       const sc = this.scene, hr = this.hero;
       if (stage === 'end') {
         if (this.fish) { for (const o of this.fish.objs) sc.remove(o); for (const o of this.fish.spot.post || []) o.visible = true; }
+        // levanta do banco e dá um passo até a estaca
+        if (this.fish && this.fish.seat) this.rise = { t: 0, x0: hr.x, z0: hr.z, x1: this.fish.spot.x, z1: this.fish.spot.z };
+        this.heroSprite.material.depthTest = true; this.heroSprite.renderOrder = 0;
         this.fish = null;
         return;
       }
-      if (!this.fish || stage === 'cast') {
+      if (!this.fish || stage === 'cast' || stage === 'sit') {
+        // sentado, cada novo lançamento continua no banco
+        const seat = (this.fish && this.fish.seat) || (stage === 'sit' && spot.bench) || null, seated = !!(this.fish && this.fish.seated);
         if (this.fish) for (const o of this.fish.objs) sc.remove(o);
         this.fishFrames();
         const N = 22, lineGeo = new THREE.BufferGeometry(); lineGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 3), 3));
@@ -956,15 +961,16 @@
         for (const o of [line, bob]) sc.add(o);
         // a estaca com lanterna do ponto de pesca some enquanto se pesca (senão parece um cajado na mão do herói)
         for (const o of spot.post || []) o.visible = false;
-        this.fish = { spot, stage: 'cast', t: 0, line, bob, lineN: N, objs: [line, bob], ripples: [], frame: 'fcast0', prog: 0, catchSpr: null };
-        // câmera de lado para ver herói, linha e boia; o herói vira para a água
-        this.cam.yaw = Math.atan2(spot.wx - hr.x, spot.wz - hr.z) + Math.PI * 0.62;
+        this.fish = { spot, stage: 'cast', t: 0, line, bob, lineN: N, objs: [line, bob], ripples: [], frame: 'fcast0', prog: 0, catchSpr: null, seat, seated };
+        if (stage === 'sit') { this.fish.stage = 'sit'; this.fish.frame = 'fhold'; bob.visible = false; if (!seated) this.fish.approach = { t: 0, x0: hr.x, z0: hr.z }; }
+        // câmera de lado para ver herói, linha e boia (sentado, um pouco mais de frente para mostrar o banco)
+        this.cam.yaw = Math.atan2(spot.wx - (seat ? seat.x : hr.x), spot.wz - (seat ? seat.z : hr.z)) + Math.PI * (seat ? 0.74 : 0.62);
         this.cam.dist = Math.min(Math.max(this.cam.dist, 9), 12);
         hr.dir = (spot.wx - hr.x) * Math.cos(this.cam.yaw) - (spot.wz - hr.z) * Math.sin(this.cam.yaw) > 0 ? 1 : -1;
         hr.moving = false;
       }
       const F = this.fish;
-      if (stage === 'cast') { F.stage = 'cast'; F.t = 0; F.bob.visible = false; if (E.Audio.sfx) E.Audio.sfx('slash'); }
+      if (stage === 'cast') { F.stage = 'cast'; F.t = 0; F.bob.visible = false; F.reach = Math.max(0, ((data.reach || 3) - 3) * 0.35); if (E.Audio.sfx) E.Audio.sfx('slash'); }
       else if (stage === 'bite') { F.stage = 'bite'; F.t = 0; this.fishRipple(F.bob.position, 3, 0.9); }
       else if (stage === 'reset') { F.stage = 'wait'; F.t = 0; F.prog = 0; }
       else if (stage === 'reel') { if (F.stage !== 'reel') { F.stage = 'reel'; F.t = 0; } F.prog = data.prog ?? F.prog; F.fishY = data.fish ?? F.fishY; F.inside = !!data.inside; }
@@ -1006,6 +1012,18 @@
       const F = this.fish; if (!F) return;
       const hr = this.hero, sp = F.spot, wl = this.waterLevel;
       F.t += dt;
+      // caminha até o banco e senta; o herói fica por cima do assento
+      if (F.approach) {
+        const A = F.approach, b = F.seat, u = Math.min(1, (A.t += dt) / 0.7);
+        hr.x = A.x0 + (b.x - A.x0) * u; hr.z = A.z0 + (b.z - A.z0) * u;
+        const sx = (b.x - A.x0) * Math.cos(this.cam.yaw) - (b.z - A.z0) * Math.sin(this.cam.yaw);
+        if (Math.abs(sx) > .01) hr.dir = sx > 0 ? 1 : -1;
+        F.cv = u < 1 ? this.heroFrames.walk[Math.floor(A.t * 14) % 12] : null;
+        if (u < 1) return;
+        F.approach = null; F.seated = true; if (E.Audio.sfx) E.Audio.sfx('step');
+        hr.dir = (sp.wx - b.x) * Math.cos(this.cam.yaw) - (sp.wz - b.z) * Math.sin(this.cam.yaw) > 0 ? 1 : -1;
+      }
+      if (F.seated) { this.heroSprite.material.depthTest = false; this.heroSprite.renderOrder = 4; hr.x = F.seat.x; hr.z = F.seat.z; }
       // quadro do herói (cada um com a vara numa posição) e quanto a linha cede
       let sag = 0.9;
       if (F.stage === 'cast') {
@@ -1015,17 +1033,20 @@
         if (F.t > 0.32 && !F.flying && !F.bob.visible) { F.flying = true; F.flyT = 0; F.flyFrom = F.tip ? F.tip.clone() : new THREE.Vector3(hr.x, hr.y + 2, hr.z); }
         sag = 0.2;
         if (F.t > 1.0 && !F.flying) F.stage = 'wait';
-      } else if (F.stage === 'wait') F.frame = 'fhold';
+      } else if (F.stage === 'wait' || F.stage === 'sit') F.frame = 'fhold';
       else if (F.stage === 'bite') { F.frame = Math.floor(this.t * 12) % 2 ? 'fbite' : 'fhold'; sag = 0.25; }
       else if (F.stage === 'reel') { F.frame = Math.floor(this.t * 7) % 2 ? 'freel0' : 'freel1'; sag = 0.05; }
       else if (F.stage === 'escape') { F.frame = 'fhold'; sag = 1.6; if (F.t > 0.9) F.stage = 'wait'; }
       else if (F.stage === 'catch') { F.frame = F.t < 0.55 ? 'freel0' : 'fcatch'; sag = 1.2; }
       // a linha sai da ponta da vara desenhada no sprite
-      const cv = this.heroFrames.fish[F.frame];
+      F.key = (F.seated ? 's' : '') + F.frame;
+      const cv = this.heroFrames.fish[F.key];
       const wdir = new THREE.Vector3(sp.wx - hr.x, 0, sp.wz - hr.z).normalize();
       F.tip = this.spriteWorld(cv, cv._tipF || cv._handF || [0.78, 0.5]);
       // boia: voo em arco depois do lançamento, depois flutua; puxada para a margem durante a luta
-      const target = new THREE.Vector3(sp.wx, wl + 0.08, sp.wz);
+      // varas de maior alcance lançam um pouco mais longe (se ainda houver água ali)
+      const far = F.reach && this.groundAt(sp.wx + wdir.x * F.reach, sp.wz + wdir.z * F.reach) < wl - 0.2 ? F.reach : 0;
+      const target = new THREE.Vector3(sp.wx + wdir.x * far, wl + 0.08, sp.wz + wdir.z * far);
       if (F.flying) {
         F.flyT += dt / 0.55;
         const u = Math.min(1, F.flyT);
@@ -1148,7 +1169,7 @@
     fishFrames(h = E.Store.hero()) {
       if (!h || !this.heroFrames) return;
       const rod = (h.life && h.life.rod) || 0, wt = E.SP.heroWeaponType(h);
-      this.heroFrames.fish = Object.fromEntries(['fcast0', 'fcast1', 'fhold', 'fbite', 'freel0', 'freel1', 'fcatch'].map((k) => [k, E.SP.hero(h, k + ':' + rod, wt)]));
+      this.heroFrames.fish = Object.fromEntries(['fcast0', 'fcast1', 'fhold', 'fbite', 'freel0', 'freel1', 'fcatch'].flatMap((k) => [[k, E.SP.hero(h, k + ':' + rod, wt)], ['s' + k, E.SP.hero(h, 's' + k + ':' + rod, wt)]]));
     }
     // Eco (espírito guardião) flutuando atrás do herói
     refreshEco() {
@@ -1451,7 +1472,8 @@
       let cv, sx = 1, sy = 1;
       const step = hr.moving && !WG.locked ? (moved || speed * Math.min(1, Math.hypot(mv.x, mv.y)) * dt) * (hr.climb ? 1.8 : 1) : 0;
       hr.stride = ((hr.stride || 0) + step) % 3.3;
-      if (this.fish && this.fish.frame) cv = HF.fish[this.fish.frame];
+      if (this.rise) { const R = this.rise, u = Math.min(1, (R.t += dt) / 0.45); hr.x = R.x0 + (R.x1 - R.x0) * u; hr.z = R.z0 + (R.z1 - R.z0) * u; cv = R.t < .18 ? HF.crouch : HF.walk[Math.floor(R.t * 14) % 12]; if (u >= 1) this.rise = null; }
+      else if (this.fish && (this.fish.cv || this.fish.frame)) cv = this.fish.cv || HF.fish[this.fish.key || this.fish.frame];
       else if (hr.boat) cv = HF.idle[Math.floor(this.t*1.7)%2];
       else if (hr.preJump > 0) { cv = HF.crouch; sx = 1.05; sy = 0.93; }
       else if (air) { if (hr.glide) cv = HF.up; else if (hr.vy > 1.2) { cv = HF.up; sx = 0.94; sy = 1.07; } else if (hr.vy > -1.5) cv = HF.up; else { cv = HF.fall; sx = 0.97; sy = 1.03; } }

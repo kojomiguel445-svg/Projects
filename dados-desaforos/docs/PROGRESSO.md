@@ -5,7 +5,7 @@ de produção 5.3.1 (`dpl_B1hjBGYCHBUraYPjSFCMqfxEdFXA`), conferido por SHA-1 (c
 
 ## Como publicar (sem Git ligado ao Vercel)
 1. `node tools/release.mjs <x.y.z>` (versão nova; adicione `<script>` novos ao index.html antes).
-2. `python3 tools/deploy_plan.py <x.y.z> <pasta> <versões-anteriores=url ...>`
+2. `python3 tools/deploy_plan.py <x.y.z> <pasta>`
    - a base (último deploy de produção) e as versões que ela contém ficam em `tools/deploy-base.json`;
 3. `create_deployment` com os arquivos de `<pasta>/deploy-files.json` (prévia primeiro, depois
    `target: production` referenciando os mesmos SHA). O build (`tools/build.mjs`) baixa a base

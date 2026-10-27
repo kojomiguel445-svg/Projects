@@ -84,11 +84,11 @@
   G.whatsNew = async () => {
     E.state.seenVersion = E.Title.VERSION; E.Store.save();
     const html = `<div class="whatsnew"><ul>
-      <li><b>Nova interface de exploração:</b> minimapa com bússola, botões circulares com atalhos de teclado, missão discreta ao lado do mapa e barra de vida fina com nível e pontos de vida.</li>
-      <li><b>Ao alcance de F:</b> um marcador flutua sobre o personagem ou objeto mais próximo; as opções aparecem à direita, como em um RPG de mundo aberto.</li>
-      <li><b>Menos poluição na tela:</b> quando você fica parado, os botões e o rastreador recuam e voltam ao primeiro toque.</li>
-      <li><b>Menus renovados:</b> painéis translúcidos, botões em pílula, abas suaves e transições de abertura e fechamento.</li>
-      <li><b>Mundo mais caprichado (5.3.2):</b> casas assentadas no terreno, vilas niveladas, bordas naturais e placas legíveis.</li>
+      <li><b>Pesca sentado:</b> nos pontos com banco à beira d'água, seu personagem se senta, lança, espera segurando a vara, reage à fisgada, recolhe e se levanta ao terminar.</li>
+      <li><b>Tensão da linha:</b> segure para recolher e solte quando o peixe correr. Linha frouxa demais solta o anzol; tensa demais, arrebenta.</li>
+      <li><b>Varas com atributos:</b> resistência, controle, alcance e velocidade de fisgada mudam a luta, a espera e o lançamento.</li>
+      <li><b>Raridades e mar aberto:</b> peixes Comuns a Lendários, cinco espécies novas no mar e uma apresentação especial para capturas épicas e lendárias. Todo lendário concede a Bênção das Águas.</li>
+      <li><b>Nova interface (5.4):</b> HUD e menus translúcidos, marcador de interação e transições suaves.</li>
     </ul></div>`;
     await UI.modal({ title: `✦ Novidades da versão ${E.Title.VERSION}`, html, buttons: [{ label: 'Ver o Oráculo', value: 'wish' }, { label: 'Bora jogar!', value: true, cls: 'primary' }] }).then((v) => { if (v === 'wish') E.Wish.open(); });
   };

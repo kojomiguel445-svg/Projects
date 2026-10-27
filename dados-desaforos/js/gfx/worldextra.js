@@ -532,9 +532,27 @@
       const lamp = new THREE.Mesh(new THREE.OctahedronGeometry(0.16, 0), glowMat('#9fe3ff')); lamp.position.set(s.x, surface(world, s.x, s.z) + 1.7, s.z);
       world.scene.add(post, lamp);
       s.rings = rings; s.post = [post, lamp];
-      s.ia = { kind: 'fish', spot: s, x: s.x, z: s.z, r: 2.8, label: 'Pescar', icon: '🎣' };
+      if (!world.cave && s.i % 2 === 0) WX.fishBench(world, s);
+      s.ia = { kind: 'fish', spot: s, x: s.x, z: s.z, r: 2.8, label: s.bench ? 'Sentar e pescar' : 'Pescar', icon: '🎣' };
       world.interactables.push(s.ia);
     }
+  };
+  // Banco de madeira ao lado da estaca, de frente para a água: quem pesca ali pesca sentado.
+  WX.fishBench = (world, s) => {
+    const wl = world.waterLevel, dx = s.wx - s.x, dz = s.wz - s.z, l = Math.hypot(dx, dz) || 1, ux = dx / l, uz = dz / l;
+    const bx = s.x - uz * 1.5, bz = s.z + ux * 1.5, rot = Math.atan2(ux, uz);
+    const feet = [[-0.6, -0.12], [0.6, -0.12], [-0.6, 0.18], [0.6, 0.18]].map(([a, b]) => surface(world, bx + Math.cos(rot) * a + Math.sin(rot) * b, bz - Math.sin(rot) * a + Math.cos(rot) * b));
+    const lo = Math.min(...feet), hi = Math.max(...feet);
+    if (lo < wl + 0.1 || hi - lo > 0.35) return;
+    const g = new THREE.Group(), wood = std('#8a5e3a'), dark = std('#5e3f27');
+    const box = (m, x, y, z, sx, sy, sz) => { const o = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), m); o.position.set(x, y, z); o.castShadow = o.receiveShadow = true; g.add(o); return o; };
+    for (const k of [-0.08, 0.08]) box(wood, 0, 0.46, k + 0.03, 1.34, 0.06, 0.15);
+    for (const k of [-1, 1]) { box(dark, k * 0.56, 0.21 - (hi - lo) / 2, 0.03, 0.08, 0.48 + (hi - lo), 0.34); box(dark, k * 0.56, 0.7, -0.15, 0.07, 0.5, 0.07); }
+    box(wood, 0, 0.78, -0.16, 1.3, 0.12, 0.05); box(wood, 0, 0.62, -0.16, 1.3, 0.08, 0.05);
+    g.position.set(bx, hi, bz); g.rotation.y = rot; g.name = 'fishing-bench';
+    world.scene.add(g);
+    s.bench = { x: bx, z: bz, y: hi, rot, seat: 0.49, group: g };
+    (world.benches || (world.benches = [])).push(s.bench);
   };
   WX.animFishSpots = (world, t) => {
     for (const s of world.fishSpots || []) s.rings.forEach((m, k) => { const ph = (t * 0.6 + k / 3) % 1; m.scale.setScalar(0.6 + ph * 2.2); m.material.opacity = (s.left > 0 ? 0.55 : 0.12) * (1 - ph); });

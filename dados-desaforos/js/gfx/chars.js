@@ -222,7 +222,10 @@
   CH.draw = (o) => {
     const p = new E.SP.Px(W, H);
     // quadros de pesca podem levar o tipo da vara: 'fhold:2'
-    const [f, rodTier] = (o.frame || 'idle0').split(':');
+    let [f, rodTier] = (o.frame || 'idle0').split(':');
+    // sentado num banco: 's' antes do quadro de pesca ('sfhold:2'); o corpo desce e as pernas dobram
+    const seated = /^sf(cast0|cast1|hold|bite|reel0|reel1|catch)$/.test(f);
+    if (seated) f = f.slice(1);
     const L = o.look, sp = o.species || 'humano';
     const skin = L.skin, hair = L.hair, c1 = L.c1, c2 = L.c2;
     const atk = f === 'atk';
@@ -255,6 +258,7 @@
     if (f === 'jump1') { lL = rL = -5; arms = 'up'; }
     if (f === 'jump2') { spread = 2; arms = 'out'; lL = -1; }
     if (twoHands) arms = rArm = 'grip';
+    if (seated) { lL = rL = 0; sway = Math.max(-1, Math.min(1, sway)); crouch = 0; bob = (f === 'freel1' ? 1 : 0) + 8; }
     bob += crouch;
     const bw = ({ magro: 0, medio: 1, forte: 3 }[L.build] ?? 1) + (sp === 'anao' ? 2 : sp === 'golias' ? 2 : sp === 'orc' ? 1 : 0);
     const shoulder = 9 + bw, waist = 7 + bw, legW = 5 + Math.round(bw / 2);
@@ -292,6 +296,11 @@
     p.rect(lx, legTop, legW, 72 - legTop + lL, pants);
     p.rect(rx, legTop, legW, 72 - legTop + rL, pants);
     p.rect(lx, legTop, 1, 72 - legTop + lL, sh(pants, 0.15));
+    if (seated) { // coxas voltadas para a frente (topo claro) e joelhos marcados
+      p.rect(lx - 1, legTop, legW + 1, 4, sh(pants, 0.12)); p.rect(rx, legTop, legW + 1, 4, sh(pants, 0.12));
+      p.rect(lx - 1, legTop, legW + 1, 1, sh(pants, 0.3)); p.rect(rx, legTop, legW + 1, 1, sh(pants, 0.3));
+      p.rect(lx, legTop + 4, legW, 1, sh(pants, -0.2)); p.rect(rx, legTop + 4, legW, 1, sh(pants, -0.2));
+    }
     if (sp === 'pequenino') { // pés descalços e peludos
       for (const [x, d] of [[lx, lL], [rx, rL]]) { p.rect(x - 1, 70 + d, legW + 3, 4, skin); p.rect(x - 1, 73 + d, legW + 3, 1, sh(skin, -0.25)); p.set(x, 70 + d, hair); p.set(x + 2, 69 + d, hair); p.set(x + legW - 1, 70 + d, hair); for (let k = 0; k < 3; k++) p.set(x + legW - 1 + k, 73 + d, sh(skin, -0.38)); }
     } else {
