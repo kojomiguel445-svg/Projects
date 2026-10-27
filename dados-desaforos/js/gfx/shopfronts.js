@@ -39,7 +39,7 @@
     const draw=()=>{x.clearRect(0,0,512,96);x.fillStyle='#233e47';x.fillRect(3,3,506,90);x.strokeStyle='#d8bb82';x.lineWidth=3;x.strokeRect(8,8,496,80);x.font='bold 31px Nunito, sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillStyle='#f5e7ca';x.fillText(v.name,256,49,472);};draw();
     const tex=new THREE.CanvasTexture(c);tex.colorSpace=THREE.SRGBColorSpace;
     const mount=v.awning||v.arch,beam=v.open?v.h:v.service==='inn'?3.05:3.4;
-    const mesh=new THREE.Mesh(new THREE.PlaneGeometry(Math.min(v.w-.45,5.1),.83),new THREE.MeshBasicMaterial({map:tex,side:THREE.DoubleSide}));mesh.position.set(0,beam-.25,v.d/2+.68);mount.add(mesh);for(const side of[-1,1])box(w,mount,v.palette.wood,side*Math.min(1.7,v.w*.3),beam+.04,v.d/2+.32,.08,.08,.76);v.signMesh=mesh;v.signTexture=tex;v.updateSign=name=>{v.name=String(name||v.name);draw();tex.needsUpdate=true;};
+    const mesh=new THREE.Mesh(new THREE.PlaneGeometry(Math.min(v.w-.45,5.1),.83),new THREE.MeshBasicMaterial({map:tex}));mesh.position.set(0,beam-.25,v.d/2+.68);mount.add(S.readable(mesh));for(const side of[-1,1])box(w,mount,v.palette.wood,side*Math.min(1.7,v.w*.3),beam+.04,v.d/2+.32,.08,.08,.76);v.signMesh=mesh;v.signTexture=tex;v.updateSign=name=>{v.name=String(name||v.name);draw();tex.needsUpdate=true;};
     return mesh;
   }
   function make(w,opts,closed){
@@ -193,6 +193,8 @@
       v.awning.visible=!inside;if(v.signMesh&&!v.signMesh.userData.scenePerfSource)v.signMesh.visible=!inside;
     }
   };
+  // A text board is two single-sided faces, so the lettering never reads mirrored from behind.
+  S.readable=m=>{m.material.side=THREE.FrontSide;const back=new THREE.Mesh(m.geometry,m.material);back.name='sign-back';back.rotation.y=Math.PI;back.position.z=-.012;m.add(back);return m;};
   S.point=point;S.material=material;S.box=box;S.cylinder=cyl;S.palette=palette;
   E.Shopfronts=S;
 })();

@@ -110,7 +110,9 @@
       case 'lantern': return { solid: merge([part(new THREE.CylinderGeometry(0.06, 0.08, 1.6, 5), '#3a3040', 0, 0.8), part(new THREE.BoxGeometry(0.5, 0.06, 0.06), '#3a3040', 0.2, 1.55)]), glow: merge([part(new THREE.OctahedronGeometry(0.16, 0), '#9fe3ff', 0.42, 1.35)]), r: 0.15 };
       case 'house': {
         const wall = U.pick(['#e8dcc0', '#d8c8a8', '#c8b8a0']), roof = U.pick(['#b34a3a', '#3a62a8', '#5a7a4a']);
-        return { solid: merge([part(new THREE.BoxGeometry(3, 2.2, 2.6), wall, 0, 1.1), part(new THREE.ConeGeometry(2.4, 1.6, 4), roof, 0, 3.0, 0, 0, Math.PI / 4), part(new THREE.BoxGeometry(0.7, 1.2, 0.1), '#6b4a2e', 0, 0.6, 1.31), part(new THREE.BoxGeometry(0.5, 0.5, 0.1), '#ffe9a8', 0.9, 1.4, 1.31)]), r: 1.8 };
+        // telhado de quatro águas no retângulo da casa (beiral uniforme) e embasamento de pedra para o declive
+        const hip = part(new THREE.ConeGeometry(2.4, 1.6, 4), roof, 0, 0, 0, 0, Math.PI / 4); hip.scale(1.05, 1, 0.92); hip.translate(0, 3.0, 0);
+        return { solid: merge([part(new THREE.BoxGeometry(3.24, 1.0, 2.84), '#9c9484', 0, -0.42), part(new THREE.BoxGeometry(3, 2.2, 2.6), wall, 0, 1.1), hip, part(new THREE.BoxGeometry(0.42, 1.1, 0.42), '#8a7e72', 0.85, 3.35, -0.45), part(new THREE.BoxGeometry(0.8, 1.3, 0.12), '#6b4a2e', 0, 0.65, 1.32), part(new THREE.BoxGeometry(1.0, 0.1, 0.5), '#9c9484', 0, 0.05, 1.5), part(new THREE.BoxGeometry(0.55, 0.55, 0.1), '#ffe9a8', 0.95, 1.45, 1.31), part(new THREE.BoxGeometry(0.55, 0.55, 0.1), '#ffe9a8', -0.95, 1.45, 1.31)]), r: 1.8 };
       }
       case 'lamp': return { solid: merge([part(new THREE.CylinderGeometry(0.07, 0.1, 2.2, 6), '#2a2a34', 0, 1.1)]), glow: merge([part(new THREE.BoxGeometry(0.3, 0.35, 0.3), '#ffe0a0', 0, 2.3)]), r: 0.15 };
       case 'crate': return { solid: merge([part(new THREE.BoxGeometry(0.8, 0.8, 0.8), '#9a6a3a', 0, 0.4), part(new THREE.BoxGeometry(0.6, 0.6, 0.6), '#8a5a2a', 0.7, 0.3, 0.2, 0, 0.5)]), r: 0.6 };
@@ -630,6 +632,20 @@
       const groups = {};
       const avoid = [this.spawn, this.waypoint, ...this.npcPos, ...this.campPos, ...this.chestPos, this.storyPos, this.questPos, ...this.outpostPos];
       const ex = this.extra || {}, bigAvoid = [...(ex.statues || []), ...(ex.monuments || []), ex.summon].filter(Boolean);
+      // construções assentam no relevo: meia-largura, meia-profundidade e desnível máximo sob a base
+      // (medido na malha visível do terreno; o assentamento final soma terrainAt − height no centro)
+      const FOOT = { house: [1.6, 1.4, 0.7], tent: [1.1, 1.1, 0.45], crate: [0.9, 0.5, 0.4], pillar: [0.55, 0.55, 0.6], arch: [2, 0.4, 0.6] }, built = [];
+      const settle = (type, it) => {
+        const f = FOOT[type]; if (!f) return true;
+        const ca = Math.cos(it.r), sa = Math.sin(it.r), hs = [[-1, -1], [1, -1], [-1, 1], [1, 1], [0, 0]].map(([a, b]) => this.terrainAt(it.x + (a * f[0] * ca + b * f[1] * sa) * it.s, it.z + (-a * f[0] * sa + b * f[1] * ca) * it.s));
+        const lo = Math.min(...hs), hi = Math.max(...hs), home = type === 'house' || type === 'tent';
+        if (hi - lo > f[2]) return false;
+        if (home && (built.some((p) => Math.hypot(p.x - it.x, p.z - it.z) < 6.5) || this.roadDist(it.x, it.z) < 3.6)) return false;
+        // a casa fica no ponto mais alto, sobre o embasamento; tendas, caixotes e ruínas, no mais baixo (nunca no ar)
+        it.y = type === 'house' ? hi : lo; it.h += it.y - hs[4]; if (type === 'house') it.plinth = 0.92;
+        if (home) built.push(it);
+        return true;
+      };
       for (let i = 0; i < total; i++) {
         const x = (rng() - 0.5) * 168 * K, z = (rng() - 0.5) * 168 * K;
         if (bigAvoid.some((p) => Math.hypot(p.x - x, p.z - z) < 9)) continue;
@@ -647,7 +663,10 @@
         if (cluster < -0.12 && rng() < 0.7) continue;
         let type = B.props[Math.floor(rng() * B.props.length)];
         if (['house', 'tent'].includes(type) && Math.hypot(x, z) > 45 && rng() < 0.8) type = B.props.find((p) => !['house', 'tent', 'lamp', 'crate'].includes(p)) || 'bush';
-        (groups[type] = groups[type] || []).push({ x, z, h, s: 0.75 + rng() * 0.6, r: rng() * Math.PI * 2 });
+        // casas e tendas variam pouco de tamanho (portas e janelas mantêm a escala dos personagens)
+        const it = { x, z, h, s: type === 'house' ? 0.95 + rng() * 0.12 : type === 'tent' ? 0.9 + rng() * 0.2 : 0.75 + rng() * 0.6, r: rng() * Math.PI * 2 };
+        if (!settle(type, it)) continue;
+        (groups[type] = groups[type] || []).push(it);
       }
       // vila: casas/lanternas ao redor do centro
       const deco = this.cave ? [] : this.reg.biome === 'city' || this.reg.biome === 'market' ? ['house', 'house', 'lamp', 'house', 'tent', 'lamp'] : ['lantern', 'lantern', 'lantern', 'crate'];
@@ -655,7 +674,8 @@
         const a = (i / deco.length) * Math.PI * 2 + 0.4, r = this.plaza + 4 + (i % 2) * 3;
         const x = Math.cos(a) * r, z = Math.sin(a) * r;
         if (this.roadDist(x, z) < 2) return;
-        (groups[type] = groups[type] || []).push({ x, z, h: this.height(x, z), s: 1, r: -a + Math.PI / 2 });
+        const it = { x, z, h: this.height(x, z), s: 1, r: -a + Math.PI / 2 };
+        if (settle(type, it)) (groups[type] = groups[type] || []).push(it);
       });
       this.propGroups = groups; // usado pelo minimapa
       const dummy = new THREE.Object3D();

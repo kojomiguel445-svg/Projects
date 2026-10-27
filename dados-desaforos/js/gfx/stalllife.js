@@ -208,7 +208,7 @@
     }
     const c=document.createElement('canvas');c.width=384;c.height=80;const ctx=c.getContext('2d');ctx.fillStyle='#26424a';ctx.fillRect(0,0,384,80);ctx.strokeStyle='#d5bc86';ctx.lineWidth=3;ctx.strokeRect(3,3,378,74);ctx.fillStyle='#f7e5bf';ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='bold 24px Nunito,sans-serif';ctx.fillText(property && property.name || 'Seu ponto comercial',192,29,360);ctx.font='16px Nunito,sans-serif';ctx.fillStyle='#c4d6cf';ctx.fillText(shop.open?'ABERTO · atendimento no balcão':'FECHADO',192,59);
     const t = new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;
-    const label=new THREE.Mesh(new THREE.PlaneGeometry(1.8,.4),new THREE.MeshBasicMaterial({map:t,side:THREE.DoubleSide}));label.position.set((st.venue.w||8)*.32,1.85,(st.venue.d||7)/2+.06);g.add(label);
+    const label=new THREE.Mesh(new THREE.PlaneGeometry(1.8,.4),new THREE.MeshBasicMaterial({map:t}));label.position.set((st.venue.w||8)*.32,1.85,(st.venue.d||7)/2+.06);g.add(E.Shopfronts.readable(label));
     if(E.ScenePerf)E.ScenePerf.batch(g,{exclude:[label]});
     st.venue.group.add(g);
     if(E.Shopfronts && E.Shopfronts.restyle)E.Shopfronts.restyle(st.venue,color);

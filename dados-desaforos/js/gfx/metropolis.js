@@ -48,7 +48,7 @@
   function lineColliders(w,a,b,r=.28){const n=Math.max(1,Math.ceil(Math.hypot(b.x-a.x,b.z-a.z)/(r*1.7)));for(let i=0;i<=n;i++)w.colliders.push({x:U.lerp(a.x,b.x,i/n),z:U.lerp(a.z,b.z,i/n),r,city:true});}
   function textTexture(text,small){const c=document.createElement('canvas');c.width=512;c.height=small?80:112;const x=c.getContext('2d');x.fillStyle='#2f4b52';x.fillRect(0,0,c.width,c.height);x.strokeStyle='#d3b87c';x.lineWidth=3;x.strokeRect(6,6,c.width-12,c.height-12);x.fillStyle='#f2e6c9';x.textAlign='center';x.textBaseline='middle';x.font=`${small?'bold 28px Nunito':'bold 46px Cinzel'},serif`;x.fillText(text,256,c.height/2+1,480);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return t;}
   function nameplate(w,g,text,x,y,z,width=5,rotation=0,standing=false){
-    const m=new THREE.Mesh(new THREE.PlaneGeometry(width,width*.18),new THREE.MeshBasicMaterial({map:textTexture(text,true),side:THREE.DoubleSide}));m.position.set(x,y,z);m.rotation.y=rotation;g.add(m);
+    const m=new THREE.Mesh(new THREE.PlaneGeometry(width,width*.18),new THREE.MeshBasicMaterial({map:textTexture(text,true)}));m.position.set(x,y,z);m.rotation.y=rotation;g.add(E.Shopfronts.readable(m));
     if(standing){const frame=new THREE.Group();frame.name='district-sign-support';frame.position.set(x,0,z);frame.rotation.y=rotation;g.add(frame);const top=y+width*.09;
       for(const side of[-1,1]){const lx=side*width*.43,px=x+Math.cos(rotation)*lx,pz=z-Math.sin(rotation)*lx,bottom=w.groundAt(px,pz);box(w,frame,'#80684e',lx,(bottom+top)/2,-.07,.12,top-bottom,.14);}
       box(w,frame,'#80684e',0,top-.05,-.07,width+.12,.12,.16);
@@ -138,6 +138,18 @@
     w.mapShapes.blocks.push({x,z,w:Math.abs(ca)*width+Math.abs(sa)*depth,d:Math.abs(ca)*depth+Math.abs(sa)*width,c:roof,height,floors});
     w.metroArchitecture.buildings++;w.metroArchitecture.floors+=floors;w.metroArchitecture.maxHeight=Math.max(w.metroArchitecture.maxHeight,height+2.7);
     return h;
+  }
+  // The outer quarters meet the countryside through gardens, not a cut wall: loose rows of
+  // trees and shrubs behind the perimeter buildings, leaving roads and the north gate open.
+  function greenBelt(w,g){
+    const rng=U.seeded(1331*7+5),spots=[];
+    for(const side of[-1,1])for(let z=-58;z<=30;z+=5.5)spots.push([side*(74.5+rng()*3.5),z+rng()*2.4]);
+    for(let x=-72;x<=72;x+=5.5)if(Math.abs(x)>15)spots.push([x+rng()*2.4,-81-rng()*3.5]);
+    for(const [x,z]of spots){
+      if(w.roadDist&&w.roadDist(x,z)<4.5)continue;
+      if(rng()<.55)tree(w,g,x,z,.62+rng()*.3);
+      else{const y=w.height(x,z);for(let k=0;k<3;k++){const m=new THREE.Mesh(new THREE.DodecahedronGeometry(.55+rng()*.35,0),material(w,k%2?'#6f9273':'#86a477'));m.position.set(x+(k-1)*.75,y+.38,z+(rng()-.5)*.6);m.scale.y=.8;g.add(m);}w.colliders.push({x,z,r:1.1,city:true});}
+    }
   }
   function clockTower(w,g,x,z){
     const h=house(w,g,x,z,6.6,6.6,19,'#526b78',0,'financial');if(!h)return;
@@ -229,7 +241,7 @@
     road(w,city,0,-19,8.2,125);road(w,city,0,0,111,5.4);road(w,city,0,-16,75,5.2);road(w,city,0,18,72,5.0);road(w,city,-16,1,4.2,38);road(w,city,16,1,4.2,38);road(w,city,0,23,56,4.0);road(w,city,0,-35.5,143,5.8);road(w,city,-58,-12,5.0,107);road(w,city,58,-12,5.0,107);road(w,city,-38,-54,40,5.2);road(w,city,34,-54,52,5.2);finishRoads(w,city);
     const plaza=new THREE.Mesh(new THREE.CircleGeometry(16.6,48),stoneMaterial(w)),pp=plaza.geometry.attributes.position,pu=plaza.geometry.attributes.uv;for(let i=0;i<pu.count;i++)pu.setXY(i,pp.getX(i)/2.8,-pp.getY(i)/2.8);pu.needsUpdate=true;plaza.rotation.x=-Math.PI/2;plaza.position.set(0,.475,1);city.add(plaza);w.groundPlatforms.push({x:0,z:1,r:16.6,y:.475,cityPaving:true});
     const inlay=new THREE.Mesh(new THREE.RingGeometry(11.6,11.75,48),material(w,'#b9a682'));inlay.rotation.x=-Math.PI/2;inlay.position.set(0,.481,1);city.add(inlay);
-    skyline(w,city);
+    skyline(w,city);greenBelt(w,city);
     for(const b of MT.BUILDINGS){
       const opts={...b,palette:{wall:b.color,roof:b.roofC,wood:'#80684e',accent:b.accent,stone:'#b4aa91'}};
       const closed=b.service==='inn'||b.service==='home';const v=closed?E.Shopfronts.closed(w,opts):E.Shopfronts.add(w,opts);w.metroVenues.push(v);

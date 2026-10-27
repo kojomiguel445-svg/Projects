@@ -500,8 +500,8 @@
     x2.fillStyle = '#ffe9a8'; x2.font = 'bold 30px serif'; x2.textAlign = 'center'; x2.textBaseline = 'middle'; x2.fillText('Posto Comercial', 150, 34, 194);
     const signTexture = new THREE.CanvasTexture(c);
     E.Icons.paint(x2, 'scales', 10, 10, 44, () => { signTexture.needsUpdate = true; });
-    const sign = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 0.55), new THREE.MeshBasicMaterial({ map: signTexture, side: THREE.DoubleSide }));
-    sign.position.set(0, 2.95, 0.95); g.add(sign);
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 0.55), new THREE.MeshBasicMaterial({ map: signTexture }));
+    sign.position.set(0, 2.95, 0.95); g.add(E.Shopfronts ? E.Shopfronts.readable(sign) : sign);
     g.position.set(x, y, z); g.rotation.y = Math.atan2(-x, -z); g.userData.groundSupport = { radius: 1.6 };
     world.scene.add(g);
     if (E.ScenePerf) E.ScenePerf.batch(g);
@@ -1068,7 +1068,7 @@
       x2.fillStyle = '#ffe9a8'; x2.font = 'bold 26px serif'; x2.textAlign = 'center'; x2.textBaseline = 'middle'; x2.fillText(E.WD.CAVES[world.reg.caveId].name, 153, 34, 184);
       const signTexture = new THREE.CanvasTexture(c);
       E.Icons.paint(x2, 'pickaxe', 10, 10, 44, () => { signTexture.needsUpdate = true; });
-      const sign = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.6), new THREE.MeshBasicMaterial({ map: signTexture, side: THREE.DoubleSide })); sign.position.set(0, 2.85, 0.7); g.add(sign);
+      const sign = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.6), new THREE.MeshBasicMaterial({ map: signTexture })); sign.position.set(0, 2.85, 0.7); g.add(E.Shopfronts ? E.Shopfronts.readable(sign) : sign);
       g.position.set(p.x, y, p.z); g.rotation.y = Math.atan2(-p.x, -p.z);
       sc.add(g);
       world.colliders.push({ x: p.x, z: p.z, r: 2.2 });

@@ -99,8 +99,8 @@
     const key=p=>Math.round(p.x*100)+','+Math.round(p.z*100),removable=new Set(Object.values(w.propGroups||{}).flat().map(key));
     const protectedSolids=(w.colliders||[]).filter(c=>!removable.has(key(c)));
     const intersects=(q,x,z,hw,hd,r)=>Math.max(0,Math.abs(q.x-x)-hw)**2+Math.max(0,Math.abs(q.z-z)-hd)**2<r*r;
-    for(let attempt=0;attempt<350;attempt++){
-      const a=rng()*Math.PI*2,r=38+rng()*20,p={x:Math.cos(a)*r,z:Math.sin(a)*r,rotation:Math.atan2(-Math.cos(a),-Math.sin(a))};
+    const site=(a,r)=>({x:Math.cos(a)*r,z:Math.sin(a)*r,rotation:Math.atan2(-Math.cos(a),-Math.sin(a))});
+    const score=(p,r)=>{
       let cost=r*.035;
       for(const plot of plots){
         const q=worldPoint(p,plot.x,plot.z),hs=[];
@@ -126,24 +126,71 @@
       }
       const samples=[[-3,25],[3,25],[-3,-24],[3,-24],[0,0]].map(([x,z])=>worldPoint(p,x,z));
       for(const q of samples)cost+=Math.max(0,w.waterLevel+.25-ground(w,q.x,q.z))*80;
+      return cost;
+    };
+    for(let attempt=0;attempt<350;attempt++){
+      const a=rng()*Math.PI*2,r=38+rng()*20,p=site(a,r),cost=score(p,r);
       if(cost<bestScore){best=p;bestScore=cost;}
       if(cost<12)break;
     }
-    best.score=bestScore;return best;
+    best.score=bestScore;
+    // A hillside site turns the street into a ramp and lifts shops onto tall plinths.
+    // Only then search a wider ring where the whole street's rise also counts.
+    // The Lantern Forest keeps its original clearing and trails untouched.
+    if(rise(w,best)>8&&w.reg.biome!=='forest'){
+      const rng2=U.seeded(w.reg.seed*977+13);let flat=best,flatScore=bestScore+rise(w,best)**2*6;
+      for(let attempt=0;attempt<500;attempt++){
+        const a=rng2()*Math.PI*2,r=26+rng2()*44,p=site(a,r),cost=score(p,r)+rise(w,p)**2*6;
+        if(cost<flatScore){flat=p;flatScore=cost;}
+      }
+      flat.score=flatScore;return flat;
+    }
+    return best;
   }
-  function road(w,group,a,b,width,mat,offset=.055,kind='street'){
+  // Height range along the street and its shop rows.
+  function rise(w,p){
+    const hs=[];for(let lx=-12;lx<=12;lx+=6)for(let lz=-25;lz<=25;lz+=5){const q=worldPoint(p,lx,lz);hs.push(ground(w,q.x,q.z));}
+    return Math.max(...hs)-Math.min(...hs);
+  }
+  // The street sits on a terrace: the terrain under the plan eases onto a gentle plane
+  // (at most 6% along the street) and blends back over a margin. The rendered mesh,
+  // w.height and the scattered props all follow the same levelled surface.
+  function level(w,plan){
+    const mesh=w.terrain,grid=w.terrainGrid;if(!mesh||!grid)return;
+    const HX=14.5,HZ=27,M=10,pts=[];
+    for(let lx=-10;lx<=10;lx+=5)for(let lz=-24;lz<=24;lz+=4){const q=worldPoint(plan,lx,lz);pts.push([lz,w.height(q.x,q.z)]);}
+    const mean=pts.reduce((t,q)=>t+q[1],0)/pts.length,cov=pts.reduce((t,q)=>t+q[0]*(q[1]-mean),0),vz=pts.reduce((t,q)=>t+q[0]*q[0],0);
+    const grade=U.clamp(cov/vz,-.06,.06),floorY=Math.max(mean,w.waterLevel+.7),target=lz=>floorY+grade*lz;
+    const weight=(x,z)=>{const p=localPoint(plan,x,z),d=Math.hypot(Math.max(0,Math.abs(p.x)-HX),Math.max(0,Math.abs(p.z)-HZ));if(d>=M)return null;const t=1-d/M;return{k:t*t*(3-2*t),lz:U.clamp(p.z,-HZ,HZ)};};
+    const original=w.height.bind(w);
+    w.height=(x,z)=>{const h=original(x,z),q=weight(x,z);return q?h+(target(q.lz)-h)*q.k:h;};
+    const R=Math.hypot(HX,HZ)+M,P=mesh.geometry.attributes.position;
+    for(let i=0;i<P.count;i++){const x=P.getX(i),z=P.getZ(i);if(Math.hypot(x-plan.x,z-plan.z)<R)P.setY(i,w.height(x,z));}
+    P.needsUpdate=true;mesh.geometry.computeVertexNormals();mesh.geometry.computeBoundingSphere();mesh.geometry.computeBoundingBox();
+    // Trees and rocks near the new terrace follow the ground they stand on.
+    const matrix=new THREE.Matrix4();
+    for(const o of w.scene.children)if(o.isInstancedMesh){
+      let moved=false;
+      for(let i=0;i<o.count;i++){o.getMatrixAt(i,matrix);const e=matrix.elements;if(Math.hypot(e[12]-plan.x,e[14]-plan.z)>R||!weight(e[12],e[14]))continue;e[13]+=w.height(e[12],e[14])-original(e[12],e[14]);o.setMatrixAt(i,matrix);moved=true;}
+      if(moved){o.instanceMatrix.needsUpdate=true;o.computeBoundingSphere();}
+    }
+    for(const list of Object.values(w.propGroups||{}))for(const it of list){const q=weight(it.x,it.z);if(q){const dy=w.height(it.x,it.z)-original(it.x,it.z);it.h+=dy;if(it.y!==undefined)it.y+=dy;}}
+    plan.level={floorY,grade};
+  }
+  function road(w,group,a,b,width,mat,offset=.055,kind='street',edgeFade=0){
     const dx=b.x-a.x,dz=b.z-a.z,length=Math.hypot(dx,dz);if(length<.05)return;
-    return pave(w,group,{x:(a.x+b.x)/2,z:(a.z+b.z)/2,w:width,d:length,rotation:Math.atan2(dx,dz)},mat,offset,kind);
+    return pave(w,group,{x:(a.x+b.x)/2,z:(a.z+b.z)/2,w:width,d:length,rotation:Math.atan2(dx,dz),edgeFade},mat,offset,kind);
   }
   function clearTown(w,plan){
     const entrance=worldPoint(plan,0,25),end={x:entrance.x*.3,z:entrance.z*.3},dx=end.x-entrance.x,dz=end.z-entrance.z,ll=dx*dx+dz*dz;
     const inside=(x,z)=>{const p=localPoint(plan,x,z);if(Math.abs(p.x)<13.35&&Math.abs(p.z)<25.35)return true;const t=Math.max(0,Math.min(1,((x-entrance.x)*dx+(z-entrance.z)*dz)/(ll||1)));return Math.hypot(x-entrance.x-t*dx,z-entrance.z-t*dz)<2.1;};
-    const removed=[];
-    for(const [type,list]of Object.entries(w.propGroups||{}))w.propGroups[type]=list.filter(p=>{if(inside(p.x,p.z)){removed.push(p);return false;}return true;});
+    const removed=[],apron=(x,z)=>{const p=localPoint(plan,x,z);return Math.abs(p.x)<20&&Math.abs(p.z)<32;};
+    // Houses and tents also keep clear of the paved apron around the curb.
+    for(const [type,list]of Object.entries(w.propGroups||{}))w.propGroups[type]=list.filter(p=>{if(inside(p.x,p.z)||(type==='house'||type==='tent')&&apron(p.x,p.z)){removed.push(p);return false;}return true;});
     w.colliders=w.colliders.filter(c=>!removed.some(p=>Math.hypot(c.x-p.x,c.z-p.z)<.11));
     const matrix=new THREE.Matrix4();
     for(const o of w.scene.children)if(o.isInstancedMesh){
-      let count=0;for(let i=0;i<o.count;i++){o.getMatrixAt(i,matrix);if(inside(matrix.elements[12],matrix.elements[14]))continue;if(count!==i)o.setMatrixAt(count,matrix);count++;}
+      let count=0;for(let i=0;i<o.count;i++){o.getMatrixAt(i,matrix);const x=matrix.elements[12],z=matrix.elements[14];if(inside(x,z)||removed.some(p=>Math.abs(p.x-x)<.01&&Math.abs(p.z-z)<.01))continue;if(count!==i)o.setMatrixAt(count,matrix);count++;}
       if(count!==o.count){o.count=count;o.instanceMatrix.needsUpdate=true;if(count)o.computeBoundingSphere();else o.visible=false;}
     }
     // Decorative halos tied to removed lanterns do not hang over the new street.
@@ -227,7 +274,7 @@
     else if(profile.style==='crystal-observatory'||profile.style==='basalt-sanctuary'){for(const side of[-1,1]){const shard=new THREE.Mesh(new THREE.ConeGeometry(.29,.95,5),S().material(w,colors.roof,{emissive:colors.roof,emissiveIntensity:.12}));shard.position.set(side*4.6,top+.64,0);gate.add(shard);}}
     else if(profile.style==='garden-pergolas'||profile.style==='timber-moss'){for(let k=0;k<8;k++){const leaf=new THREE.Mesh(new THREE.DodecahedronGeometry(.23,0),S().material(w,k%2?'#789773':colors.roof));leaf.position.set((k-3.5)*1.05,top+.05,.06);gate.add(leaf);}}
     else if(profile.style==='alpine-stone')S().box(w,gate,'#e6efeb',0,top+.1,0,9.7,.15,.42);
-    const cv=document.createElement('canvas');cv.width=512;cv.height=96;const x=cv.getContext('2d');x.fillStyle='#293f45';x.fillRect(0,0,512,96);x.strokeStyle=colors.accent;x.lineWidth=4;x.strokeRect(3,3,506,90);x.fillStyle='#f2e3c4';x.textAlign='center';x.textBaseline='middle';x.font='bold 32px Nunito,sans-serif';x.fillText(profile.name,256,49,480);const texture=new THREE.CanvasTexture(cv);texture.colorSpace=THREE.SRGBColorSpace;const sign=new THREE.Mesh(new THREE.PlaneGeometry(4.6,.86),new THREE.MeshBasicMaterial({map:texture,side:THREE.DoubleSide}));sign.position.set(0,top-.55,.19);gate.add(sign);
+    const cv=document.createElement('canvas');cv.width=512;cv.height=96;const x=cv.getContext('2d');x.fillStyle='#293f45';x.fillRect(0,0,512,96);x.strokeStyle=colors.accent;x.lineWidth=4;x.strokeRect(3,3,506,90);x.fillStyle='#f2e3c4';x.textAlign='center';x.textBaseline='middle';x.font='bold 32px Nunito,sans-serif';x.fillText(profile.name,256,49,480);const texture=new THREE.CanvasTexture(cv);texture.colorSpace=THREE.SRGBColorSpace;const sign=new THREE.Mesh(new THREE.PlaneGeometry(4.6,.86),new THREE.MeshBasicMaterial({map:texture}));sign.position.set(0,top-.55,.19);gate.add(S().readable(sign));
     // The side monument occupies the gap between plots, never the main walking lane.
     const site=worldPoint(plan,10.8,0),heights=[[-.7,-.7],[.7,-.7],[0,0],[-.7,.7],[.7,.7]].map(([x,z])=>ground(w,site.x+x,site.z+z)),y=Math.max(...heights)+.025,foundation=y-Math.min(...heights)+.08,g=new THREE.Group();g.name='regional-square-landmark';g.position.set(site.x,y,site.z);g.rotation.y=plan.rotation;town.add(g);S().cylinder(w,g,colors.stone,0,-foundation/2,0,.84,foundation,8);S().cylinder(w,g,colors.stone,0,.17,0,.83,.34,8);w.colliders.push({...site,r:.84,villageDecor:true});
     if(profile.style==='clockwork-burgh'){
@@ -245,6 +292,8 @@
   }
   function streets(w,plan,town,colors){
     const map=pavingTexture(w,colors.stone),base=S().material(w,'#f0e9d8',{map,side:THREE.DoubleSide}),street=S().material(w,'#c9c7b8',{map,side:THREE.DoubleSide}),trim=S().material(w,'#ead8af',{side:THREE.DoubleSide});
+    // Worn pavers outside the curb thin out into the ground instead of a cut-out edge.
+    pave(w,town,{x:plan.x,z:plan.z,w:36,d:60,rotation:plan.rotation,edgeFade:5},S().material(w,colors.stone,{map,side:THREE.DoubleSide}),.03,'apron');
     pave(w,town,{x:plan.x,z:plan.z,w:26,d:50,rotation:plan.rotation},base,.045,'precinct');
     const a=worldPoint(plan,0,-25),b=worldPoint(plan,0,25);road(w,town,a,b,6.4,street,.058);
     // Keep a single continuous surface at every crossing. Borders are split at
@@ -252,7 +301,7 @@
     const gaps=[-17.2,-5.8,5.8,17.2],segments=[[-25,-18.3],[-16.1,-6.9],[-4.7,4.7],[6.9,16.1],[18.3,25]];
     for(const sign of[-1,1])for(const [from,to]of segments)road(w,town,worldPoint(plan,sign*3.35,from),worldPoint(plan,sign*3.35,to),.12,trim,.074,'street-border');
     for(const z of gaps)for(const sign of[-1,1])road(w,town,worldPoint(plan,sign*3.2,z),worldPoint(plan,sign*5.8,z),2.0,street,.058,'shop-approach');
-    const start=worldPoint(plan,0,25),near={x:start.x*.3,z:start.z*.3};road(w,town,start,near,3.0,street,.058,'entry-path');
+    const start=worldPoint(plan,0,25),near={x:start.x*.3,z:start.z*.3};road(w,town,start,near,3.0,street,.058,'entry-path',1.3);
     // The outer curb belongs to the paving, leaving grass outside the village.
     for(const sign of[-1,1]){road(w,town,worldPoint(plan,sign*12.8,-24.8),worldPoint(plan,sign*12.8,24.8),.16,trim,.074,'outer-curb');road(w,town,worldPoint(plan,-12.8,sign*24.8),worldPoint(plan,12.8,sign*24.8),.16,trim,.074,'outer-curb');}
     const loop=[[-3,-23],[-3,23],[3,23],[3,-23]].map(([x,z])=>worldPoint(plan,x,z));loop.pauseIndices=[1,3];(w.crowdRoutes||(w.crowdRoutes=[])).push(loop);
@@ -286,7 +335,7 @@
   V.build=w=>{
     if(w.cave||w.village||!S())return;
     if(w.reg.metro){fires(w);return;}
-    const plan=layout(w),colors=PALETTES[w.reg.biome]||PALETTES.forest,profile=PROFILES[w.reg.biome]||PROFILES.forest,town=new THREE.Group();town.name='village-streets';w.scene.add(town);clearTown(w,plan);pavingTexture(w,colors.stone);const doors=[],venues=[];
+    const plan=layout(w),colors=PALETTES[w.reg.biome]||PALETTES.forest,profile=PROFILES[w.reg.biome]||PROFILES.forest,town=new THREE.Group();town.name='village-streets';w.scene.add(town);clearTown(w,plan);if(rise(w,plan)<=8)level(w,plan);pavingTexture(w,colors.stone);const doors=[],venues=[];
     for(const plot of plots){
       const p=worldPoint(plan,plot.x,plot.z),def=SERVICES.find(s=>s[0]===plot.service),rotation=plan.rotation+(plot.x<0?Math.PI/2:-Math.PI/2);
       const opts={id:'village-'+plot.service,service:plot.service,name:regionalName(profile,plot.service)||def[1],x:p.x,z:p.z,rotation,w:plot.service==='inn'?7.8:7.2,d:plot.service==='inn'?6.5:6.0,h:profile.h,palette:colors,style:profile.style};
