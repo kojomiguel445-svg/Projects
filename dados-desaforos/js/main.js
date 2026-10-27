@@ -84,10 +84,11 @@
   G.whatsNew = async () => {
     E.state.seenVersion = E.Title.VERSION; E.Store.save();
     const html = `<div class="whatsnew"><ul>
-      <li><b>Casas no lugar certo:</b> as casas, tendas, caixotes, colunas e arcos espalhados pelas regiões assentam no terreno, sem flutuar nem afundar, com embasamento de pedra nas encostas.</li>
-      <li><b>Vilas niveladas:</b> as vilas que ficavam em ladeiras agora ocupam um terraço plano; as lojas não ficam mais sobre pedestais altos.</li>
-      <li><b>Bordas naturais:</b> o calçamento das vilas se desfaz aos poucos na grama e Aurenna ganhou jardins e árvores atrás dos prédios da periferia.</li>
-      <li><b>Placas legíveis:</b> letreiros de lojas, portais e postos não aparecem mais espelhados quando vistos por trás.</li>
+      <li><b>Nova interface de exploração:</b> minimapa com bússola, botões circulares com atalhos de teclado, missão discreta ao lado do mapa e barra de vida fina com nível e pontos de vida.</li>
+      <li><b>Ao alcance de F:</b> um marcador flutua sobre o personagem ou objeto mais próximo; as opções aparecem à direita, como em um RPG de mundo aberto.</li>
+      <li><b>Menos poluição na tela:</b> quando você fica parado, os botões e o rastreador recuam e voltam ao primeiro toque.</li>
+      <li><b>Menus renovados:</b> painéis translúcidos, botões em pílula, abas suaves e transições de abertura e fechamento.</li>
+      <li><b>Mundo mais caprichado (5.3.2):</b> casas assentadas no terreno, vilas niveladas, bordas naturais e placas legíveis.</li>
     </ul></div>`;
     await UI.modal({ title: `✦ Novidades da versão ${E.Title.VERSION}`, html, buttons: [{ label: 'Ver o Oráculo', value: 'wish' }, { label: 'Bora jogar!', value: true, cls: 'primary' }] }).then((v) => { if (v === 'wish') E.Wish.open(); });
   };

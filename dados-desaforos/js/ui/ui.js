@@ -21,10 +21,23 @@
   };
 
   // ---------- modais ----------
+  // Saída suave: um retrato estático some no lugar da tela, que já foi removida de verdade
+  // (o jogo e os seletores nunca encontram uma tela "fechando").
+  const leave = (node, rename) => {
+    if (!node.parentNode || document.body.classList.contains('reduced')) return;
+    const ghost = node.cloneNode(true);
+    ghost.removeAttribute('id'); ghost.querySelectorAll('[id]').forEach((n) => n.removeAttribute('id'));
+    if (rename) ghost.classList.replace(rename[0], rename[1]);
+    const from = node.querySelectorAll('canvas'), to = ghost.querySelectorAll('canvas');
+    from.forEach((c, i) => { try { to[i].getContext('2d').drawImage(c, 0, 0); } catch { /* WebGL: fica em branco por 0,2 s */ } });
+    ghost.classList.add('ui-leave'); ghost.setAttribute('aria-hidden', 'true'); ghost.inert = true;
+    node.parentNode.insertBefore(ghost, node);
+    setTimeout(() => ghost.remove(), 220);
+  };
   UI.modal = ({ title, text = '', html = '', buttons = [], dismiss = true, cls = '' }) => new Promise((resolve) => {
     const bg = U.h(`<div class="modal-bg"><div class="modal ${cls}"><h3>${title || ''}</h3>${text ? `<div class="sub">${text}</div>` : ''}<div class="mbody">${html}</div><div class="row"></div></div></div>`);
     const row = bg.querySelector('.row');
-    const close = (v) => { bg.remove(); resolve(v); };
+    const close = (v) => { leave(bg, ['modal-bg', 'modal-bg-leave']); bg.remove(); resolve(v); };
     buttons.forEach((b) => {
       const el = U.h(`<button class="btn ${b.cls || ''}"><span class="ico">${b.icon || (b.cls === 'primary' ? '✓' : '✕')}</span>${b.label}</button>`);
       el.onclick = () => { E.Audio.sfx('click'); close(b.value !== undefined ? b.value : b.label); };
@@ -63,6 +76,7 @@
     const i = stack.findIndex((s) => s.el === el);
     if (i < 0) return;
     const [s] = stack.splice(i, 1);
+    leave(s.el);
     s.el.remove();
     if (s.onClose) s.onClose();
     U.emit('ui:screen', stack.length);

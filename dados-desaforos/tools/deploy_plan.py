@@ -3,14 +3,15 @@
 Compara a árvore atual com o commit importado do deploy 5.3.1 e grava:
   tools/deploy-plan.json  - diferenças por caractere (arquivos alterados) e lista da base
   <saida>/deploy-files.json - lista `files` para create_deployment (só o que precisa subir)
-Uso: python3 tools/deploy_plan.py <release> <pasta-de-saída> [versão-anterior=url ...]
+Uso: python3 tools/deploy_plan.py <release> <pasta-de-saída>   (base em tools/deploy-base.json)
 """
 import difflib, hashlib, json, os, subprocess, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BASE_COMMIT = '6133d8e'
-BASE_URL = 'https://dados-desaforos-elarion-1w5dil8zl-kojomiguel445-5477.vercel.app'
-SKIP = ('releases/', 'tests/', 'tools/', 'icons/ui/', 'dist/', '.gitignore')
+# Último deploy de produção: commit com o mesmo conteúdo, URL imutável e versões que ele já contém.
+BASE = json.load(open(os.path.join(ROOT, 'tools/deploy-base.json')))
+BASE_COMMIT, BASE_URL = BASE['commit'], BASE['url']
+SKIP = ('releases/', 'tests/', 'tools/', 'docs/', 'icons/ui/', 'dist/', '.gitignore')
 CONFIG = {'vercel.json'}
 
 
@@ -53,7 +54,7 @@ def char_ops(a, b):
 
 def main():
     release, outdir = sys.argv[1], sys.argv[2]
-    old_releases = [a.split('=', 1) for a in sys.argv[3:]] or [['5.3.0', BASE_URL], ['5.3.1', BASE_URL]]
+    old_releases = [[v, BASE_URL] for v in BASE['releases'] if v != release]
     base = base_files()
     patches, uploaded, removed = {}, [], []
     for rel in base:

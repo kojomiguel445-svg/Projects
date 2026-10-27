@@ -20,19 +20,21 @@
       <div class="hud-tl">
         <div class="minimap" title="Abrir mapa"><canvas width="256" height="256"></canvas><span class="compass">N</span></div>
         <div class="region-name"></div>
+        <div class="survival-hud"><span class="survival-time" aria-label="Calendário"></span><button class="survival-food" data-a="food" title="Comida e saciedade">${E.Icons ? E.Icons.html('cooking', { decorative: true }) : ''}<span></span><i><b></b></i></button></div>
         <div class="tracker"></div>
       </div>
       <div class="hud-tr">
-        <button class="icon-btn sprint-btn" data-a="sprint" aria-label="Correr (segure)" aria-pressed="false" title="Correr: segure este botão ou Shift">${E.Icons ? E.Icons.html('runner', { decorative: true }) : UI.ICONS.jump}</button>
+        <button class="icon-btn sprint-btn" data-a="sprint" data-key="Shift" aria-label="Correr (segure)" aria-pressed="false" title="Correr: segure este botão ou Shift">${E.Icons ? E.Icons.html('runner', { decorative: true }) : UI.ICONS.jump}</button>
         <button class="icon-btn online-btn" data-a="online" title="Jogadores online e grupo">${UI.ICONS.globe}<span class="ob-n"></span></button>
-        <button class="icon-btn" data-a="wish" title="Oráculo das Armas">${UI.ICONS.wish}</button>
-        <button class="icon-btn" data-a="quests" title="Missões">${UI.ICONS.quest}</button>
-        <button class="icon-btn" data-a="map" title="Mapa">${UI.ICONS.map}</button>
-        <button class="icon-btn" data-a="menu" title="Menu">${UI.ICONS.menu}</button>
+        <button class="icon-btn" data-a="wish" data-key="O" title="Oráculo das Armas">${UI.ICONS.wish}</button>
+        <button class="icon-btn" data-a="quests" data-key="J" title="Missões">${UI.ICONS.quest}</button>
+        <button class="icon-btn" data-a="map" data-key="M" title="Mapa">${UI.ICONS.map}</button>
+        <button class="icon-btn" data-a="menu" data-key="Esc" title="Menu">${UI.ICONS.menu}</button>
       </div>
       <div class="coop-bar"></div>
       <div class="prompts"></div>
-      <div class="hud-bottom"><div class="hp-name"><span class="nm"></span><span class="lv"></span></div><div class="survival-hud"><span class="survival-time" aria-label="Calendário"></span><button class="survival-food" data-a="food" title="Comida e saciedade">${E.Icons ? E.Icons.html('cooking', { decorative: true }) : ''}<span></span><i><b></b></i></button></div><div class="bar hpbar"><i class="hp"></i><i class="temp"></i></div><div class="bar xp"><i></i></div></div>
+      <div class="hud-bottom"><div class="hp-name"><span class="lv"></span><span class="nm"></span><span class="hp-num"></span></div><div class="bar hpbar"><i class="hp"></i><i class="temp"></i></div><div class="bar xp"><i></i></div></div>
+      <div class="ia-mark" aria-hidden="true"><i></i></div>
       <div class="joy" aria-hidden="true"><i></i></div>
       <div class="mobile-actions"><button class="icon-btn" data-a="jump" aria-label="Pular">${UI.ICONS.jump}</button><button class="icon-btn act" data-a="act" aria-label="Interagir">${UI.ICONS.hand}</button></div>
     </div>`);
@@ -43,7 +45,7 @@
     onlineLabelsEl = document.createElement('div');
     onlineLabelsEl.style.cssText = 'position:absolute;inset:0;pointer-events:none';
     labelsEl.appendChild(onlineLabelsEl);
-    for (const [key, selector] of Object.entries({ region: '.region-name', name: '.nm', level: '.lv', hp: '.hp', temp: '.temp', hpbar: '.hpbar', xp: '.xp i', tracker: '.tracker', prompts: '.prompts', act: '[data-a=act]', sprint: '[data-a=sprint]', jump: '[data-a=jump]', lifeTime: '.survival-time', food: '[data-a=food]', foodLabel: '[data-a=food] > span', foodFill: '[data-a=food] b' })) refs[key] = el.querySelector(selector);
+    for (const [key, selector] of Object.entries({ region: '.region-name', name: '.nm', level: '.lv', hpNum: '.hp-num', iaMark: '.ia-mark', hp: '.hp', temp: '.temp', hpbar: '.hpbar', xp: '.xp i', tracker: '.tracker', prompts: '.prompts', act: '[data-a=act]', sprint: '[data-a=sprint]', jump: '[data-a=jump]', lifeTime: '.survival-time', food: '[data-a=food]', foodLabel: '[data-a=food] > span', foodFill: '[data-a=food] b' })) refs[key] = el.querySelector(selector);
     el.querySelector('.minimap').onclick = () => E.Wonders.regionMap();
     el.querySelector('.tracker').onclick = () => E.Journal.quests();
     el.querySelector('[data-a=wish]').onclick = () => E.Wish.open();
@@ -93,6 +95,7 @@
     writeHtml(refs.level, `${buffs.map((b) => `<span class="hb" title="${E.L.BUFFS[b.id].name}: ${b.left} min">${E.L.BUFFS[b.id].icon}</span>`).join('')} Nv. ${h.level}`);
     const max = C.maxHp(h);
     const pct = Math.max(0, h.hp) / max * 100;
+    writeText(refs.hpNum, `${Math.max(0, h.hp)}${h.tempHp ? ` +${h.tempHp}` : ''} / ${max}`);
     writeStyle(refs.hp, 'width', pct + '%');
     writeStyle(refs.temp, 'width', Math.min(100, (h.tempHp || 0) / max * 100) + '%');
     refs.hpbar.classList.toggle('low', pct < 30);
@@ -160,8 +163,24 @@
     if (now - lastMini >= 125) { lastMini = now; drawMini(w); }
     if (now - lastTracker >= 250) { lastTracker = now; HUD.tracker(); }
     HUD.syncSim();
-    if (now - lastLabels >= 1000 / 15) { lastLabels = now; drawLabels(w); drawStamina(w); }
+    if (now - lastLabels >= 1000 / 15) { lastLabels = now; drawLabels(w); drawStamina(w); drawMark(w); calm(w, now); }
   };
+  // Parado e sem tocar em nada, os botões e o rastreador recuam; qualquer ação os traz de volta.
+  let lastInput = performance.now();
+  for (const type of ['pointerdown', 'keydown', 'wheel']) addEventListener(type, () => { lastInput = performance.now(); }, { passive: true, capture: true });
+  function calm(w, now) {
+    const quiet = now - lastInput > 5000 && !(w.hero && w.hero.moving) && !near.length;
+    if (el._calm !== quiet) { el.classList.toggle('calm', quiet); el._calm = quiet; }
+  }
+  // marcador sobre o que está ao alcance de F (ou do botão de mão)
+  function drawMark(w) {
+    const it = near[0], mk = refs.iaMark, at = it && Number.isFinite(it.x) && Number.isFinite(it.z);
+    const p = at && w.project(it.x, (Number.isFinite(it.y) ? it.y : w.groundAt(it.x, it.z)) + (it.kind === 'npc' ? 3.1 : 1.9), it.z), show = !!(p && !p.behind);
+    if (mk._shown !== show) { mk.classList.toggle('on', show); mk._shown = show; }
+    if (!show) return;
+    writeStyle(mk, 'transform', `translate(${p.x.toFixed(0)}px, ${p.y.toFixed(0)}px)`);
+    writeText(mk.firstElementChild, U.isTouch() ? '' : 'F');
+  }
   // vigor (estilo Genshin): um anel ao lado do herói que aparece quando está sendo gasto
   let stEl = null;
   function drawStamina(w) {
