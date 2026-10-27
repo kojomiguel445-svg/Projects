@@ -1,0 +1,40 @@
+{
+  "name": "Dados & Desaforos — Crônicas de Elarion",
+  "short_name": "Elarion",
+  "description": "RPG com regras de D&D 5.5, mundo 3D em pixel art, Oráculo de armas, pesca, comércio, cassino e jogo online com amigos.",
+  "lang": "pt-BR",
+  "start_url": "/jogar.html",
+  "scope": "/",
+  "display": "fullscreen",
+  "display_override": [
+    "fullscreen",
+    "standalone"
+  ],
+  "orientation": "landscape",
+  "background_color": "#0b0f1e",
+  "theme_color": "#121624",
+  "categories": [
+    "games",
+    "entertainment"
+  ],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
