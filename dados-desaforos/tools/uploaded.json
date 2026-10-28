@@ -8,6 +8,6 @@
  "js/gfx/shopfloor.js": "ad159b42b7d301b7be1f0291df30b8efd48b6d21",
  "js/gfx/workplace.js": "88f25ecb650e5167a94c869491e02141891041ea",
  "tools/build.mjs": "cb8b513ab85c246fed6f07e1acac95ac0bf3ba56",
- "tools/deploy-plan.json": "6e881f5d729996a49eeeec403907ea98e937ec49",
+ "tools/deploy-plan.json": "697cb5bf199410eb75c2262fc57b8ab4486e8a20",
  "vercel.json": "61a3f3d59ba629464865263891c17991ffb5509c"
 }
