@@ -1,0 +1,72 @@
+/* Vila, contratos e interiores: desenhos locais e controles com espaço para o toque. */
+.settlement-screen { --sett-line: #c7b48f77; }
+.settlement-body { padding: 0; display: flex; min-height: 0; }
+.sett-tabs { flex: 0 0 174px; padding: 20px 12px; border-right: 1px solid var(--sett-line); background: #e1d8c5; overflow: auto; display: flex; flex-direction: column; align-items: stretch; gap: 5px; }
+.sett-tabs button { min-height: 42px; padding: 9px 12px; border-radius: 8px; text-align: left; font-size: 13px; color: #586075; }
+.sett-tabs button:hover { background: #cfc2a855; }
+.sett-tabs button.on { color: #f8edd5; background: #3d5367; box-shadow: 0 3px 10px #263b5020; }
+.sett-pane { flex: 1; min-width: 0; overflow: auto; padding: 24px clamp(14px,3vw,34px); background: #f0e9da; }
+.sett-heading { margin-bottom: 20px; max-width: 820px; }
+.sett-heading > span { color: #94794b; letter-spacing: .2em; font-size: 10px; font-weight: 900; }
+.sett-heading h3 { font-family: var(--display); font-weight: 600; font-size: 24px; color: #36485d; margin: 5px 0 8px; }
+.sett-heading p { margin: 0; font-size: 13px; color: #687183; line-height: 1.65; }
+.sett-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(230px,1fr)); align-items: start; gap: 16px; }
+.sett-card { position: relative; padding: 22px; border: 1px solid #c7b48f77; border-radius: 14px; background: #fffaf0; box-shadow: 0 4px 16px #473a230b; min-width: 0; }
+.sett-card-icon { width: 48px; height: 48px; display: grid; place-items: center; border: 1px solid #d8c6a5; border-radius: 14px; background: linear-gradient(145deg,#eee3cb,#d5c3a0); margin-bottom: 12px; }
+.sett-card-icon img.el-icon { width: 37px; height: 37px; margin: 0; }
+.sett-card h4 { margin: 0 0 9px; color: #36485d; font-size: 16px; }
+.sett-card p { color: #737c89; font-size: 12px; line-height: 1.65; margin: 0 0 15px; }
+.sett-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.sett-actions .btn { font-size: 12px; min-height: 38px; padding: 8px 13px; white-space: normal; text-align: center; }
+.sett-actions .field { min-width: 0; width: 100%; }
+.sett-actions > strong { display: block; width: 100%; font-size: 13px; color: #43536b; margin: 8px 0 2px; }
+.sett-interview { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.sett-food-status { margin: -8px 0 20px; color: #587454; font-size: 13px; font-weight: 800; }
+.sett-shift-progress, .sett-appointment-time { width: 100%; padding: 9px; border-radius: 6px; background: #efe4ce; font-weight: 800; color: #765e37 !important; }
+.sett-storage { display: grid; gap: 10px; }
+.sett-storage-row { display: flex; justify-content: space-between; align-items: center; gap: 15px; padding: 16px 20px; background: #fffaf0; border: 1px solid #c7b48f55; border-radius: 12px; }
+.sett-storage-row b { display: block; font-size: 14px; }
+.sett-storage-row small { display: block; color: #757d88; margin-top: 4px; }
+.interior-hud { position: absolute; inset: 0; z-index: 14; pointer-events: none; color: #f4ead9; }
+.interior-header { position: absolute; inset: calc(16px + var(--safe-t,0px)) calc(18px + env(safe-area-inset-right,0px)) auto calc(18px + env(safe-area-inset-left,0px)); display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; padding: 13px 16px; border: 1px solid #e4cf9d42; border-radius: 14px; background: #142334ed; box-shadow: 0 5px 25px #0003; }
+.interior-header h2 { font-family: var(--display); font-size: clamp(16px,2.3vw,24px); font-weight: 500; margin: 3px 0; }
+.interior-kicker { font-size: 9px; letter-spacing: .19em; text-transform: uppercase; color: #d7bb81; }
+.interior-clock { display: block; font-size: 11px; color: #b7c9d4; }
+.interior-header button { pointer-events: auto; }
+.interior-header .btn img.el-icon { width: 22px; height: 22px; }
+.interior-tip { position: absolute; left: 50%; bottom: calc(22px + var(--safe-b,0px)); transform: translateX(-50%); white-space: nowrap; padding: 7px 12px; border-radius: 99px; font-size: 11px; color: #e3d4b5; background: #152436e6; }
+.interior-act { position: absolute; right: calc(22px + env(safe-area-inset-right,0px)); bottom: calc(60px + var(--safe-b,0px)); min-height: 48px; max-width: min(280px,44vw); pointer-events: auto; box-shadow: 0 4px 18px #0004; }
+.interior-act img.el-icon { width: 24px; height: 24px; margin: 0; }
+.interior-object-label { position: absolute; left: 50%; top: 61%; transform: translateX(-50%); background: #18293dd9; border: 1px solid #e4cf9d55; border-radius: 6px; font-size: 11px; padding: 6px 10px; }
+.interior-object-label:empty { display: none; }
+.interior-pad { position: absolute; left: calc(24px + env(safe-area-inset-left,0px)); bottom: calc(38px + var(--safe-b,0px)); width: 138px; height: 104px; display: grid; grid-template-columns: repeat(3,44px); grid-template-rows: repeat(2,48px); gap: 3px; pointer-events: auto; }
+.interior-pad button { touch-action: none; width: 44px; height: 44px; border: 1px solid #d6c19377; border-radius: 12px; background: #24384cdd; color: #f3dfb6; font-size: 16px; }
+.interior-pad button:active { background: #b6975c; }
+.interior-pad [data-dir=up] { grid-column: 2; }
+.interior-pad [data-dir=left] { grid-column: 1; grid-row: 2; }
+.interior-pad [data-dir=down] { grid-column: 2; grid-row: 2; }
+.interior-pad [data-dir=right] { grid-column: 3; grid-row: 2; }
+@media (pointer: fine) and (min-width: 1100px) { .interior-pad { opacity: .38; } .interior-pad:hover { opacity: 1; } }
+@media (max-width: 760px) { .sett-tabs { flex-basis: 124px; padding: 12px 6px; } .sett-tabs button { font-size: 11px; padding: 8px; min-height: 38px; } .sett-pane { padding: 15px; } .sett-grid { grid-template-columns: repeat(auto-fit,minmax(190px,1fr)); gap: 12px; } .sett-card { padding: 16px; } .sett-heading h3 { font-size: 20px; } }
+@media (max-height: 500px) and (orientation: landscape) { .interior-header { top: 8px; padding: 8px 13px; } .interior-header h2 { font-size: 16px; } .interior-clock { font-size: 10px; } .interior-pad { bottom: 14px; transform: scale(.88); transform-origin: left bottom; } .interior-act { bottom: 24px; min-height: 43px; } .interior-tip { bottom: 6px; font-size: 9px; } .sett-heading { margin-bottom: 12px; } .sett-heading h3 { font-size: 19px; } }
+@media (max-width: 500px) and (orientation: portrait) { .settlement-body { flex-direction: column; } .sett-tabs { flex: none; flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--sett-line); padding: 7px; } .sett-tabs button { flex: none; text-align: center; } .sett-grid { grid-template-columns: 1fr; } .interior-tip { display: none; } .interior-header { padding: 10px; } }
+
+.interior-pad button img.el-icon { width: 25px; height: 25px; margin: 0; }
+.interior-pad [data-dir=left] img.el-icon { transform: rotate(180deg); }
+
+/* O cenário continua visível; as ações acompanham os móveis. */
+.lived-interior .interior-header { right: auto; width: min(365px,calc(100vw - 36px)); padding: 10px 13px; background: #1a2e3de8; border-radius: 10px; }
+.lived-interior .interior-header h2 { font-size: 18px; margin: 2px 0; }
+.lived-interior .interior-kicker { letter-spacing: .12em; font-size: 8px; }
+.lived-interior .interior-clock { font-size: 10px; }
+.lived-interior .interior-object-label { top: auto; bottom: 16%; }
+.lived-interior .interior-placement { position:absolute; left:50%; bottom:20px; transform:translateX(-50%); width:min(630px,calc(100vw - 30px)); display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:8px; pointer-events:auto; background:#203746f5; border:1px solid #d2be8b99; border-radius:12px; padding:12px; box-shadow:0 7px 30px #1118; }
+.lived-interior .interior-placement > div { flex:1 1 230px; min-width:0; }
+.lived-interior .interior-placement strong { display:block; font-family:var(--display); font-size:15px; font-weight:500; color:#f3e2bc; }
+.lived-interior .interior-placement small { display:block; font-size:10px; color:#c4d2cd; line-height:1.5; margin-top:4px; }
+.lived-interior .interior-placement .btn { min-height:36px; padding:7px 11px; font-size:11px; }
+.lived-interior .interior-placement .el-icon { width:18px; height:18px; }
+.lived-interior.placing-furniture .interior-tip { display:none; }
+.lived-interior.placing-furniture .interior-pad { bottom:126px; }
+.lived-interior.interior-sleeping::after { content:''; position:absolute; inset:0; background:#152334; opacity:.85; transition:opacity .2s; pointer-events:auto; }
+@media(max-height:500px) and (orientation:landscape) { .lived-interior .interior-header { top:8px; width:min(330px,calc(100vw - 36px)); padding:7px 11px; } .lived-interior .interior-header h2{font-size:15px} .lived-interior .interior-placement { bottom:12px; padding:9px; } .lived-interior.placing-furniture .interior-pad { bottom:110px; } .lived-interior .interior-object-label { bottom:14%; } }

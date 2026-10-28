@@ -157,7 +157,7 @@
     const log = c.panel.querySelector('.iv-log'); log.scrollTop = log.scrollHeight; c.panel.scrollTop = box.offsetTop - 60;
     box.querySelector('[data-up]').onclick = () => standUp(c);
     const card = box.querySelector('[data-card]'); if (card) card.onclick = () => E.Work.openCard();
-    if (E.Audio && E.Audio.sfx) E.Audio.sfx(r.ok ? 'coin' : 'click');
+    if (E.Audio && E.Audio.sfx) E.Audio.sfx(r.ok ? 'success' : 'fail');
     E.Store.save();
   }
   function standUp(c) {
@@ -181,5 +181,6 @@
     W().close(); E.UI.closeAll();
     I.open({ kind: 'office', region: it.region, title: 'Sala dos fundos · ' + SS().placeName(it.service), place: it.service, jobId: id, owner: r.session.owner });
   };
+  P.slide = frame;
   E.Workplace = P;
 })();

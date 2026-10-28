@@ -1,0 +1,183 @@
+{
+ "steps": [
+  {
+   "name": "setup",
+   "eval": "(()=>{const h=E.Store.hero(),r=E.Settlements.region(),d=E.Settlements.data(h);d.jobs[r]={contract:'clerk',interviewDay:0,lastShiftDay:0,shifts:0};E.Work.normalize(h);\nwindow.__serve=(wrong)=>{const c=E.Interior.current,s=E.Work.shift();if(!c||!c.panel||!s)return 'no-shift';const q=k=>c.panel.querySelector(k),cu=s.at>=0?s.customers[s.at]:null;if(!cu||cu.state==='done'){const f=q('[data-act=finish]');if(f&&!f.hidden){f.click();return 'finished';}return 'waiting '+s.served+' people='+c.people.map(p=>p.state).join(',');}\nif(cu.state==='scan'){cu.lines.forEach((l,li)=>{let n=0;while(l.scanned<l.qty&&n++<4){const x=c.panel.querySelector('[data-scan=\"'+li+'\"]');if(!x||x.disabled)break;x.click();}});q('[data-act=bill]').click();return 'billed '+cu.total;}\nif(cu.state==='pay'){q('[data-act=receive]').click();return 'received '+cu.paid;}\nif(cu.state==='change'){const w=window.__wrongOnce;window.__wrongOnce=false;let due=cu.paid-cu.total;if(w)due+=due>0?-1:1;for(const co of E.Work.COINS){while(due>=co.v&&s.drawer[co.id]>0){const b=c.panel.querySelector('[data-coin='+co.id+']');if(!b)break;b.click();due-=co.v;}}q('[data-act=give]').click();return 'gave tray left='+due+' state='+cu.state;}\nreturn cu.state;};return d.jobs[r];})()"
+  },
+  {
+   "name": "enter",
+   "eval": "(()=>{E.Shopfloor.enter({service:'general',region:E.Settlements.region()});return E.Interior.current&&E.Interior.current.kind;})()",
+   "shot": "s1-floor",
+   "settle": 1200
+  },
+  {
+   "name": "post-early",
+   "eval": "(()=>{const c=E.Interior.current;c.fixtures.find(f=>f.id==='post').run();return c.phase;})()"
+  },
+  {
+   "name": "clock",
+   "eval": "(()=>{const c=E.Interior.current;Object.assign(c.hero,{x:3.9,z:-3.2});c.fixtures.find(f=>f.id==='clock').run();return c.phase;})()",
+   "shot": "s2-clock",
+   "settle": 800
+  },
+  {
+   "name": "post",
+   "eval": "(()=>{const c=E.Interior.current;c.fixtures.find(f=>f.id==='post').run();return c.phase;})()",
+   "wait": 5000,
+   "shot": "s3-customers",
+   "settle": 200
+  },
+  {
+   "name": "serve0",
+   "eval": "window.__serve()",
+   "wait": 2200
+  },
+  {
+   "name": "serve1",
+   "eval": "window.__serve()",
+   "wait": 2200,
+   "shot": "s4-scan",
+   "settle": 100
+  },
+  {
+   "name": "serve2",
+   "eval": "window.__wrongOnce=true;window.__serve()",
+   "wait": 2200
+  },
+  {
+   "name": "serve3",
+   "eval": "window.__serve()",
+   "wait": 2200,
+   "shot": "s5-3",
+   "settle": 150
+  },
+  {
+   "name": "serve4",
+   "eval": "window.__serve()",
+   "wait": 2200,
+   "shot": "s5-4",
+   "settle": 150
+  },
+  {
+   "name": "serve5",
+   "eval": "window.__serve()",
+   "wait": 2200,
+   "shot": "s5-5",
+   "settle": 150
+  },
+  {
+   "name": "serve6",
+   "eval": "window.__serve()",
+   "wait": 2200,
+   "shot": "s5-6",
+   "settle": 150
+  },
+  {
+   "name": "serve7",
+   "eval": "window.__serve()",
+   "wait": 2200,
+   "shot": "s5-7",
+   "settle": 150
+  },
+  {
+   "name": "serve8",
+   "eval": "window.__serve()",
+   "wait": 2200
+  },
+  {
+   "name": "serve9",
+   "eval": "window.__serve()",
+   "wait": 2200
+  },
+  {
+   "name": "serve10",
+   "eval": "window.__serve()",
+   "wait": 2200
+  },
+  {
+   "name": "serve11",
+   "eval": "window.__serve()",
+   "wait": 2200
+  },
+  {
+   "name": "serve12",
+   "eval": "window.__serve()",
+   "wait": 2200
+  },
+  {
+   "name": "serve13",
+   "eval": "window.__serve()",
+   "wait": 2200
+  },
+  {
+   "name": "serve14",
+   "eval": "window.__serve()",
+   "wait": 2200
+  },
+  {
+   "name": "serve15",
+   "eval": "window.__serve()",
+   "wait": 2200
+  },
+  {
+   "name": "serve16",
+   "eval": "window.__serve()",
+   "wait": 2200
+  },
+  {
+   "name": "serve17",
+   "eval": "window.__serve()",
+   "wait": 2200
+  },
+  {
+   "name": "serve18",
+   "eval": "window.__serve()",
+   "wait": 2200
+  },
+  {
+   "name": "serve19",
+   "eval": "window.__serve()",
+   "wait": 2200
+  },
+  {
+   "name": "serve20",
+   "eval": "window.__serve()",
+   "wait": 2200
+  },
+  {
+   "name": "serve21",
+   "eval": "window.__serve()",
+   "wait": 2200
+  },
+  {
+   "name": "serve22",
+   "eval": "window.__serve()",
+   "wait": 2200
+  },
+  {
+   "name": "serve23",
+   "eval": "window.__serve()",
+   "wait": 2200
+  },
+  {
+   "name": "serve24",
+   "eval": "window.__serve()",
+   "wait": 2200
+  },
+  {
+   "name": "serve25",
+   "eval": "window.__serve()",
+   "wait": 2200
+  },
+  {
+   "name": "after",
+   "eval": "(()=>{const h=E.Store.hero(),j=E.Settlements.jobData(h,E.Settlements.region());return {gold:h.gold,shifts:j.shifts,last:j.lastShiftDay,shift:!!E.Work.shift()};})()",
+   "shot": "s6-summary",
+   "settle": 400
+  },
+  {
+   "name": "again",
+   "eval": "(()=>{E.Interior.close();E.Shopfloor.enter({service:'general',region:E.Settlements.region()});const c=E.Interior.current;Object.assign(c.hero,{x:3.9,z:-3.2});c.fixtures.find(f=>f.id==='clock').run();return c.phase;})()"
+  }
+ ]
+}

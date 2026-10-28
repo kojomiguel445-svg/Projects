@@ -84,10 +84,11 @@
   G.whatsNew = async () => {
     E.state.seenVersion = E.Title.VERSION; E.Store.save();
     const html = `<div class="whatsnew"><ul>
-      <li><b>Carteira de trabalho:</b> no menu, veja seu emprego atual, estabelecimento, salário, turnos pagos e o histórico. Agora é um emprego por vez.</li>
-      <li><b>Entrevista de verdade:</b> pergunte sobre a vaga ao responsável da loja, siga-o até a sala dos fundos, sente-se e responda com suas próprias palavras. Ele faz perguntas de acompanhamento e explica a decisão.</li>
-      <li><b>Avaliação transparente:</b> a entrevista é avaliada por regras locais (coerência, comunicação, interesse, resolução de situações e confiabilidade). Não usa IA generativa e suas respostas não são guardadas.</li>
-      <li><b>Pesca sentado (5.5):</b> bancos à beira d'água, tensão da linha, varas com atributos e raridades de Comum a Lendário.</li>
+      <li><b>Trabalho no caixa:</b> contratado no empório, entre no salão, bata o ponto na área dos funcionários e assuma o caixa atrás do balcão.</li>
+      <li><b>Clientes de verdade:</b> eles entram, passeiam pelas gôndolas, fazem fila, colocam as compras no balcão, pagam e saem com a sacola.</li>
+      <li><b>Caixa registradora:</b> registre cada produto, feche a conta, guarde o pagamento na gaveta e monte o troco com as moedas (1 po = 10 pp). Errou? O cliente avisa e devolve as moedas para você recontar.</li>
+      <li><b>Salário do dia:</b> pago uma vez por dia ao fechar o caixa, com pequeno desconto por erros de troco. O emprego continua na carteira.</li>
+      <li><b>Carteira e entrevista (5.6):</b> um emprego por vez e entrevista com respostas livres na sala dos fundos.</li>
     </ul></div>`;
     await UI.modal({ title: `✦ Novidades da versão ${E.Title.VERSION}`, html, buttons: [{ label: 'Ver o Oráculo', value: 'wish' }, { label: 'Bora jogar!', value: true, cls: 'primary' }] }).then((v) => { if (v === 'wish') E.Wish.open(); });
   };

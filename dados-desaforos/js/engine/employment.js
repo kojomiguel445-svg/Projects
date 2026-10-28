@@ -279,5 +279,101 @@
     const cur = K.current(h);
     E.WorldServices.open({ title: 'Carteira de trabalho', icon: 'journal', eyebrow: 'DOCUMENTOS', text: '', html: K.cardHtml(h), actions: cur ? [{ label: 'Mostrar meu local de trabalho', run: () => E.WorldServices.guide(cur.def.place, cur.region) }] : [{ label: 'Procurar vagas na Casa dos Ofícios', run: () => E.WorldServices.guide('guild') }] });
   };
+  // ------------------------------------------------------------ expediente no caixa
+  // Valores em peças de prata (pp): 1 po = 10 pp. O dinheiro da gaveta é da loja; o salário sai uma vez por dia.
+  K.ACTIVITY = { clerk: 'cashier' };
+  K.activity = (id) => K.ACTIVITY[id] || null;
+  K.COINS = [{ id: 'po10', v: 100, label: '10 po' }, { id: 'po5', v: 50, label: '5 po' }, { id: 'po1', v: 10, label: '1 po' }, { id: 'pp5', v: 5, label: '5 pp' }, { id: 'pp1', v: 1, label: '1 pp' }];
+  K.money = (v) => { v = Math.round(v); const po = Math.floor(v / 10), pp = v % 10; return po && pp ? `${po} po ${pp} pp` : po ? `${po} po` : `${pp} pp`; };
+  // Cada estabelecimento pode ganhar o próprio catálogo; o empório é o primeiro com caixa jogável.
+  K.CATALOG = { general: [
+    { id: 'pao', name: 'Pão de viagem', price: 4, color: '#c99a5b' }, { id: 'vela', name: 'Vela de sebo', price: 2, color: '#efe3c0' },
+    { id: 'isca', name: 'Isca de minhoca', price: 3, color: '#8d6b4f' }, { id: 'linha', name: 'Linha de pesca', price: 7, color: '#d9d2b8' },
+    { id: 'sabao', name: 'Sabão de cinzas', price: 6, color: '#b9c7b1' }, { id: 'pederneira', name: 'Pederneira', price: 8, color: '#6f7378' },
+    { id: 'corda', name: 'Corda de cânhamo', price: 12, color: '#b58b53' }, { id: 'cantil', name: 'Cantil de couro', price: 15, color: '#7b5236' },
+    { id: 'mapa', name: 'Mapa da região', price: 20, color: '#e2cf9a' }, { id: 'lanterna', name: 'Lanterna de mão', price: 35, color: '#d6a640' },
+  ] };
+  const FLOAT = { po10: 0, po5: 2, po1: 6, pp5: 6, pp1: 10 }, CUSTOMERS = 5;
+  const coinSum = (coins) => K.COINS.reduce((t, c) => t + (coins[c.id] || 0) * c.v, 0);
+  const coinsOf = (v) => { const out = {}; for (const c of K.COINS) { const n = Math.floor(v / c.v); if (n) { out[c.id] = n; v -= n * c.v; } } return out; };
+  K.coinSum = coinSum;
+  // Às vezes o cliente paga o valor exato; nas outras, entrega a próxima quantia redonda.
+  function payWith(total) {
+    if (U.rand() < .2) return coinsOf(total);
+    const options = [10, 20, 50, 100, 200].filter(v => v > total);
+    return coinsOf(options[Math.min(options.length - 1, Math.floor(U.rand() * 2))]);
+  }
+  function customer(cat, i) {
+    const pool = cat.slice(), lines = [], n = 1 + Math.floor(U.rand() * 3);
+    for (let k = 0; k < n; k++) { const it = pool.splice(Math.floor(U.rand() * pool.length), 1)[0]; lines.push({ id: it.id, name: it.name, price: it.price, color: it.color, qty: it.price < 10 && U.rand() < .3 ? 2 : 1, scanned: 0 }); }
+    const total = lines.reduce((t, l) => t + l.price * l.qty, 0), pay = payWith(total);
+    return { i, lines, total, pay, paid: coinSum(pay), state: 'shopping', tries: 0 };
+  }
+  let shift = null;
+  K.shift = () => shift;
+  K.shiftStart = (h, r) => {
+    r = SS.region(r); const cur = K.current(h), cl = clock(), d = SS.data(h);
+    if (!cur || cur.region !== r || K.activity(cur.id) !== 'cashier') return result(false, 'Você não está contratado para o caixa desta loja.');
+    if (cur.data.lastShiftDay === cl.day) return result(false, 'O turno de hoje já foi pago. Volte amanhã.');
+    if (d.activeShift) return result(false, 'Termine o turno que já está em andamento.');
+    const cat = K.CATALOG[cur.def.place] || K.CATALOG.general;
+    shift = { token: U.uid(), region: r, job: cur.id, day: cl.day, customers: Array.from({ length: CUSTOMERS }, (_, i) => customer(cat, i)), served: 0, errors: 0, sales: 0, drawer: { ...FLOAT }, tray: {}, at: -1 };
+    shift.float = coinSum(shift.drawer);
+    return result(true, 'Ponto registrado. Assuma o caixa atrás do balcão.', { shift });
+  };
+  const live = (token) => shift && shift.token === token ? shift : null;
+  const front = (s) => s && s.at >= 0 ? s.customers[s.at] : null;
+  // O cliente só é atendido quando chega ao balcão e o anterior já foi embora.
+  K.arrive = (token, i) => {
+    const s = live(token), cur = front(s); if (!s || !s.customers[i] || cur && cur.state !== 'done') return null;
+    s.at = i; s.customers[i].state = 'scan'; s.tray = {}; return s.customers[i];
+  };
+  K.scan = (token, li) => {
+    const c = front(live(token)), l = c && c.state === 'scan' && c.lines[li]; if (!l || l.scanned >= l.qty) return null;
+    l.scanned++; return { line: l, all: c.lines.every(x => x.scanned === x.qty) };
+  };
+  K.bill = (token) => {
+    const c = front(live(token)); if (!c || c.state !== 'scan' || !c.lines.every(x => x.scanned === x.qty)) return null;
+    c.state = 'pay'; return { total: c.total, pay: { ...c.pay }, paid: c.paid };
+  };
+  K.receive = (token) => {
+    const s = live(token), c = front(s); if (!c || c.state !== 'pay') return null;
+    for (const [k, n] of Object.entries(c.pay)) s.drawer[k] = (s.drawer[k] || 0) + n;
+    c.state = 'change'; return { total: c.total, paid: c.paid };
+  };
+  K.tray = (token, id, delta) => {
+    const s = live(token), c = front(s); if (!c || c.state !== 'change' || !K.COINS.some(x => x.id === id)) return null;
+    const from = delta > 0 ? s.drawer : s.tray, to = delta > 0 ? s.tray : s.drawer;
+    if (!(from[id] > 0)) return coinSum(s.tray);
+    from[id]--; to[id] = (to[id] || 0) + 1; return coinSum(s.tray);
+  };
+  K.giveChange = (token) => {
+    const s = live(token), c = front(s); if (!c || c.state !== 'change') return null;
+    const due = c.paid - c.total, given = coinSum(s.tray);
+    if (given !== due) {
+      // O cliente devolve as moedas para o caixa recontar; os dois primeiros erros contam no turno.
+      for (const [k, n] of Object.entries(s.tray)) s.drawer[k] = (s.drawer[k] || 0) + n;
+      s.tray = {}; c.tries++; if (c.tries <= 2) s.errors++;
+      return { ok: false, short: given < due, hint: c.tries >= 2 ? K.money(due) : null };
+    }
+    s.tray = {}; c.state = 'done'; s.sales += c.total; s.served++;
+    return { ok: true, change: due, last: s.served === s.customers.length };
+  };
+  K.shiftFinish = (h, token) => {
+    const s = live(token); if (!s || s.served !== s.customers.length) return result(false, 'Atenda todos os clientes antes de fechar o caixa.');
+    const j = legacyJobData(h, s.region), cl = clock(), d = SS.data(h);
+    if (j.contract !== s.job || j.lastShiftDay === cl.day || !Number.isFinite(h.gold)) { shift = null; return result(false, 'Este turno não pode ser pago.'); }
+    const drawer = coinSum(s.drawer), balanced = drawer === s.float + s.sales;
+    const acc = Math.max(0, 1 - s.errors / (s.customers.length * 1.5)), pay = Math.round(SS.jobPay(s.job, s.region) * (.6 + .4 * acc));
+    j.lastShiftDay = cl.day; j.shifts = (j.shifts || 0) + 1; d.reputation += Math.max(0, 3 - s.errors); h.gold += pay;
+    if (E.Sim) { const sd = E.Sim.data(h); sd.hunger = Math.max(0, sd.hunger - 3); }
+    if (E.Life && E.Life.addXp && E.L && E.L.PROFS && E.L.PROFS.comercio) E.Life.addXp(h, 'comercio', 4 + Math.round(acc * 6));
+    shift = null; save();
+    return result(true, `Caixa fechado: ${s.served} clientes, ${K.money(s.sales)} em vendas${balanced ? ', gaveta conferida' : ''}. Salário: ${pay} po.`, { pay, errors: s.errors, sales: s.sales, served: s.served, balanced });
+  };
+  K.shiftAbort = () => { shift = null; };
+  // O turno antigo de perguntas não vale para quem trabalha no caixa: um caminho só por emprego.
+  const legacyStart = SS.startShift;
+  SS.startShift = (h, r) => { const j = SS.jobData(h, r); return K.activity(j.contract) === 'cashier' ? result(false, 'O caixa do empório é operado no balcão: entre no salão e assuma o caixa.') : legacyStart(h, r); };
   E.Work = K;
 })();

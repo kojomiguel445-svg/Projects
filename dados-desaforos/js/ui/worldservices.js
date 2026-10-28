@@ -204,6 +204,7 @@
   }
   function work(it){
     const h=hero(),d=S().data(h),j=S().jobData(h,it.region),def=S().JOBS[j.contract],shift=d.activeShift;
+    if(def&&E.Shopfloor&&E.Work&&E.Work.activity(j.contract)==='cashier'&&def.place===it.service)return E.Shopfloor.enter(it);
     if(!def||def.place!==it.service&&!(shift&&shift.region===it.region&&S().JOBS[shift.id].place===it.service))return jobs(it);
     if(j.appointment)return jobs(it);
     if(!shift)return W.open({title:def.name,icon:def.icon,text:`O responsável fornece o material. O turno leva ${def.duration} segundos de trabalho no local e paga até ${S().jobPay?S().jobPay(j.contract,it.region):def.pay} po.`,actions:[{label:'Iniciar meu turno aqui',disabled:j.lastShiftDay===E.Sim.clock().day,run:()=>transaction(()=>S().startShift(h,it.region),()=>work(it))},{label:'Consultar outras vagas daqui',primary:false,run:()=>jobListing(it)}]});
