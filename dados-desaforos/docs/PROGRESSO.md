@@ -27,7 +27,7 @@ de produção 5.3.1 (`dpl_B1hjBGYCHBUraYPjSFCMqfxEdFXA`), conferido por SHA-1 (c
   funcionários, posto atrás do balcão, 5 clientes que entram/escolhem/fazem fila/pagam/saem, registro
   dos itens, conta, gaveta e troco em moedas (1 po = 10 pp); regras e salário diário em `employment.js`
   (`tests/plan-cashier.json`). Outros estabelecimentos podem ganhar catálogo em `E.Work.CATALOG`.
-- [x] 6. Moradias (5.8.0): painel Personalizar casa (`js/gfx/homedecor.js`, `css/home.css`) com compra,
+- [x] 6. Moradias (5.8.0, em produção): painel Personalizar casa (`js/gfx/homedecor.js`, `css/home.css`) com compra,
   posição, giro e guarda de móveis; sofá, TV, geladeira, armário e bancada; papéis de parede e pisos com
   prévia ao vivo; grade de 25 cm e regra única de posição `SS.canPlaceFurniture` (paredes, porta, bancada,
   outros móveis) usada pela prévia e pelo motor; só o morador edita (`tests/plan-home.json`).
