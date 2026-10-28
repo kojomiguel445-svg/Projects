@@ -23,7 +23,7 @@ de produção 5.3.1 (`dpl_B1hjBGYCHBUraYPjSFCMqfxEdFXA`), conferido por SHA-1 (c
   saves antigos/duplicados), convite do responsável, sala dos fundos com os dois sentados e entrevista
   livre avaliada por regras (`js/engine/employment.js`, `js/gfx/workplace.js`, `tests/plan-work.json`).
   Sem servidor de jogo neste projeto Vercel: a validação roda no motor do cliente, não num servidor.
-- [x] 5. Trabalho no caixa (5.7.0): salão do empório (`js/gfx/shopfloor.js`), ponto na área dos
+- [x] 5. Trabalho no caixa (5.7.0, em produção): salão do empório (`js/gfx/shopfloor.js`), ponto na área dos
   funcionários, posto atrás do balcão, 5 clientes que entram/escolhem/fazem fila/pagam/saem, registro
   dos itens, conta, gaveta e troco em moedas (1 po = 10 pp); regras e salário diário em `employment.js`
   (`tests/plan-cashier.json`). Outros estabelecimentos podem ganhar catálogo em `E.Work.CATALOG`.

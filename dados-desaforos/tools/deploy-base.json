@@ -1,12 +1,13 @@
 {
- "commit": "d559d7d",
- "url": "https://dados-desaforos-elarion-9ja7h1phc-kojomiguel445-5477.vercel.app",
+ "commit": "22f53fa",
+ "url": "https://dados-desaforos-elarion-3qrtq7wt0-kojomiguel445-5477.vercel.app",
  "releases": [
   "5.3.0",
   "5.3.1",
   "5.3.2",
   "5.4.0",
   "5.5.0",
-  "5.6.0"
+  "5.6.0",
+  "5.7.0"
  ]
 }
