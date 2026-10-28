@@ -19,7 +19,7 @@ de produção 5.3.1 (`dpl_B1hjBGYCHBUraYPjSFCMqfxEdFXA`), conferido por SHA-1 (c
   alterar a floresta; mudar exige trocar `w.reg.biome!=='forest'` em `villages.js` (layout).
 - [x] 2. HUD (5.4.0, em produção): HUD e menus translúcidos, marcador de interação, recuo quando parado, transições
 - [x] 3. Pesca (5.5.0, em produção): pesca sentada em bancos, tensão da linha, varas com atributos, raridades, peixes de mar aberto, revelação de raros
-- [x] 4. Carteira de trabalho e entrevista (5.6.0): carteira no menu, um emprego por vez (inclusive
+- [x] 4. Carteira de trabalho e entrevista (5.6.0, em produção): carteira no menu, um emprego por vez (inclusive
   saves antigos/duplicados), convite do responsável, sala dos fundos com os dois sentados e entrevista
   livre avaliada por regras (`js/engine/employment.js`, `js/gfx/workplace.js`, `tests/plan-work.json`).
   Sem servidor de jogo neste projeto Vercel: a validação roda no motor do cliente, não num servidor.
