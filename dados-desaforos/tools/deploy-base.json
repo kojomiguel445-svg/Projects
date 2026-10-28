@@ -1,6 +1,6 @@
 {
- "commit": "ac05c23",
- "url": "https://dados-desaforos-elarion-blyuv7w4m-kojomiguel445-5477.vercel.app",
+ "commit": "0a318a9",
+ "url": "https://dados-desaforos-elarion-8hhdbkqx7-kojomiguel445-5477.vercel.app",
  "releases": [
   "5.3.0",
   "5.3.1",
@@ -9,6 +9,7 @@
   "5.5.0",
   "5.6.0",
   "5.7.0",
-  "5.8.0"
+  "5.8.0",
+  "5.9.0"
  ]
 }

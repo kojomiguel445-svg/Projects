@@ -31,3 +31,6 @@ de produção 5.3.1 (`dpl_B1hjBGYCHBUraYPjSFCMqfxEdFXA`), conferido por SHA-1 (c
   posição, giro e guarda de móveis; sofá, TV, geladeira, armário e bancada; papéis de parede e pisos com
   prévia ao vivo; grade de 25 cm e regra única de posição `SS.canPlaceFurniture` (paredes, porta, bancada,
   outros móveis) usada pela prévia e pelo motor; só o morador edita (`tests/plan-home.json`).
+- [x] 5.9.0 (em produção): guilda e diárias por personagem; entrevista/turno presos ao personagem;
+  HUD mais próximo de Genshin (grupo de personagens com troca 1-4, menu redondo, ícones soltos,
+  barra de vida fina, faixa com nome da área, UID).
