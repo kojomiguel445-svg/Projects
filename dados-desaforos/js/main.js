@@ -84,6 +84,8 @@
   G.whatsNew = async () => {
     E.state.seenVersion = E.Title.VERSION; E.Store.save();
     const html = `<div class="whatsnew"><ul>
+      <li><b>Vila do Bosque:</b> a vila mudou para um terreno plano à beira do lago, sem cobrir as trilhas da floresta. A rua não é mais uma rampa e as lojas ficam no nível do chão.</li>
+      <li><b>Vila das Montanhas:</b> a ponta da rua não fica mais embaixo d'água.</li>
       <li><b>Grupo de personagens:</b> seus personagens aparecem à direita da tela. Toque no retrato ou use as teclas 1 a 4 para trocar na hora, sem sair do lugar.</li>
       <li><b>Cada personagem com a própria carreira:</b> emprego, ofício, contratos da guilda e diárias pertencem a quem conquistou. Um personagem novo começa do zero.</li>
       <li><b>HUD renovado:</b> menu redondo ao lado do minimapa, ícones leves no topo, barra de vida fina com nível, nome da área ao chegar numa região e UID no canto.</li>

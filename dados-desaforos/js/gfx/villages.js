@@ -100,6 +100,7 @@
     const protectedSolids=(w.colliders||[]).filter(c=>!removable.has(key(c)));
     const intersects=(q,x,z,hw,hd,r)=>Math.max(0,Math.abs(q.x-x)-hw)**2+Math.max(0,Math.abs(q.z-z)-hd)**2<r*r;
     const site=(a,r)=>({x:Math.cos(a)*r,z:Math.sin(a)*r,rotation:Math.atan2(-Math.cos(a),-Math.sin(a))});
+    const forest=w.reg.biome==='forest'&&typeof w.roadDist==='function',trees=forest?[...((w.propGroups||{}).tree||[]),...((w.propGroups||{}).pine||[])]:[];
     const score=(p,r)=>{
       let cost=r*.035;
       for(const plot of plots){
@@ -126,6 +127,11 @@
       }
       const samples=[[-3,25],[3,25],[-3,-24],[3,-24],[0,0]].map(([x,z])=>worldPoint(p,x,z));
       for(const q of samples)cost+=Math.max(0,w.waterLevel+.25-ground(w,q.x,q.z))*80;
+      // Na Floresta das Lanternas a vila não pode cobrir as trilhas e deve derrubar o mínimo de árvores.
+      if(forest){
+        for(let lx=-15;lx<=15;lx+=2.5)for(let lz=-27;lz<=27;lz+=3){const q=worldPoint(p,lx,lz);if(w.roadDist(q.x,q.z)<3.2)cost+=400;}
+        for(const t of trees){const ip=localPoint(p,t.x,t.z);if(Math.abs(ip.x)<20&&Math.abs(ip.z)<32)cost+=6;}
+      }
       return cost;
     };
     for(let attempt=0;attempt<350;attempt++){
@@ -136,8 +142,8 @@
     best.score=bestScore;
     // A hillside site turns the street into a ramp and lifts shops onto tall plinths.
     // Only then search a wider ring where the whole street's rise also counts.
-    // The Lantern Forest keeps its original clearing and trails untouched.
-    if(rise(w,best)>8&&w.reg.biome!=='forest'){
+    // In the Lantern Forest the same search also keeps the trails clear and spares trees (see score).
+    if(rise(w,best)>8){
       const rng2=U.seeded(w.reg.seed*977+13);let flat=best,flatScore=bestScore+rise(w,best)**2*6;
       for(let attempt=0;attempt<500;attempt++){
         const a=rng2()*Math.PI*2,r=26+rng2()*44,p=site(a,r),cost=score(p,r)+rise(w,p)**2*6;
@@ -160,7 +166,8 @@
     const HX=14.5,HZ=27,M=10,pts=[];
     for(let lx=-10;lx<=10;lx+=5)for(let lz=-24;lz<=24;lz+=4){const q=worldPoint(plan,lx,lz);pts.push([lz,w.height(q.x,q.z)]);}
     const mean=pts.reduce((t,q)=>t+q[1],0)/pts.length,cov=pts.reduce((t,q)=>t+q[0]*(q[1]-mean),0),vz=pts.reduce((t,q)=>t+q[0]*q[0],0);
-    const grade=U.clamp(cov/vz,-.06,.06),floorY=Math.max(mean,w.waterLevel+.7),target=lz=>floorY+grade*lz;
+    // The lowest end of the sloped terrace must stay above the water, not just its centre.
+    const grade=U.clamp(cov/vz,-.06,.06),floorY=Math.max(mean,w.waterLevel+.7+Math.abs(grade)*HZ),target=lz=>floorY+grade*lz;
     const weight=(x,z)=>{const p=localPoint(plan,x,z),d=Math.hypot(Math.max(0,Math.abs(p.x)-HX),Math.max(0,Math.abs(p.z)-HZ));if(d>=M)return null;const t=1-d/M;return{k:t*t*(3-2*t),lz:U.clamp(p.z,-HZ,HZ)};};
     const original=w.height.bind(w);
     w.height=(x,z)=>{const h=original(x,z),q=weight(x,z);return q?h+(target(q.lz)-h)*q.k:h;};
