@@ -52,23 +52,25 @@
   LF.title = (h) => { const d = LF.data(h); return d.title || null; };
 
   // ------------------------------------------------------------ eventos (diárias, contratos, conquistas)
+  // Guilda e diárias pertencem a cada personagem. O progresso antigo, que era da conta inteira,
+  // fica com o personagem em jogo quando a versão nova abre; os demais começam do zero.
+  const slot = (key) => { const h = E.Store.hero(); if (!h) return E.state[key] || null; if (h[key] === undefined && E.state[key]) { h[key] = E.state[key]; delete E.state[key]; } return h[key] || null; };
+  const setSlot = (key, v) => { const h = E.Store.hero(); if (h) h[key] = v; else E.state[key] = v; return v; };
   LF.ev = (name, n = 1, extra) => {
     if (E.Chains) E.Chains.ev(name, n, extra);
-    LF.ensureDaily();
-    const dl = E.state.daily;
+    const dl = LF.ensureDaily();
     for (const t of dl.tasks) { const def = L().DAILY_POOL.find((x) => x.id === t.id); if (def && def.ev === name && t.p < def.n) { t.p = Math.min(def.n, t.p + n); if (t.p >= def.n) E.UI.toast(`✔ Diária concluída: ${def.text}`, 'gold'); } }
     U.emit('life:changed');
   };
   const dayKey = () => { if (E.Sim) return `1-1-${E.Sim.clock().day}`; const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
   LF.ensureDaily = () => {
     const k = dayKey();
-    if (E.state.daily && E.state.daily.day === k) return E.state.daily;
+    const cur = slot('daily'); if (cur && cur.day === k) return cur;
     const rng = U.seeded(k.split('-').reduce((a, b) => a * 31 + Number(b), 7) + Number(E.state.uid.slice(-4)));
     const pool = L().DAILY_POOL.slice();
     const tasks = [];
     while (tasks.length < 4) { const i = Math.floor(rng() * pool.length); tasks.push({ id: pool.splice(i, 1)[0].id, p: 0, claimed: false }); }
-    E.state.daily = { day: k, tasks, bonus: false };
-    return E.state.daily;
+    return setSlot('daily', { day: k, tasks, bonus: false });
   };
   LF.claimDaily = (i) => {
     const dl = LF.ensureDaily(), t = dl.tasks[i], def = L().DAILY_POOL.find((x) => x.id === t.id);
@@ -84,7 +86,7 @@
   // ------------------------------------------------------------ Guilda: contratos de caça
   LF.ensureGuild = () => {
     const k = dayKey();
-    const g = E.state.guild = E.state.guild || { rep: 0, done: 0, active: [] };
+    const g = slot('guild') || setSlot('guild', { rep: 0, done: 0, active: [] });
     if (g.day === k) return g;
     g.day = k;
     const rng = U.seeded(k.split('-').reduce((a, b) => a * 37 + Number(b), 11));
@@ -122,7 +124,7 @@
   };
   LF.guildRank = (rep) => { const ranks = [['F', 0], ['E', 50], ['D', 150], ['C', 350], ['B', 700], ['A', 1200], ['S', 2000]]; let r = ranks[0]; for (const x of ranks) if (rep >= x[1]) r = x; const nx = ranks[ranks.indexOf(r) + 1]; return { rank: r[0], next: nx ? nx[1] : null, cur: r[1] }; };
   LF.onKill = (keys, region) => {
-    const g = E.state.guild; if (!g || !g.board) return;
+    const g = slot('guild'); if (!g || !g.board) return;
     for (const c of g.board) {
       if (c.state !== 'active' || c.region !== region) continue;
       const n = keys.filter((k) => k === c.mon).length;

@@ -18,6 +18,7 @@
     el = U.h(`<div id="hud" class="layer noevents">
       <div class="labels"></div>
       <div class="hud-tl">
+        <button class="paimon" data-a="menu" data-key="Esc" title="Menu do viajante" aria-label="Menu do viajante">${E.Icons ? E.Icons.html('compass', { decorative: true }) : UI.ICONS.menu}</button>
         <div class="minimap" title="Abrir mapa"><canvas width="256" height="256"></canvas><span class="compass">N</span></div>
         <div class="region-name"></div>
         <div class="survival-hud"><span class="survival-time" aria-label="Calendário"></span><button class="survival-food" data-a="food" title="Comida e saciedade">${E.Icons ? E.Icons.html('cooking', { decorative: true }) : ''}<span></span><i><b></b></i></button></div>
@@ -29,9 +30,11 @@
         <button class="icon-btn" data-a="wish" data-key="O" title="Oráculo das Armas">${UI.ICONS.wish}</button>
         <button class="icon-btn" data-a="quests" data-key="J" title="Missões">${UI.ICONS.quest}</button>
         <button class="icon-btn" data-a="map" data-key="M" title="Mapa">${UI.ICONS.map}</button>
-        <button class="icon-btn" data-a="menu" data-key="Esc" title="Menu">${UI.ICONS.menu}</button>
       </div>
       <div class="coop-bar"></div>
+      <div class="party" aria-label="Personagens"></div>
+      <div class="area-banner" aria-hidden="true"><b></b><small></small></div>
+      <div class="uid"></div>
       <div class="prompts"></div>
       <div class="hud-bottom"><div class="hp-name"><span class="lv"></span><span class="nm"></span><span class="hp-num"></span></div><div class="bar hpbar"><i class="hp"></i><i class="temp"></i></div><div class="bar xp"><i></i></div></div>
       <div class="ia-mark" aria-hidden="true"><i></i></div>
@@ -64,10 +67,51 @@
     run.addEventListener('keyup', runEnd); run.addEventListener('blur', runEnd);
     el.querySelector('[data-a=act]').onclick = () => U.emit('world:interact');
     setupJoystick(el.querySelector('.joy'));
+    // No celular, correr fica junto de pular e interagir, como nos controles de toque do gênero.
+    if (document.body.classList.contains('touch')) el.querySelector('.mobile-actions').prepend(run);
+    el.querySelector('.party').onclick = (event) => { const b = event.target.closest('[data-hero]'); if (b) HUD.switchHero(b.dataset.hero); };
+    writeText(el.querySelector('.uid'), E.state.uid ? `UID: ${E.state.uid}` : '');
     trackerMarkup = null;
     HUD.update();
     if (E.Net) HUD.online(E.Net.connected, E.Net.players.size + 1);
   };
+  // ---------- grupo de personagens (lado direito) ----------
+  let bannerRegion = null, bannerTimer = 0, partyKey = '';
+  const faces = new Map();
+  const partyList = () => E.state.heroes.filter((h) => !h.dead && !h.deleted).slice(0, 4);
+  const face = (h) => {
+    const key = h.id + JSON.stringify(h.look) + (h.equip && h.equip.weapon || '');
+    if (!faces.has(key)) { try { faces.set(key, E.SP.hero(h, 'idle0', E.SP.heroWeaponType(h)).toDataURL()); } catch { faces.set(key, ''); } }
+    return faces.get(key);
+  };
+  HUD.party = () => {
+    if (!el) return;
+    const box = el.querySelector('.party'), active = E.Store.hero(), list = partyList();
+    const key = list.map((h) => `${h.id}:${h.hp}:${C.maxHp(h)}:${h.name}:${JSON.stringify(h.look)}`).join('|') + '#' + (active && active.id);
+    if (key === partyKey) return; partyKey = key;
+    box.innerHTML = list.map((h, i) => `<button class="pt ${active && h.id === active.id ? 'on' : ''}" data-hero="${h.id}" title="${U.esc(h.name)} · Nv. ${h.level}"><span class="pt-name">${U.esc(h.name)}<i class="pt-hp"><b style="width:${Math.max(0, Math.min(100, h.hp / C.maxHp(h) * 100))}%"></b></i></span><span class="pt-face" style="background-image:url(${face(h)})"></span><span class="pt-key">${i + 1}</span></button>`).join('');
+  };
+  // Troca no próprio lugar: o mundo continua carregado; cada personagem mantém seus dados e empregos.
+  HUD.switchHero = (id) => {
+    const cur = E.Store.hero(), h = E.state.heroes.find((x) => x.id === id && !x.dead && !x.deleted), w = E.WG.world;
+    if (!h || !cur || h.id === cur.id) return;
+    if (E.WG.mode() !== 'world' || E.WG.locked || !w) return E.UI.toast('Troque de personagem enquanto explora o mundo.');
+    if (E.Net && E.Net.connected && E.Net.party && E.Net.party.members.length > 1) return E.UI.toast('No cooperativo, troque de personagem pelo menu Heróis.');
+    E.state.activeHero = h.id; E.Store.save(); w.refreshHeroFrames(); partyKey = ''; HUD.update();
+    const card = el.querySelector(`[data-hero="${h.id}"]`); if (card) { card.classList.add('swap'); setTimeout(() => card.classList.remove('swap'), 500); }
+    if (E.Audio && E.Audio.sfx) E.Audio.sfx('open');
+    E.UI.toast(`Agora você joga com ${h.name}.`);
+  };
+  HUD.banner = (title, sub) => {
+    if (!el) return; const b = el.querySelector('.area-banner');
+    writeText(b.querySelector('b'), title); writeText(b.querySelector('small'), sub ? String(sub) : '');
+    b.classList.add('show'); clearTimeout(bannerTimer); bannerTimer = setTimeout(() => b.classList.remove('show'), 3800);
+  };
+  addEventListener('keydown', (event) => {
+    if (!el || event.repeat || !/^Digit[1-4]$/.test(event.code) || event.target && /INPUT|TEXTAREA|SELECT/.test(event.target.tagName)) return;
+    if (E.WG.mode() !== 'world' || E.WG.locked || E.UI.anyOpen() || document.querySelector('.modal-bg') || (E.WorldServices && E.WorldServices.active)) return;
+    const h = partyList()[+event.code.slice(5) - 1]; if (h) { event.preventDefault(); HUD.switchHero(h.id); }
+  });
   HUD.online = (on, n) => { if (!el) return; const b = el.querySelector('.online-btn'); b.classList.toggle('on', on); b.querySelector('.ob-n').textContent = on ? n : ''; HUD.coop(); };
   // faixa do cooperativo: de quem é o mundo e quem está nele (P1…P4)
   HUD.coop = () => {
@@ -89,6 +133,8 @@
     if (!h) return;
     const w = E.WG.world;
     writeText(refs.region, w ? w.reg.name : '');
+    if (w && w.reg.name !== bannerRegion) { bannerRegion = w.reg.name; HUD.banner(w.reg.name, w.reg.weather || ''); }
+    HUD.party();
     const ttl = E.Life && E.Life.title(h);
     writeHtml(refs.name, `${U.esc(h.name)}${ttl ? ` <small class="ttl">· ${U.esc(ttl)}</small>` : ''}`);
     const buffs = E.Life ? E.Life.activeBuffs(h) : [];
@@ -129,7 +175,7 @@
     if (ch && !st.complete) {
       const here = w && ch.region === w.id;
       const reg = E.WD.REGIONS[ch.region];
-      html = `<div class="t1">✧ ${ch.title}</div><div class="t2">${st.ready ? 'Objetivo concluído — abra as Missões e escolha o destino.' : here ? ch.mission : `Viaje para ${reg.name}`}</div>`;
+      html = `<div class="t1 main">${ch.title}</div><div class="t2">${st.ready ? 'Objetivo concluído — abra as Missões e escolha o destino.' : here ? ch.mission : `Viaje para ${reg.name}`}</div>`;
       if (here && !st.ready && w.objective) html += `<div class="dist">${Math.round(Math.hypot(w.objective.x - w.hero.x, w.objective.z - w.hero.z))} m · siga o feixe de luz${ch.goal.type === 'collect' ? ' até a erva brilhante' : ''}</div>`;
     } else {
       const act = Object.entries(E.state.quests).find(([, s]) => s.state === 'active');
@@ -143,8 +189,8 @@
           const reg = Object.values(E.WD.REGIONS).find((r) => r.herb === q.target);
           if (reg) near = ` · cresce em ${reg.name}`;
         }
-        if (q) html = `<div class="t1">📜 ${q.title}</div><div class="t2">${E.Quests.isComplete(q) ? 'Volte para entregar a missão.' : q.text}</div>${q.n ? `<div class="dist">${act[1].progress}/${q.n}${near}</div>` : ''}`;
-      } else html = `<div class="t1">✦ Elarion</div><div class="t2">Explore, abra baús e enfrente criaturas.</div>`;
+        if (q) html = `<div class="t1">${q.title}</div><div class="t2">${E.Quests.isComplete(q) ? 'Volte para entregar a missão.' : q.text}</div>${q.n ? `<div class="dist">${act[1].progress}/${q.n}${near}</div>` : ''}`;
+      } else html = `<div class="t1">Elarion</div><div class="t2">Explore, abra baús e enfrente criaturas.</div>`;
     }
     if (trackerMarkup !== html) { trackerMarkup = html; tr.innerHTML = html; }
   };

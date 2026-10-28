@@ -179,3 +179,77 @@ body.reduced .screen,body.reduced .screen > .screen-body,body.reduced .modal,bod
 .interior-pad button { border-radius: 50%; background: var(--g-glass-2); color: var(--g-cream); box-shadow: 0 0 0 1px var(--g-edge) inset; }
 .interior-pad button:active { background: rgba(70,120,92,.7); }
 .modal-bg-leave { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 18px; background: rgba(8, 10, 18, .5); }
+
+/* ---------- 5.9 · HUD mais próximo de Genshin ----------
+   Menu redondo ao lado do minimapa, ícones soltos no topo direito, grupo de personagens à direita,
+   barra de vida fina com nível, faixa com o nome da área e UID no canto. */
+#hud .hud-tl { position: absolute; }
+#hud .paimon { position: absolute; left: 0; top: 0; width: 46px; height: 46px; padding: 0; border: 0; border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle at 35% 30%, #fffaf0, #ece5d8 60%, #cdbf9f); color: #3b4255; cursor: pointer; pointer-events: auto; box-shadow: 0 0 0 2px rgba(255,255,255,.75), 0 4px 12px rgba(0,0,0,.35); transition: transform .2s var(--g-ease); }
+#hud .paimon:hover { transform: scale(1.06); }
+#hud .paimon:active { transform: scale(.94); }
+#hud .paimon img, #hud .paimon svg { width: 28px; height: 28px; }
+#hud .minimap, #hud .survival-hud { margin-left: 58px; }
+#hud .minimap { margin-top: 10px; }
+#hud .region-name { display: none; }
+#hud .tracker { margin-top: 10px; padding-left: 4px; }
+#hud .tracker::before { content: none; }
+#hud .tracker .t1 { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: #ece5d8; }
+#hud .tracker .t1::before { content: ''; flex: none; width: 9px; height: 9px; transform: rotate(45deg); background: #ece5d8; box-shadow: 0 0 0 2px rgba(16,20,32,.35), 0 0 8px rgba(255,255,255,.35); }
+#hud .tracker .t1.main { color: #f3dca6; }
+#hud .tracker .t1.main::before { background: #f3dca6; box-shadow: 0 0 0 2px rgba(16,20,32,.35), 0 0 10px rgba(243,220,166,.7); }
+#hud .tracker .t2, #hud .tracker .dist { padding-left: 17px; }
+/* Ícones do topo direito sem disco atrás, como glifos claros com sombra. */
+#hud .hud-tr { gap: 4px; }
+#hud .hud-tr .icon-btn { width: 44px; height: 44px; background: none; box-shadow: none; }
+#hud .hud-tr .icon-btn:hover { background: rgba(255,255,255,.1); box-shadow: none; }
+#hud .hud-tr .icon-btn svg, #hud .hud-tr .icon-btn > img.el-icon { width: 30px; height: 30px; filter: drop-shadow(0 1px 2px rgba(0,0,0,.9)) drop-shadow(0 0 6px rgba(0,0,0,.35)); }
+#hud .hud-tr .icon-btn::after { bottom: -10px; font-size: 9px; opacity: .8; }
+/* Barra de vida fina, nível à esquerda e valores centralizados. */
+#hud .hud-bottom { width: min(330px, 46vw); bottom: calc(26px + var(--safe-b)); }
+#hud .hp-name { position: relative; display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 4px; min-height: 16px; }
+#hud .hp-name .nm { display: none; }
+#hud .hp-name .lv { font-family: inherit; font-weight: 800; font-size: 13px; letter-spacing: .02em; color: #fff; text-shadow: 0 1px 2px #000, 0 0 6px rgba(0,0,0,.5); }
+#hud .hp-name .hp-num { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); font-size: 12px; font-weight: 700; color: #fff; text-shadow: 0 1px 2px #000, 0 0 6px rgba(0,0,0,.5); }
+#hud .bar.hpbar { height: 7px; border-radius: 4px; background: rgba(10,14,22,.55); box-shadow: 0 0 0 1px rgba(255,255,255,.35); overflow: hidden; }
+#hud .bar.hpbar .hp { background: linear-gradient(180deg, #b4ee7a, #84cf43); border-radius: 4px; }
+#hud .bar.hpbar.low .hp { background: linear-gradient(180deg, #ff8a78, #e2483c); }
+#hud .hud-bottom .bar.xp { display: none; }
+/* Grupo de personagens: nome, retrato redondo e tecla de troca. */
+#hud .party { position: absolute; right: calc(16px + env(safe-area-inset-right, 0px)); top: 50%; transform: translateY(-62%); display: flex; flex-direction: column; gap: 10px; pointer-events: auto; }
+#hud .pt { display: grid; grid-template-columns: auto 54px 24px; align-items: center; gap: 9px; padding: 0; border: 0; background: none; color: #fff; font: inherit; cursor: pointer; text-align: right; transition: transform .25s var(--g-ease); }
+#hud .pt.on { transform: translateX(-14px); }
+#hud .pt-name { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; max-width: 120px; font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px #000, 0 0 8px rgba(0,0,0,.6); }
+#hud .pt-hp { display: block; width: 74px; height: 4px; border-radius: 2px; background: rgba(10,14,22,.55); box-shadow: 0 0 0 1px rgba(255,255,255,.25); overflow: hidden; }
+#hud .pt-hp b { display: block; height: 100%; background: #9be35a; }
+#hud .pt-face { position: relative; width: 54px; height: 54px; border-radius: 50%; background: rgba(16,20,32,.55) 50% 14% / 170% no-repeat; image-rendering: pixelated; box-shadow: 0 0 0 2px rgba(255,255,255,.55), 0 4px 10px rgba(0,0,0,.35); transition: transform .25s var(--g-ease), box-shadow .25s; }
+#hud .pt-key { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 5px; background: rgba(16,20,32,.55); box-shadow: 0 0 0 1px rgba(255,255,255,.45) inset; font-size: 12px; font-weight: 800; }
+#hud .pt.on .pt-face { box-shadow: 0 0 0 2.5px #f3dca6, 0 0 16px rgba(243,220,166,.5), 0 4px 10px rgba(0,0,0,.35); }
+#hud .pt.on .pt-name { color: #f3dca6; }
+#hud .pt.swap .pt-face { animation: ptSwap .45s var(--g-ease); }
+#hud .pt:not(.on):hover .pt-face { box-shadow: 0 0 0 2px #fff, 0 4px 10px rgba(0,0,0,.35); }
+@keyframes ptSwap { 0% { transform: scale(1); } 40% { transform: scale(1.14); } 100% { transform: scale(1); } }
+/* Nome da área ao entrar numa região. */
+#hud .area-banner { position: absolute; left: 50%; top: 20%; transform: translate(-50%, 8px); display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; color: #fff; pointer-events: none; opacity: 0; transition: opacity .9s, transform .9s var(--g-ease); }
+#hud .area-banner.show { opacity: 1; transform: translate(-50%, 0); }
+#hud .area-banner b { font-size: 30px; font-weight: 700; letter-spacing: .08em; text-shadow: 0 2px 10px rgba(0,0,0,.65), 0 0 2px rgba(0,0,0,.8); }
+#hud .area-banner b::before, #hud .area-banner b::after { content: '◆'; margin: 0 14px; font-size: 12px; color: #f3dca6; vertical-align: middle; }
+#hud .area-banner small { font-size: 12px; letter-spacing: .28em; text-transform: uppercase; color: #f3dca6; text-shadow: 0 1px 4px rgba(0,0,0,.8); }
+#hud .area-banner small:empty { display: none; }
+#hud .uid { position: absolute; right: calc(12px + env(safe-area-inset-right, 0px)); bottom: calc(5px + var(--safe-b)); font-size: 10.5px; letter-spacing: .04em; color: rgba(255,255,255,.62); text-shadow: 0 1px 2px #000; }
+#hud.calm .party { opacity: .85; }
+/* Toque: grupo menor, controles de ação em leque com correr junto. */
+body.touch #hud .paimon { width: 38px; height: 38px; }
+body.touch #hud .paimon img, body.touch #hud .paimon svg { width: 22px; height: 22px; }
+body.touch #hud .minimap, body.touch #hud .survival-hud { margin-left: 46px; }
+body.touch #hud .party { top: 44%; gap: 6px; }
+body.touch #hud .pt { grid-template-columns: auto 42px 20px; gap: 6px; }
+body.touch #hud .pt-face { width: 42px; height: 42px; }
+body.touch #hud .pt-name { font-size: 11.5px; max-width: 90px; }
+body.touch #hud .pt-hp { width: 56px; }
+body.touch #hud .pt-key { width: 18px; height: 18px; font-size: 10px; }
+body.touch #hud .area-banner b { font-size: 21px; }
+body.touch #hud .hud-tr .sprint-btn { display: none; }
+body.touch .mobile-actions .sprint-btn { display: grid; place-items: center; width: 50px; height: 50px; margin-bottom: 64px; border-radius: 50%; background: var(--g-glass); color: var(--g-cream); box-shadow: 0 0 0 1px var(--g-edge-2) inset, 0 6px 16px rgba(0,0,0,.25); }
+body.touch .mobile-actions .sprint-btn.running, body.touch .mobile-actions .sprint-btn[aria-pressed="true"] { background: rgba(243,220,166,.85); color: var(--g-ink); }
+body.touch .mobile-actions .icon-btn::after { content: none; }
+body.touch #hud .uid { bottom: calc(2px + var(--safe-b)); font-size: 9.5px; }

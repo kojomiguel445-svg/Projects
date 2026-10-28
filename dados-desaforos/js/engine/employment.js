@@ -187,7 +187,9 @@
 
   // ------------------------------------------------------------ sessão de entrevista
   let session = null;
-  K.session = () => session;
+  // Entrevista e turno em andamento ficam presos ao personagem que os começou.
+  const mine = (o) => { const h = hero(); return !!(o && h && o.hero === h.id); };
+  K.session = () => { if (session && !mine(session)) session = null; return session; };
   K.begin = (h, r, id, place) => {
     r = SS.region(r); const def = SS.JOBS[id], j = SS.jobData(h, r), cl = clock();
     if (!def || !SS.availableJobs(h, r, place).some(x => x.id === id) || def.place !== place) return result(false, 'Esta vaga não é oferecida neste estabelecimento.');
@@ -196,13 +198,13 @@
     // A tentativa é registrada no início: sair no meio não dá direito a outra no mesmo dia.
     j.interviewDay = cl.day; j.appointment = null; save();
     const owner = (E.Interior && E.Interior.kit && E.Interior.kit.merchantNames[place]) || 'O responsável';
-    session = { token: U.uid(), id, region: r, place, owner, mood: K.personality(r, place), step: 1, answers: [], script: script(id), done: false };
+    session = { token: U.uid(), hero: h.id, id, region: r, place, owner, mood: K.personality(r, place), step: 1, answers: [], script: script(id), done: false };
     session.question = nextQuestion(session);
     return result(true, '', { session, question: session.question });
   };
   K.cancel = () => { session = null; };
   K.answer = (token, raw) => {
-    const s = session; raw = String(raw || '').replace(/\s+/g, ' ').trim().slice(0, MAX_CHARS);
+    const s = K.session(); raw = String(raw || '').replace(/\s+/g, ' ').trim().slice(0, MAX_CHARS);
     if (!s || s.token !== token || s.done) return result(false, 'A entrevista não está em andamento.');
     if (raw.length < 2) return result(false, 'Escreva sua resposta antes de enviar.');
     const q = s.question, a = K.analyze(raw, { groups: q.groups, extra: q.extra });
@@ -243,7 +245,7 @@
   const WEAK = { coh: 'as respostas fugiram do que eu perguntei', comm: 'suas respostas foram curtas ou confusas demais para eu conhecer você', motive: 'não ficou claro por que você quer este trabalho', situ: 'não ficou claro como você resolveria o problema do cliente', trust: 'faltou mostrar compromisso com horário e responsabilidade' };
   const GOOD = { coh: 'você respondeu exatamente ao que eu perguntei', comm: 'você se expressa com clareza', motive: 'dá para ver que você quer mesmo trabalhar aqui', situ: 'você pensou com cuidado em como resolver a situação', trust: 'passou confiança sobre horário e responsabilidade' };
   K.finish = (h, token) => {
-    const s = session;
+    const s = K.session();
     if (!s || s.token !== token || !s.done || s.answers.length !== 5) return result(false, 'A entrevista ainda não terminou.');
     session = null;
     const sc = K.score(s), order = Object.keys(sc.criteria).sort((a, b) => sc.criteria[b] - sc.criteria[a]);
@@ -310,18 +312,18 @@
     return { i, lines, total, pay, paid: coinSum(pay), state: 'shopping', tries: 0 };
   }
   let shift = null;
-  K.shift = () => shift;
+  K.shift = () => { if (shift && !mine(shift)) shift = null; return shift; };
   K.shiftStart = (h, r) => {
     r = SS.region(r); const cur = K.current(h), cl = clock(), d = SS.data(h);
     if (!cur || cur.region !== r || K.activity(cur.id) !== 'cashier') return result(false, 'Você não está contratado para o caixa desta loja.');
     if (cur.data.lastShiftDay === cl.day) return result(false, 'O turno de hoje já foi pago. Volte amanhã.');
     if (d.activeShift) return result(false, 'Termine o turno que já está em andamento.');
     const cat = K.CATALOG[cur.def.place] || K.CATALOG.general;
-    shift = { token: U.uid(), region: r, job: cur.id, day: cl.day, customers: Array.from({ length: CUSTOMERS }, (_, i) => customer(cat, i)), served: 0, errors: 0, sales: 0, drawer: { ...FLOAT }, tray: {}, at: -1 };
+    shift = { token: U.uid(), hero: h.id, region: r, job: cur.id, day: cl.day, customers: Array.from({ length: CUSTOMERS }, (_, i) => customer(cat, i)), served: 0, errors: 0, sales: 0, drawer: { ...FLOAT }, tray: {}, at: -1 };
     shift.float = coinSum(shift.drawer);
     return result(true, 'Ponto registrado. Assuma o caixa atrás do balcão.', { shift });
   };
-  const live = (token) => shift && shift.token === token ? shift : null;
+  const live = (token) => { const s = K.shift(); return s && s.token === token ? s : null; };
   const front = (s) => s && s.at >= 0 ? s.customers[s.at] : null;
   // O cliente só é atendido quando chega ao balcão e o anterior já foi embora.
   K.arrive = (token, i) => {

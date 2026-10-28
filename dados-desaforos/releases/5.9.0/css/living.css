@@ -1,0 +1,15 @@
+/* Cozinha, viagem e calendário: controles legíveis sem filtros caros. */
+.sprint-btn { position: relative; border: 1px solid #d8bd8966; }
+.sprint-btn.running { background: #d4b475; box-shadow: inset 0 0 0 2px #f7e1b2; }
+.sprint-btn.running > img { filter: drop-shadow(0 1px 1px #35344c55); }
+.survival-hud { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 5px; font-size: 10px; font-weight: 800; color: #fff5df; text-shadow: 0 1px 3px #111; pointer-events: auto; }
+.survival-time { white-space: nowrap; color: #e6dbbf; }
+.survival-food { display: flex; align-items: center; gap: 5px; min-width: 90px; }
+.survival-food > i { display: block; width: 60px; height: 5px; border-radius: 8px; overflow: hidden; background: #172838d9; }
+.survival-food > i > b { display: block; height: 100%; background: #a9be76; border-radius: inherit; }
+.survival-food.low > i > b { background: #e9a46c; }
+.survival-food.empty { color: #ffac8e; }
+#menu .menu-grid { grid-auto-rows: minmax(85px,100px); gap: 12px 10px; }
+#menu .menu-shortcuts { overflow: auto; }
+@media (max-height:600px) and (orientation:landscape) { #menu .menu-grid { grid-template-columns: repeat(5,minmax(0,1fr)); grid-auto-rows: 65px; gap: 7px 5px; } .survival-hud { gap: 8px; font-size: 9px; } .survival-food > i { width:45px; } }
+@media(max-height:380px) and (orientation:landscape){#menu .menu-grid{grid-auto-rows:60px;gap:5px}.survival-hud{margin-top:2px}}

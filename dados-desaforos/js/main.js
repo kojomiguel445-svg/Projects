@@ -84,11 +84,10 @@
   G.whatsNew = async () => {
     E.state.seenVersion = E.Title.VERSION; E.Store.save();
     const html = `<div class="whatsnew"><ul>
-      <li><b>Personalizar casa:</b> dentro da sua casa, toque em Personalizar casa para comprar, posicionar, girar e guardar móveis, com prévia antes de confirmar.</li>
-      <li><b>Móveis novos:</b> sofá, TV de cristal (com canais), geladeira de gelo-eterno, armário de cozinha e bancada com pia, além da cama, mesa, cadeira e fogão.</li>
-      <li><b>Paredes e piso:</b> papéis de parede (listrado, floral, xadrez e lambri de madeira) e pisos de nogueira, ladrilho, pedra e terracota, com prévia ao vivo.</li>
-      <li><b>Grade e encaixe:</b> os móveis encaixam numa grade de 25 cm, encostam nas paredes sem atravessá-las e nunca bloqueiam a porta. Só o morador pode editar.</li>
-      <li><b>Trabalho no caixa (5.7):</b> expediente no empório com clientes, registro de produtos e troco em moedas.</li>
+      <li><b>Grupo de personagens:</b> seus personagens aparecem à direita da tela. Toque no retrato ou use as teclas 1 a 4 para trocar na hora, sem sair do lugar.</li>
+      <li><b>Cada personagem com a própria carreira:</b> emprego, ofício, contratos da guilda e diárias pertencem a quem conquistou. Um personagem novo começa do zero.</li>
+      <li><b>HUD renovado:</b> menu redondo ao lado do minimapa, ícones leves no topo, barra de vida fina com nível, nome da área ao chegar numa região e UID no canto.</li>
+      <li><b>Personalizar casa (5.8):</b> móveis novos, papéis de parede e pisos com prévia.</li>
     </ul></div>`;
     await UI.modal({ title: `✦ Novidades da versão ${E.Title.VERSION}`, html, buttons: [{ label: 'Ver o Oráculo', value: 'wish' }, { label: 'Bora jogar!', value: true, cls: 'primary' }] }).then((v) => { if (v === 'wish') E.Wish.open(); });
   };
