@@ -3,7 +3,9 @@
 Compara a árvore atual com o commit importado do deploy 5.3.1 e grava:
   tools/deploy-plan.json  - diferenças por caractere (arquivos alterados) e lista da base
   <saida>/deploy-files.json - lista `files` para create_deployment (só o que precisa subir)
-Uso: python3 tools/deploy_plan.py <release> <pasta-de-saída>   (base em tools/deploy-base.json)
+Uso: python3 tools/deploy_plan.py <release> <pasta-de-saída> [--src <url raw do commit>]   (base em tools/deploy-base.json)
+Com --src, os arquivos alterados e novos não vão no deploy: o build os baixa do repositório público
+(commit fixo, já enviado ao GitHub) e confere o SHA-1 de cada um (`fetched`).
 """
 import difflib, hashlib, json, os, subprocess, sys
 
@@ -54,6 +56,7 @@ def char_ops(a, b):
 
 def main():
     release, outdir = sys.argv[1], sys.argv[2]
+    src = sys.argv[sys.argv.index('--src') + 1].rstrip('/') if '--src' in sys.argv else None
     old_releases = [[v, BASE_URL] for v in BASE['releases'] if v != release]
     base = base_files()
     patches, uploaded, removed = {}, [], []
@@ -82,6 +85,11 @@ def main():
             if rel.startswith(SKIP) or rel in CONFIG or rel in base:
                 continue
             uploaded.append(rel)
+    fetched = {}
+    if src:
+        for rel in sorted(list(patches) + uploaded):
+            fetched[rel] = hashlib.sha1(open(os.path.join(ROOT, rel), 'rb').read()).hexdigest()
+        patches, uploaded = {}, []
     groups = {}
     for f in base:
         d, _, n = f.rpartition('/')
@@ -89,6 +97,8 @@ def main():
     plan = {'base': BASE_URL, 'release': release, 'baseFiles': ';'.join(d + ':' + ','.join(n) for d, n in groups.items()),
             'patches': patches, 'uploaded': sorted(uploaded), 'removed': removed, 'oldReleases': old_releases,
             'sums': {rel: hashlib.sha1(open(os.path.join(ROOT, rel), 'rb').read()).hexdigest() for rel in sorted(uploaded)}}
+    if src:
+        plan.update({'src': src, 'fetched': fetched})
     with open(os.path.join(ROOT, 'tools/deploy-plan.json'), 'w') as fh:
         json.dump(plan, fh, ensure_ascii=False, separators=(',', ':'))
     cfg = json.load(open(os.path.join(ROOT, 'vercel.json')))
@@ -110,7 +120,7 @@ def main():
     with open(os.path.join(outdir, 'deploy-files.json'), 'w') as fh:
         json.dump(files, fh, ensure_ascii=False)
     inline = sum(len(f.get('data', '')) for f in files)
-    print(f'patches={len(patches)} uploaded={len(uploaded)} removed={len(removed)} inline_chars={inline}')
+    print(f'patches={len(patches)} uploaded={len(uploaded)} fetched={len(fetched)} removed={len(removed)} inline_chars={inline}')
     for f in files:
         print(' ', f['file'], 'sha' if 'sha' in f else len(f['data']))
 

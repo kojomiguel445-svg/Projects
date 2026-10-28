@@ -24,10 +24,12 @@ async function pool(items, fn, n = 12) { const q = [...items]; await Promise.all
 
 // lista da base compactada por pasta: "pasta:a,b;outra:c"
 plan.baseFiles = plan.baseFiles.split(';').flatMap((g) => { const [d, f] = g.split(':'); return f.split(',').map((n) => (d ? d + '/' : '') + n); });
-const releaseFiles = [...new Set([...plan.baseFiles, ...plan.uploaded])].filter((f) => /^(css|fonts|js|vendor)\//.test(f) || /^icons\/[^/]+\.png$/.test(f)).concat('index.html');
+// Arquivos buscados no repositório público num commit fixo (plan.src), conferidos por SHA-1 (plan.fetched).
+const fetched = plan.fetched || {};
+const releaseFiles = [...new Set([...plan.baseFiles, ...plan.uploaded, ...Object.keys(fetched)])].filter((f) => /^(css|fonts|js|vendor)\//.test(f) || /^icons\/[^/]+\.png$/.test(f)).concat('index.html');
 fs.rmSync(out, { recursive: true, force: true });
 // 1. arquivos da base que não foram enviados nem removidos
-await pool(plan.baseFiles.filter((f) => !plan.uploaded.includes(f) && !plan.removed.includes(f)), async (rel) => {
+await pool(plan.baseFiles.filter((f) => !plan.uploaded.includes(f) && !plan.removed.includes(f) && !fetched[f]), async (rel) => {
   let data = await fetchBase(rel);
   const p = plan.patches[rel];
   if (p) {
@@ -45,6 +47,12 @@ for (const rel of plan.uploaded) {
   if (plan.sums && plan.sums[rel] && sha1(data) !== plan.sums[rel]) throw new Error('arquivo enviado não confere: ' + rel);
   put(rel, data);
 }
+// 2b. arquivos alterados ou novos baixados do GitHub (commit imutável)
+await pool(Object.keys(fetched), async (rel) => {
+  const data = await fetchBase(rel, false, plan.src);
+  if (sha1(data) !== fetched[rel]) throw new Error('arquivo do repositório não confere: ' + rel);
+  put(rel, data);
+});
 // 3. ícones SVG avulsos (idênticos aos embutidos em icons-data.js)
 const ctx = { E: {} }; vm.runInNewContext(fs.readFileSync(path.join(out, 'js/gfx/icons-data.js'), 'utf8'), ctx);
 for (const [k, e] of Object.entries(ctx.E.IconCatalog)) put(`icons/ui/${k}.svg`, Buffer.from(e.src.split(',')[1], 'base64'));
@@ -56,4 +64,4 @@ fs.mkdirSync(path.join(rel, 'icons'), { recursive: true });
 for (const f of fs.readdirSync(path.join(out, 'icons'))) if (f.endsWith('.png')) fs.copyFileSync(path.join(out, 'icons', f), path.join(rel, 'icons', f));
 fs.copyFileSync(path.join(out, 'index.html'), path.join(rel, 'index.html'));
 for (const [v, from] of plan.oldReleases) await pool(releaseFiles.map((f) => `releases/${v}/${f}`), async (f) => { const data = await fetchBase(f, true, from); if (data) put(f, data); });
-console.log(`dist pronto: versão ${plan.release}, ${plan.baseFiles.length} da base, ${Object.keys(plan.patches).length} com diferenças, ${plan.uploaded.length} enviados`);
+console.log(`dist pronto: versão ${plan.release}, ${plan.baseFiles.length} da base, ${Object.keys(plan.patches).length} com diferenças, ${plan.uploaded.length} enviados, ${Object.keys(fetched).length} do repositório`);

@@ -11,6 +11,10 @@ de produção 5.3.1 (`dpl_B1hjBGYCHBUraYPjSFCMqfxEdFXA`), conferido por SHA-1 (c
    `target: production` referenciando os mesmos SHA). O build (`tools/build.mjs`) baixa a base
    imutável, aplica as diferenças e confere cada arquivo por SHA-1.
    O build confere por SHA-1 tanto as diferenças quanto os arquivos novos enviados (`sums`).
+   Desde a 5.10.0 há o modo `--src <url raw do commit>`: com o commit já enviado ao GitHub (repositório
+   público), o deploy leva só `vercel.json`, `tools/build.mjs` e o plano; o build baixa os arquivos
+   alterados e novos de `raw.githubusercontent.com/<dono>/<repo>/<sha completo>/dados-desaforos/` e
+   confere o SHA-1 de cada um (`fetched`). Evita colar dezenas de milhares de caracteres no deploy.
 4. Testes locais: `python3 -m http.server 8765` na pasta e `node tests/harness.cjs <roteiro> <saída>`.
 
 ## Etapas
