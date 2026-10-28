@@ -101,7 +101,7 @@
   function frame(c, dt) {
     const cam = c.camera, aspect = innerWidth / innerHeight, halfW = Math.max(6.8, 8.2 / aspect) * aspect;
     const panel = c.panel && c.phase !== 'free' ? c.panel.getBoundingClientRect() : null;
-    const covered = panel && panel.width < innerWidth * .7 ? (innerWidth - panel.left) / innerWidth : 0;
+    const covered = panel && panel.width > 0 && panel.width < innerWidth * .7 ? (innerWidth - panel.left) / innerWidth : 0;
     c.shift = (c.shift || 0) + (covered * halfW - (c.shift || 0)) * Math.min(1, dt * 4);
     if (Math.abs(cam.left + halfW - c.shift) > 1e-3) { cam.left = -halfW + c.shift; cam.right = halfW + c.shift; cam.updateProjectionMatrix(); }
   }

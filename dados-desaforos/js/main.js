@@ -84,11 +84,11 @@
   G.whatsNew = async () => {
     E.state.seenVersion = E.Title.VERSION; E.Store.save();
     const html = `<div class="whatsnew"><ul>
-      <li><b>Trabalho no caixa:</b> contratado no empório, entre no salão, bata o ponto na área dos funcionários e assuma o caixa atrás do balcão.</li>
-      <li><b>Clientes de verdade:</b> eles entram, passeiam pelas gôndolas, fazem fila, colocam as compras no balcão, pagam e saem com a sacola.</li>
-      <li><b>Caixa registradora:</b> registre cada produto, feche a conta, guarde o pagamento na gaveta e monte o troco com as moedas (1 po = 10 pp). Errou? O cliente avisa e devolve as moedas para você recontar.</li>
-      <li><b>Salário do dia:</b> pago uma vez por dia ao fechar o caixa, com pequeno desconto por erros de troco. O emprego continua na carteira.</li>
-      <li><b>Carteira e entrevista (5.6):</b> um emprego por vez e entrevista com respostas livres na sala dos fundos.</li>
+      <li><b>Personalizar casa:</b> dentro da sua casa, toque em Personalizar casa para comprar, posicionar, girar e guardar móveis, com prévia antes de confirmar.</li>
+      <li><b>Móveis novos:</b> sofá, TV de cristal (com canais), geladeira de gelo-eterno, armário de cozinha e bancada com pia, além da cama, mesa, cadeira e fogão.</li>
+      <li><b>Paredes e piso:</b> papéis de parede (listrado, floral, xadrez e lambri de madeira) e pisos de nogueira, ladrilho, pedra e terracota, com prévia ao vivo.</li>
+      <li><b>Grade e encaixe:</b> os móveis encaixam numa grade de 25 cm, encostam nas paredes sem atravessá-las e nunca bloqueiam a porta. Só o morador pode editar.</li>
+      <li><b>Trabalho no caixa (5.7):</b> expediente no empório com clientes, registro de produtos e troco em moedas.</li>
     </ul></div>`;
     await UI.modal({ title: `✦ Novidades da versão ${E.Title.VERSION}`, html, buttons: [{ label: 'Ver o Oráculo', value: 'wish' }, { label: 'Bora jogar!', value: true, cls: 'primary' }] }).then((v) => { if (v === 'wish') E.Wish.open(); });
   };

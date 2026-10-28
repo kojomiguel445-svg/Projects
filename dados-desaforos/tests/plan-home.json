@@ -1,0 +1,126 @@
+{
+ "steps": [
+  {
+   "name": "setup",
+   "eval": "(()=>{const h=E.Store.hero(),r=E.Settlements.region();h.gold=12000;const a=E.Settlements.acquire(h,r,'home','buy');return {a:a.message,gold:h.gold};})()"
+  },
+  {
+   "name": "door",
+   "eval": "(()=>{const w=E.WG.world,r=E.Settlements.region(),it=(w.interactables||[]).find(i=>i.kind==='settlement'&&i.service==='home');if(!it)return 'no-home-door';w.hero.x=it.x+.5;w.hero.z=it.z+.3;window.__pos=[w.hero.x,w.hero.z];E.Settlements.enter('home',r);return {kind:E.Interior.current&&E.Interior.current.kind,pos:window.__pos};})()",
+   "shot": "h1-home",
+   "settle": 1200
+  },
+  {
+   "name": "leave",
+   "eval": "(()=>{E.Interior.leave();const w=E.WG.world;return {inside:!!E.Interior.current,back:[w.hero.x.toFixed(2),w.hero.z.toFixed(2)],was:window.__pos.map(v=>v.toFixed(2))};})()"
+  },
+  {
+   "name": "reenter",
+   "eval": "(()=>{E.Settlements.enter('home',E.Settlements.region());const c=E.Interior.current;return {kind:c&&c.kind,btn:!!c.overlay.querySelector('[data-customize]')};})()",
+   "wait": 500
+  },
+  {
+   "name": "panel",
+   "eval": "(()=>{const c=E.Interior.current;E.HomeDecor.open(c,'furniture');c.decor.querySelector('[data-sel=sofa]').click();return c.decor.querySelector('.hd-detail').innerText.slice(0,160);})()",
+   "shot": "h2-panel",
+   "settle": 500
+  },
+  {
+   "name": "buy-sofa",
+   "eval": "(()=>{const c=E.Interior.current;c.decor.querySelector('[data-buy=sofa]').click();const e=c.edit;if(!e)return 'no-edit';e.x=2.6;e.z=-3.85;return {edit:!!e,hidden:c.decor&&c.decor.hidden};})()",
+   "wait": 600,
+   "shot": "h3-place",
+   "settle": 300
+  },
+  {
+   "name": "sofa-ok",
+   "eval": "(()=>{const e=E.Interior.current.edit;return {gx:e.gx,gz:e.gz,valid:e.valid,why:e.why||''};})()"
+  },
+  {
+   "name": "confirm",
+   "eval": "(()=>{E.Interior.confirmPlacement();const c=E.Interior.current;return {panel:!!c.decor,edit:!!c.edit};})()",
+   "wait": 600
+  },
+  {
+   "name": "tv",
+   "eval": "(()=>{const c=E.Interior.current;c.decor.querySelector('[data-sel=tv]').click();c.decor.querySelector('[data-buy=tv]').click();const e=c.edit;e.x=-.6;e.z=-4.0;return 'ok';})()",
+   "wait": 500
+  },
+  {
+   "name": "tv-wall",
+   "eval": "(()=>{const e=E.Interior.current.edit;const ok={gx:e.gx,gz:e.gz,valid:e.valid};e.z=-4.1;return ok;})()",
+   "wait": 400
+  },
+  {
+   "name": "tv-clip",
+   "eval": "(()=>{const e=E.Interior.current.edit;const r={gz:e.gz,valid:e.valid,why:e.why};e.z=-4.0;return r;})()",
+   "wait": 400
+  },
+  {
+   "name": "tv-confirm",
+   "eval": "(()=>{E.Interior.confirmPlacement();return !!E.Interior.current.edit;})()",
+   "wait": 600
+  },
+  {
+   "name": "fridge",
+   "eval": "(()=>{const c=E.Interior.current;c.decor.querySelector('[data-sel=fridge]').click();c.decor.querySelector('[data-buy=fridge]').click();const e=c.edit;e.x=-4.3;e.z=-3.85;return 'ok';})()",
+   "wait": 500
+  },
+  {
+   "name": "fridge-door",
+   "eval": "(()=>{const e=E.Interior.current.edit;const ok={valid:e.valid};e.x=0;e.z=2.8;return ok;})()",
+   "wait": 400
+  },
+  {
+   "name": "fridge-entrance",
+   "eval": "(()=>{const e=E.Interior.current.edit;const r={valid:e.valid,why:e.why};e.x=-4.3;e.z=-3.85;e.turn=1;return r;})()",
+   "wait": 400
+  },
+  {
+   "name": "fridge-rot",
+   "eval": "(()=>{const e=E.Interior.current.edit;const r={valid:e.valid,turn:e.turn};E.Interior.confirmPlacement();return r;})()",
+   "wait": 600
+  },
+  {
+   "name": "engine-guard",
+   "eval": "(()=>{const h=E.Store.hero(),r=E.Settlements.region(),p=E.Settlements.property(h,r,'home'),f=p.furniture.find(x=>x.id==='sofa');return {wall:E.Settlements.placeFurniture(h,r,f.uid,0,-4.5,0).message,door:E.Settlements.placeFurniture(h,r,f.uid,0,3,0).message,other:E.Settlements.placeFurniture(h,'outra-regiao',f.uid,0,0,0).message};})()"
+  },
+  {
+   "name": "furn-shot",
+   "eval": "(()=>{const c=E.Interior.current;return c.decor?c.decor.querySelector('[data-gold]').textContent:'no panel';})()",
+   "shot": "h4-furniture",
+   "settle": 500
+  },
+  {
+   "name": "wall",
+   "eval": "(()=>{const c=E.Interior.current;c.decor.querySelector('[data-tab=wall]').click();c.decor.querySelector('[data-wall=flowers]').click();return c.surfaces.length;})()",
+   "shot": "h5-wall-preview",
+   "settle": 500
+  },
+  {
+   "name": "wall-apply",
+   "eval": "(()=>{const c=E.Interior.current;c.decor.querySelector('[data-apply=wall]').click();return 1;})()",
+   "wait": 700
+  },
+  {
+   "name": "floor",
+   "eval": "(()=>{const c=E.Interior.current;const p=E.Settlements.property(E.Store.hero(),c.region,'home');c.decor.querySelector('[data-tab=floor]').click();c.decor.querySelector('[data-floor=tiles]').click();return {wall:p.wall,surf:c.surfaces.length};})()",
+   "wait": 300
+  },
+  {
+   "name": "floor-apply",
+   "eval": "(()=>{const c=E.Interior.current;c.decor.querySelector('[data-apply=floor]').click();return 1;})()",
+   "wait": 700
+  },
+  {
+   "name": "tv-on",
+   "eval": "(()=>{const c=E.Interior.current;E.HomeDecor.close(c);const f=c.fixtures.find(x=>x.id==='tv');f.run(f,c);document.querySelector('.world-service-panel [data-action=\"0\"]').click();E.WorldServices.close();const p=E.Settlements.property(E.Store.hero(),c.region,'home');return {floor:p.floor,wall:p.wall,tv:p.furniture.find(x=>x.id==='tv').on,gold:E.Store.hero().gold,items:p.furniture.map(x=>x.id+(x.stored?'*':'')+'@'+x.x+','+x.z+','+(x.r||0).toFixed(2)).join(' ')};})()",
+   "shot": "h6-final",
+   "settle": 900
+  },
+  {
+   "name": "room-guard",
+   "eval": "(()=>{E.Interior.open({kind:'room',region:E.Settlements.region()});const c=E.Interior.current;E.HomeDecor.open(c);return {panel:!!c.decor,btn:!!c.overlay.querySelector('[data-customize]')};})()"
+  }
+ ]
+}

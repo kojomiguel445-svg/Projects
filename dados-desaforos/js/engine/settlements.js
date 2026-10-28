@@ -16,7 +16,8 @@
   SS.marketScale=r=>SS.isMetro(r)?1.65:1;
   SS.price=(r,base)=>Math.max(0,Math.ceil((Number(base)||0)*SS.marketScale(r)));
   SS.jobPay=(id,r)=>Math.round((SS.JOBS[id]&&SS.JOBS[id].pay||0)*(SS.isMetro(r)?1.8:1));
-  SS.WALLS = Object.freeze({cream:{name:'Cal de marfim',color:'#ded6bd',price:0},sage:{name:'Verde sálvia',color:'#93aa8d',price:16},indigo:{name:'Azul de Lunária',color:'#788aac',price:22},clay:{name:'Argila de Záhara',color:'#bd8c6b',price:18},plum:{name:'Ameixa astral',color:'#9b83a9',price:26}});
+  SS.WALLS = Object.freeze({cream:{name:'Cal de marfim',color:'#ded6bd',price:0},sage:{name:'Verde sálvia',color:'#93aa8d',price:16},indigo:{name:'Azul de Lunária',color:'#788aac',price:22},clay:{name:'Argila de Záhara',color:'#bd8c6b',price:18},plum:{name:'Ameixa astral',color:'#9b83a9',price:26},stripes:{name:'Papel listrado de linho',color:'#e6dabd',accent:'#c9b58b',pattern:'stripes',price:30},flowers:{name:'Papel floral de Lunária',color:'#cdd6e6',accent:'#7d8fb6',pattern:'flowers',price:38},check:{name:'Papel xadrez do campo',color:'#dccdab',accent:'#b49a69',pattern:'check',price:34},panel:{name:'Lambri de madeira',color:'#a27b55',accent:'#7b5a3c',pattern:'panel',price:42}});
+  SS.FLOORS = Object.freeze({oak:{name:'Tábuas de carvalho',color:'#9a7a52',line:'#6c503b',pattern:'planks',price:0},walnut:{name:'Tábuas de nogueira',color:'#6e4f37',line:'#4a3424',pattern:'planks',price:28},tiles:{name:'Ladrilho xadrez',color:'#ddd5c4',line:'#8796a3',pattern:'check',price:36},stone:{name:'Pedra polida',color:'#a19d93',line:'#77736b',pattern:'stone',price:40},terracotta:{name:'Lajota de terracota',color:'#bb7652',line:'#8c5136',pattern:'tiles',price:30}});
   SS.SKINS = Object.freeze({linen:{name:'Linho e madeira',color:'#d7c49a',price:0},forest:{name:'Jardim do mercador',color:'#79aa89',price:35},royal:{name:'Mercado azul',color:'#7998bb',price:45},sunset:{name:'Toldo do poente',color:'#c7927b',price:45},astral:{name:'Armazém astral',color:'#a795cf',price:65}});
   SS.FURNITURE = Object.freeze({
     bed:{name:'Cama de carvalho',icon:'bed',price:65,action:'Dormir',desc:'Durma até o próximo amanhecer e recupere seus PV.',w:1.8,d:2.3},
@@ -26,8 +27,24 @@
     chest:{name:'Baú de armazenamento',icon:'chest',price:32,action:'Guardar e retirar',desc:'Transfira consumíveis, alimentos e carga sem perder itens.',w:1.4,d:.8},
     wardrobe:{name:'Guarda-roupa',icon:'wardrobe',price:46,action:'Trocar de roupa',desc:'Vista os trajes que você já possui.',w:1.4,d:.8},
     bookshelf:{name:'Estante de estudo',icon:'books',price:28,action:'Ler',desc:'Consulte as regras e o seu diário de aventura.',w:1.6,d:.6},
-    lamp:{name:'Luminária de mesa',icon:'lantern',price:18,action:'Acender / apagar',desc:'Uma luz quente para a sua casa.',w:.5,d:.5}
+    lamp:{name:'Luminária de mesa',icon:'lantern',price:18,action:'Acender / apagar',desc:'Uma luz quente para a sua casa.',w:.5,d:.5},
+    sofa:{name:'Sofá estofado',icon:'home',price:58,action:'Sentar no sofá',desc:'Um sofá largo para descansar e recuperar o vigor.',w:2.0,d:.9},
+    tv:{name:'Tela de cristal (TV)',icon:'eye',price:90,action:'Ligar a tela',desc:'Um televisor de cristal encantado que mostra imagens das terras de Elarion.',w:1.4,d:.55},
+    fridge:{name:'Geladeira de gelo-eterno',icon:'snowflake',price:70,action:'Abrir a geladeira',desc:'Mantém as refeições frescas: escolha uma porção da despensa.',w:.9,d:.8},
+    cabinet:{name:'Armário de cozinha',icon:'chest',price:40,action:'Guardar e retirar',desc:'Portas e prateleiras para guardar consumíveis, alimentos e carga.',w:1.4,d:.6},
+    counter:{name:'Bancada de cozinha',icon:'cooking',price:44,action:'Preparar comida',desc:'Bancada com pia e tábua para preparar os ingredientes.',w:1.6,d:.7}
   });
+  // Planta do interior da casa (10 x 9): paredes internas, passagem da porta e bancada de decoração ficam livres.
+  SS.HOME = Object.freeze({grid:.25,maxX:4.8,back:-4.3,front:3.2,clear:Object.freeze([{x:0,z:3.35,w:2.6,d:2.3},{x:3.65,z:1.85,w:.95,d:.75}])});
+  // Regra única de posição: usada pela prévia na tela e pela gravação no motor.
+  SS.canPlaceFurniture = (p,uid,id,x,z,turn=0) => {
+    const size=SS.FURNITURE[id];if(!p||!size||!Number.isFinite(+x)||!Number.isFinite(+z))return 'Posição inválida.';
+    const H=SS.HOME,swap=Math.abs(Math.round(+turn||0))%2,w=swap?size.d:size.w,d=swap?size.w:size.d;x=+x;z=+z;
+    if(Math.abs(x)+w/2>H.maxX+1e-6||z-d/2<H.back-1e-6||z+d/2>H.front+1e-6)return 'O móvel precisa caber inteiro dentro da casa, sem atravessar as paredes.';
+    if(H.clear.some(a=>Math.abs(a.x-x)<(a.w+w)/2&&Math.abs(a.z-z)<(a.d+d)/2))return 'Deixe livres a passagem da porta e a bancada de decoração.';
+    if((p.furniture||[]).some(o=>{if(o.uid===uid||o.stored)return false;const of=SS.FURNITURE[o.id];if(!of)return false;const os=Math.abs(Math.round((o.r||0)/(Math.PI/2)))%2;return Math.abs(o.x-x)<(w+(os?of.d:of.w))/2+.08&&Math.abs(o.z-z)<(d+(os?of.w:of.d))/2+.08;}))return 'Outro móvel ocupa esse lugar.';
+    return '';
+  };
   const baseJobs = {
     cook:{name:'Ajudante de cozinha',place:'food',icon:'cooking',pay:150,duration:25,interview:['Organizo os ingredientes e mantenho a bancada limpa.','Uso o que estiver mais perto, sem conferir.','Prometo servir tudo cru para ganhar tempo.'],answer:0,tasks:[{q:'A panela está quente. Qual é a primeira etapa?',a:['Separar ingredientes e lavar as mãos','Servir sem cozinhar','Misturar produtos de limpeza'],ok:0},{q:'Um cliente tem alergia. Como agir?',a:['Ignorar o pedido','Separar utensílios e confirmar os ingredientes','Esconder o ingrediente'],ok:1},{q:'Terminou o preparo. O que falta?',a:['Abandonar a bancada','Cobrar de novo pelo mesmo prato','Conferir o ponto e limpar a estação'],ok:2}]},
     smith:{name:'Auxiliar da forja',place:'smith',icon:'hammer',pay:180,duration:30,interview:['Trabalho sem luvas para ser mais rápido.','Respeito as etapas e confiro as ferramentas.','Apago a forja com óleo.'],answer:1,tasks:[{q:'Vai mover uma peça aquecida.',a:['Pegá-la com a mão','Usar tenaz e proteção','Deixá-la no caminho'],ok:1},{q:'A lâmina saiu empenada.',a:['Conferir o alinhamento e corrigir na bigorna','Vender como nova','Esconder a peça'],ok:0},{q:'Ao fechar o turno...',a:['Deixar brasas soltas','Guardar ferramenta quente na palha','Organizar ferramentas e verificar o braseiro'],ok:2}]},
@@ -139,22 +156,21 @@
     if(!f)return result(false,'Móvel desconhecido.');
     p.furniture=p.furniture||[];if(p.furniture.length>=18)return result(false,'A casa comporta até 18 móveis. Guarde ou reorganize os que já possui.');
     const price=SS.price(r,f.price);if(!Number.isFinite(h.gold)||h.gold<price)return result(false,`Você precisa de ${price} po.`);
-    h.gold-=price;const n=p.furniture.length,placed={uid:U.uid(),id,x:-3+(n%4)*2,z:-2+Math.floor(n/4)*1.3,r:0,stored:true};p.furniture.push(placed);save();return result(true,'Móvel comprado. Escolha um lugar na aba Organizar.',{item:placed});
+    h.gold-=price;const n=p.furniture.length,placed={uid:U.uid(),id,x:-3+(n%4)*2,z:-2+Math.floor(n/4)*1.3,r:0,stored:true};p.furniture.push(placed);save();return result(true,'Móvel comprado. Escolha o lugar dele na casa e confirme.',{item:placed});
   };
   SS.placeFurniture = (h,r,uid,x,z,rotation=0) => {
     const p=SS.property(h,r,'home'),f=p&&(p.furniture||[]).find(v=>v.uid===uid);
-    if(!f||!SS.hasAccess(h,r,'home')||!Number.isFinite(+x)||!Number.isFinite(+z)||Math.abs(+x)>3.4||Math.abs(+z)>2.6||Math.abs(+x)<1.1&&+z>1.9)return result(false,'Posição inválida. Deixe a entrada livre.');
-    const size=SS.FURNITURE[f.id],turn=Number.isFinite(+rotation)?Math.round(+rotation):0,swap=Math.abs(turn)%2;
-    const w=swap?size.d:size.w,d=swap?size.w:size.d;
-    if(Math.abs(+x)+w/2>4.55||Math.abs(+z)+d/2>3.8)return result(false,'O móvel precisa caber inteiro dentro da casa.');
-    if(p.furniture.some(o=>{if(o===f||o.stored)return false;const of=SS.FURNITURE[o.id],os=Math.round((o.r||0)/(Math.PI/2))%2;return Math.abs(o.x-(+x))<(w+(os?of.d:of.w))/2+.12&&Math.abs(o.z-(+z))<(d+(os?of.w:of.d))/2+.12;}))return result(false,'Outro móvel ocupa esse lugar.');
-    f.x=+x;f.z=+z;f.r=((turn%4)+4)%4*Math.PI/2;f.stored=false;save();return result(true,'Móvel posicionado.');
+    if(!f||!SS.hasAccess(h,r,'home'))return result(false,'Só o morador pode reorganizar os móveis desta casa.');
+    const g=SS.HOME.grid,turn=Number.isFinite(+rotation)?Math.round(+rotation):0;x=Math.round(+x/g)*g;z=Math.round(+z/g)*g;
+    const why=SS.canPlaceFurniture(p,uid,f.id,x,z,turn);if(why)return result(false,why);
+    f.x=x;f.z=z;f.r=((turn%4)+4)%4*Math.PI/2;f.stored=false;save();return result(true,'Móvel posicionado.');
   };
   SS.storeFurniture = (h,r,uid) => {const p=SS.property(h,r,'home'),f=p&&(p.furniture||[]).find(v=>v.uid===uid);if(!f||!SS.hasAccess(h,r,'home'))return result(false,'Você precisa de acesso à casa para reorganizar os móveis.');f.stored=true;save();return result(true,'Móvel guardado. Você continua sendo o dono.');};
   SS.decorate = (h,r,type,id) => {
-    const kind=type==='skin'?'shop':'home',p=SS.property(h,r,kind),cat=type==='skin'?SS.SKINS:SS.WALLS,def=cat[id];
+    const spec={skin:[SS.SKINS,'shop','linen'],wall:[SS.WALLS,'home','cream'],floor:[SS.FLOORS,'home','oak']}[type];
+    const kind=spec&&spec[1],p=spec&&SS.property(h,r,kind),def=spec&&spec[0][id];
     if(!p||!SS.hasAccess(h,r,kind)||!def)return result(false,'A decoração não está disponível.');
-    const field=type==='skin'?'skin':'wall',unlock=field+'Unlocks';p[unlock]=p[unlock]||[type==='skin'?'linen':'cream'];
+    const field=type,unlock=field+'Unlocks';p[unlock]=p[unlock]||[spec[2]];
     if(!p[unlock].includes(id)){const price=SS.price(r,def.price);if(!Number.isFinite(h.gold)||h.gold<price)return result(false,`Você precisa de ${price} po.`);h.gold-=price;p[unlock].push(id);}
     p[field]=id;save();return result(true,'Decoração atualizada.');
   };

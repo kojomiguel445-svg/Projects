@@ -36,6 +36,7 @@
   }
   I.physics={radius:FOOT,bounds:BOUNDS,free,move,recover};
   I.decorators={};
+  I.models={};
   const busy=()=>!!(E.WorldServices&&E.WorldServices.active);
   const closeCard=()=>{if(E.WorldServices)E.WorldServices.close();};
   const note=r=>{if(r&&r.message)E.UI.toast(r.message,r.ok?'gold':'');return r;};
@@ -78,7 +79,7 @@
       box(c,g,0,1.1,0,1.6,2.1,.4,'#674d38');for(const y of [.35,.92,1.5]){box(c,g,0,y,.16,1.58,.1,.57,'#997548');for(let k=0;k<6;k++)box(c,g,-.58+k*.23,y+.23,.16,.14,.36,.34,['#7c9c99','#b08476','#b5a076'][k%3]);}
     }else if(item.id==='lamp'){
       cylinder(c,g,0,.13,0,.22,.15,'#96764e');cylinder(c,g,0,.63,0,.055,1.0,'#bd9d60');const shade=new THREE.Mesh(new THREE.ConeGeometry(.38,.46,8,1,true),mat(item.lit===false?'#786d5a':'#f1d899',{side:THREE.DoubleSide,emissive:item.lit===false?'#000000':'#a77f35',emissiveIntensity:.35}));shade.position.y=1.25;shade.userData.noStaticBatch=true;g.add(shade);q.shade=shade;
-    }
+    }else if(I.models[item.id])I.models[item.id](c,g,item,preview,q);
     const swap=Math.abs(Math.round((item.r||0)/(Math.PI/2)))%2;
     if(!preview){c.fixtures.push(q);c.colliders.push({x:item.x,z:item.z,hw:(swap?f.d:f.w)/2,hd:(swap?f.w:f.d)/2,uid:item.uid});}
     if(E.ScenePerf)E.ScenePerf.batch(g,{exclude:[...c.flames,q.shade].filter(Boolean)});
@@ -120,7 +121,7 @@
       if(c.kind==='room'){
         addFurniture(c,{id:'lamp',uid:'room-lamp',x:-4.05,z:-2.7,r:0});plaque(c,'Quarto do viajante',.15,2.55,-4.22,1.8);
       }else{
-        const lect=fixture(c,'manage',3.65,1.85,{label:'Decorar a casa',icon:'home',r:.8});c.colliders.push({x:3.65,z:1.85,hw:.4,hd:.29});box(c,lect.g,0,.87,0,.8,.11,.58,'#b69a6c');box(c,lect.g,0,.44,0,.13,.86,.13,'#6c543c');box(c,lect.g,-.17,.99,0,.24,.12,.2,'#8ba28a');box(c,lect.g,.18,.99,0,.24,.12,.2,'#b9917e');c.fixtures.push(lect);
+        const lect=fixture(c,'manage',3.65,1.85,{label:'Personalizar casa',icon:'home',r:.8});c.colliders.push({x:3.65,z:1.85,hw:.4,hd:.29});box(c,lect.g,0,.87,0,.8,.11,.58,'#b69a6c');box(c,lect.g,0,.44,0,.13,.86,.13,'#6c543c');box(c,lect.g,-.17,.99,0,.24,.12,.2,'#8ba28a');box(c,lect.g,.18,.99,0,.24,.12,.2,'#b9917e');c.fixtures.push(lect);
       }
     }else{
       const skin=S.SKINS[property&&property.skin]||S.SKINS.linen;
@@ -185,27 +186,31 @@
     card({title:d.name,text:`${f.stored?'Guardado, pronto para colocar.':'Colocado na casa.'} Móvel ${i+1} de ${list.length}. Mova a peça diretamente pelo chão da casa.`,actions:[{label:f.stored?'Colocar no cômodo':'Reposicionar',run:()=>{closeCard();I.beginPlacement(f.uid);}},{label:'Próximo móvel',disabled:list.length<2,run:()=>arrange(c,i+1)},{label:'Guardar esta peça',disabled:f.stored,run:()=>{const r=note(E.Settlements.storeFurniture(E.Store.hero(),c.region,f.uid));if(r.ok){closeCard();I.refresh();}}}]});
   }
   function decorate(c){card({title:'Seu lar',text:'A bancada de pintura guarda as amostras; seus móveis podem ser colocados diretamente no cômodo. Deixe a passagem da porta livre.',actions:[{label:'Mover ou colocar um móvel',run:()=>arrange(c)},{label:'Escolher tinta para as paredes',run:()=>paint(c)}]});}
+  // A prévia usa a mesma regra do motor (SS.canPlaceFurniture), na posição já encaixada na grade.
   function canPlace(c,e){
-    const S=E.Settlements,p=property(c),d=S.FURNITURE[e.item.id],swap=Math.abs(e.turn)%2,w=swap?d.d:d.w,depth=swap?d.w:d.d;
-    if(!p||!S.hasAccess(E.Store.hero(),c.region,'home')||Math.abs(e.x)>3.4||Math.abs(e.z)>2.6||Math.abs(e.x)<1.1&&e.z>1.9||Math.abs(e.x)+w/2>4.55||Math.abs(e.z)+depth/2>3.8)return false;
-    return !p.furniture.some(o=>{if(o.uid===e.item.uid||o.stored)return false;const od=S.FURNITURE[o.id],os=Math.round((o.r||0)/(Math.PI/2))%2;return Math.abs(o.x-e.x)<(w+(os?od.d:od.w))/2+.12&&Math.abs(o.z-e.z)<(depth+(os?od.w:od.d))/2+.12;});
+    const S=E.Settlements,p=property(c);
+    if(!p||!S.hasAccess(E.Store.hero(),c.region,'home')){e.why='Só o morador pode reorganizar os móveis.';return false;}
+    e.why=S.canPlaceFurniture(p,e.item.uid,e.item.id,e.gx,e.gz,e.turn);return !e.why;
   }
+  const snap=v=>Math.round(v/E.Settlements.HOME.grid)*E.Settlements.HOME.grid;
   function clearPlacement(c){
     const e=c&&c.edit;if(!e)return;
-    if(e.original)e.original.visible=true;c.room.remove(e.preview.g);e.preview.g.traverse(o=>{if(o.geometry)o.geometry.dispose();});for(const m of e.materials)m.dispose();e.bar.remove();c.edit=null;c.hudAt=0;c.act.style.display='';c.label.style.display='';c.overlay.classList.remove('placing-furniture');
+    if(e.original)e.original.visible=true;c.room.remove(e.preview.g);if(e.grid){c.scene.remove(e.grid);e.grid.geometry.dispose();e.grid.material.dispose();}e.preview.g.traverse(o=>{if(o.geometry)o.geometry.dispose();});for(const m of e.materials)m.dispose();e.bar.remove();c.edit=null;c.hudAt=0;c.act.style.display='';c.label.style.display='';c.overlay.classList.remove('placing-furniture');
   }
   I.beginPlacement=uid=>{
     const c=I.current,p=c&&property(c),item=p&&(p.furniture||[]).find(f=>f.uid===uid);if(!c||c.kind!=='home'||!item||!E.Settlements.hasAccess(E.Store.hero(),c.region,'home'))return false;
-    closeCard();clearPlacement(c);const old=c.fixtures.find(f=>f.furniture&&f.furniture.uid===uid);const copy={...item,stored:false,x:U.clamp(item.stored?c.hero.x:item.x,-3.4,3.4),z:U.clamp(item.stored?c.hero.z-1:item.z,-2.6,2.6)};
+    closeCard();clearPlacement(c);const old=c.fixtures.find(f=>f.furniture&&f.furniture.uid===uid);const copy={...item,stored:false,x:snap(U.clamp(item.stored?c.hero.x:item.x,-4.5,4.5)),z:snap(U.clamp(item.stored?c.hero.z-1.2:item.z,-4,2.9))};
     const preview=addFurniture(c,copy,true),materials=new Set();preview.g.traverse(o=>{if(o.material){const source=o.material,m=source.clone();if(!Object.values(c.materials).includes(source))source.dispose();m.transparent=true;m.opacity=.60;m.depthWrite=false;m.emissive=new THREE.Color('#3eaf81');m.emissiveIntensity=.4;o.material=m;materials.add(m);}});
     if(old)old.g.visible=false;
     const bar=U.h(`<div class="interior-placement"><div><strong>${U.esc(E.Settlements.FURNITURE[item.id].name)}</strong><small data-placement-status></small></div><button class="btn sm dark" data-rotate>${icon('swap')} Girar</button><button class="btn sm primary" data-place>Colocar</button><button class="btn sm dark" data-cancel>Cancelar</button></div>`);c.overlay.appendChild(bar);
-    c.edit={item,preview,materials,original:old&&old.g,x:copy.x,z:copy.z,turn:Math.round((item.r||0)/(Math.PI/2)),bar,status:bar.querySelector('[data-placement-status]'),valid:false};
+    // Grade discreta no chão (quadros de 25 cm) enquanto o móvel é posicionado.
+    const grid=new THREE.GridHelper(10,40,'#f3dca6','#f3dca6');grid.material.transparent=true;grid.material.opacity=.22;grid.material.depthWrite=false;grid.scale.z=.9;grid.position.set(0,.03,0);c.scene.add(grid);
+    c.edit={item,preview,materials,grid,original:old&&old.g,x:copy.x,z:copy.z,gx:copy.x,gz:copy.z,turn:Math.round((item.r||0)/(Math.PI/2)),bar,status:bar.querySelector('[data-placement-status]'),valid:false};
     bar.querySelector('[data-rotate]').onclick=()=>{if(c.edit)c.edit.turn=(c.edit.turn+1)%4;};bar.querySelector('[data-place]').onclick=()=>I.confirmPlacement();bar.querySelector('[data-cancel]').onclick=()=>I.cancelPlacement();
     c.overlay.classList.add('placing-furniture');c.act.style.display='none';c.label.style.display='none';return true;
   };
   I.cancelPlacement=()=>{const c=I.current;if(c)clearPlacement(c);};
-  I.confirmPlacement=()=>{const c=I.current,e=c&&c.edit;if(!e)return false;const r=note(E.Settlements.placeFurniture(E.Store.hero(),c.region,e.item.uid,e.x,e.z,e.turn));if(r.ok){clearPlacement(c);I.refresh();}return r.ok;};
+  I.confirmPlacement=()=>{const c=I.current,e=c&&c.edit;if(!e)return false;const r=note(E.Settlements.placeFurniture(E.Store.hero(),c.region,e.item.uid,e.gx,e.gz,e.turn));if(r.ok){clearPlacement(c);I.refresh();}return r.ok;};
   function reception(c){
     const S=E.Settlements,h=E.Store.hero(),access=S.hasAccess(h,c.region,'room'),price=(S.prices?S.prices(c.region,'room'):S.PRICES.room).rent;
     card({title:'Dona Amélia · Recepção',text:access?'A sua chave está reservada. Suba os pequenos degraus à esquerda do balcão e abra a porta do quarto.':`Boa viagem até aqui? Um quarto custa ${price} po. A cama dá direito a um descanso até o amanhecer; a comida é servida à parte.`,actions:[{label:access?'Sua chave já está reservada':`Alugar quarto · ${price} po`,disabled:access||h.gold<price,run:()=>{const r=note(S.acquire(h,c.region,'room','rent'));if(r.ok)reception(c);}},{label:'Onde fica o quarto?',run:()=>card({title:'Quartos da pousada',text:'A porta de madeira fica no fundo esquerdo, logo depois dos degraus. Aproxime-se dela e use Interagir para entrar.',actions:[]})}]});
@@ -236,8 +241,10 @@
     c.overlay.querySelector('[data-exit]').onclick=()=>I.leave();c.act.onclick=()=>I.interact();
     const held=new Set();const updatePad=()=>{keyState.x=(held.has('right')?1:0)-(held.has('left')?1:0);keyState.y=(held.has('up')?1:0)-(held.has('down')?1:0);};
     c.overlay.querySelectorAll('[data-dir]').forEach(b=>{b.onpointerdown=e=>{e.preventDefault();held.add(b.dataset.dir);updatePad();b.setPointerCapture(e.pointerId);};const release=()=>{held.delete(b.dataset.dir);updatePad();};b.onpointerup=release;b.onpointercancel=release;b.onlostpointercapture=release;});
+    if(I.onOpen)I.onOpen(c);
     E.HUD.show(false);E.WG.locked=true;E.WG.setMode('interior');I.update(0);
   };
+  I.openStorage=()=>{if(I.current)storage(I.current);};
   I.refresh=()=>{if(I.current){const c=I.current;I.open({kind:c.kind,region:c.region,title:c.title,id:c.id,keepPosition:true});}};
   I.resize=()=>{if(I.current)fitCamera(I.current);};
   I.leave=()=>{const c=I.current;if(!c)return;if(c.kind==='room')return E.Settlements.enter('inn',c.region);I.close();};
@@ -248,7 +255,7 @@
     const c=I.current;if(!c)return;dt=U.clamp(Number(dt)||0,0,.25);fitCamera(c);c.t+=dt;const h=c.hero,canMove=!E.UI.anyOpen()&&!document.querySelector('.modal-bg')&&!busy()&&!c.sleeping&&!c.edit&&!c.lockMove;
     const k=E.WG.input.move(),mx=keyState.x||k.x,my=keyState.y||k.y;
     c.moving=canMove&&(Math.abs(mx)+Math.abs(my)>.05);c.sprinting=false;
-    if(c.edit){const e=c.edit,n=Math.max(1,Math.hypot(mx,my));e.x=U.clamp(e.x+(mx*.82-my*.57)/n*2.4*dt,-3.4,3.4);e.z=U.clamp(e.z+(-mx*.57-my*.82)/n*2.4*dt,-2.6,2.6);e.preview.g.position.set(e.x,.02,e.z);e.preview.g.rotation.y=e.turn*Math.PI/2;e.valid=canPlace(c,e);for(const m of e.materials)m.emissive.set(e.valid?'#3eaf81':'#be665b');e.bar.querySelector('[data-place]').disabled=!e.valid;if(c.t>=(e.nextText||0)){e.nextText=c.t+.2;e.status.textContent=e.valid?'Mova com WASD ou os botões · R gira · Enter coloca':'Este espaço está ocupado ou bloqueia a entrada';}}
+    if(c.edit){const e=c.edit,n=Math.max(1,Math.hypot(mx,my));e.x=U.clamp(e.x+(mx*.82-my*.57)/n*2.4*dt,-4.6,4.6);e.z=U.clamp(e.z+(-mx*.57-my*.82)/n*2.4*dt,-4.1,3.0);e.gx=snap(e.x);e.gz=snap(e.z);e.preview.g.position.set(e.gx,.02,e.gz);e.preview.g.rotation.y=e.turn*Math.PI/2;e.valid=canPlace(c,e);for(const m of e.materials)m.emissive.set(e.valid?'#3eaf81':'#be665b');e.bar.querySelector('[data-place]').disabled=!e.valid;if(c.t>=(e.nextText||0)){e.nextText=c.t+.2;e.status.textContent=e.valid?'Mova com WASD ou os botões · R gira · Enter coloca':(e.why||'Este espaço está ocupado ou bloqueia a entrada');}}
     if(c.moving&&c.seated){c.seated=false;if(c.seatReturn){h.x=c.seatReturn.x;h.z=c.seatReturn.z;}}
     if(c.moving){
       // Camera-relative movement for the isometric room; normalize diagonals.
@@ -278,7 +285,7 @@
     }
     if(f.id==='anvil')return E.WorldServices&&E.WorldServices.service(c.kind,c.region);
     if(f.id==='work')return E.WorldServices&&E.WorldServices.use({service:c.kind,action:'work',region:c.region,interior:true});
-    if(f.id==='manage')return decorate(c);
+    if(f.id==='manage')return I.customize?I.customize(c):decorate(c);
     if(f.id==='bed')return card({title:'Cama de carvalho',text:S.canSleep(h)?'Uma cama limpa e silenciosa. Dormir recupera seus recursos até o amanhecer; você ainda vai precisar comer.':'Esta cama não está disponível para descanso.',actions:[{label:'Dormir até o amanhecer',disabled:!S.canSleep(h),run:()=>sleep(c)},...extra]});
     if(f.id==='hearth'||f.id==='table')return card({title:f.id==='hearth'?'Fogão aceso':'À mesa',text:f.id==='hearth'?'Escolha um ingrediente da mochila para preparar aqui.':'A mesa está posta. Escolha uma porção pronta da sua mochila.',actions:[{label:f.id==='hearth'?'Preparar uma porção':'Comer uma porção',run:()=>E.WorldServices&&E.WorldServices.use({service:'food',action:f.id==='hearth'?'cook':'eat',region:c.region,interior:true})},...extra]});
     if(f.id==='chair')return card({title:'Cadeira acolchoada',text:c.seated?'Você descansa por um instante. Mova-se quando quiser levantar.':'Uma pausa à sombra da janela. Sentar recupera seu vigor, mas não substitui dormir.',actions:[{label:c.seated?'Levantar':'Sentar',run:()=>{closeCard();if(c.seated){c.seated=false;if(c.seatReturn)Object.assign(c.hero,c.seatReturn);}else{c.seatReturn={x:c.hero.x,z:c.hero.z};c.hero.x=f.x;c.hero.z=f.z;c.seated=true;if(E.WG.world)E.WG.world.hero.st=E.WG.STAMINA;}}},...extra]});
