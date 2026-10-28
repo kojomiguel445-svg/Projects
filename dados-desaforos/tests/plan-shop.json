@@ -1,0 +1,47 @@
+{
+ "setup": {
+  "state": {}
+ },
+ "steps": [
+  {
+   "name": "rent",
+   "eval": "(()=>{const h=E.Store.hero(),r=E.Settlements.region();h.gold=900;h.inventory.pocao_cura=12;E.Sim.data(h).food.pao=20;E.Life.data(h).fish.truta_musgo=6;E.Life.data(h).fish.carpa_lanterna=3;const a=E.Settlements.acquire(h,r,'shop','rent');return {msg:a.message,gold:h.gold,price:E.Settlements.prices(r,'shop')};})()"
+  },
+  {
+   "name": "panel",
+   "eval": "(()=>{E.Vendor.open();return !!document.querySelector('.sh');})()",
+   "shot": "shop-sh1-empty",
+   "settle": 600
+  },
+  {
+   "name": "stock",
+   "eval": "(()=>{document.querySelector('[data-add=\"inventory:pocao_cura\"][data-n=\"12\"]').click();document.querySelector('[data-add=\"food:pao\"][data-n=\"20\"]').click();document.querySelector('[data-toggle]').click();return E.Vendor.shop(E.Store.hero(),E.Settlements.region()).stocks.map(e=>e.item.name+' x'+e.quantity+' @'+e.price);})()",
+   "shot": "shop-sh2-open",
+   "settle": 500
+  },
+  {
+   "name": "simulate",
+   "eval": "(()=>{const h=E.Store.hero(),r=E.Settlements.region();const g0=h.gold;let n=0;for(let i=0;i<150;i++){E.Vendor.tick(1);}const s=E.Vendor.shop(h,r);return {gold:h.gold-g0,today:s.today,events:s.events.slice(0,4).map(e=>e.text),night:E.Sim.clock().night};})()",
+   "shot": "shop-sh3-sales",
+   "settle": 500
+  },
+  {
+   "name": "fish",
+   "eval": "(()=>{const h=E.Store.hero(),r=E.Settlements.region();const o=E.Workday.orders(h,r);for(const x of o)E.Life.data(h).fish[x.fish]=(E.Life.data(h).fish[x.fish]||0)+x.qty+(x===o[0]?0:-1);E.Life.data(h).fish.carpa_lanterna=(E.Life.data(h).fish.carpa_lanterna||0)+4;const w=E.WG.world,it=(w.venues||[]).find(v=>v.service==='general');const fx=it&&(it.fixtures||[]).find(f=>f.action==='supply');if(fx){w.hero.x=fx.x;w.hero.z=fx.z+.8;}E.Workshift.supplier({region:r,service:'general',x:fx&&fx.x,z:fx&&fx.z});return {orders:o.map(x=>x.qty+'x '+x.fish+' @'+x.unit),fixture:!!fx};})()",
+   "shot": "shop-sp1-panel",
+   "settle": 600
+  },
+  {
+   "name": "deliver",
+   "eval": "(()=>{const b=document.querySelector('[data-deliver]:not([disabled])');if(b)b.click();const h=E.Store.hero();return {gold:h.gold,rep:E.Workday.tier(h),xp:h.xp,pesca:E.Life.level(h,'pesca')};})()",
+   "shot": "shop-sp2-after",
+   "settle": 500
+  },
+  {
+   "name": "card",
+   "eval": "(()=>{E.WorldServices.close();const h=E.Store.hero(),r=E.Settlements.region();const j=E.Settlements.jobData(h,r);j.contract='cook';E.Work.card(h).hired={job:'cook',region:r,day:1};E.Work.openCard();return 1;})()",
+   "shot": "shop-sp3-card",
+   "settle": 600
+  }
+ ]
+}

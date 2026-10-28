@@ -84,12 +84,11 @@
   G.whatsNew = async () => {
     E.state.seenVersion = E.Title.VERSION; E.Store.save();
     const html = `<div class="whatsnew"><ul>
-      <li><b>Grupo de até 3:</b> monte sua equipe em <b>Menu → Grupo</b> (ou tecla L). Quem está no grupo aparece à direita e troca com as teclas 1 a 3.</li>
-      <li><b>Troca com efeito de luz:</b> quem sai se desfaz em fagulhas da cor da sua classe e quem entra surge num redemoinho de luz. Há uma recarga de 1 segundo entre trocas.</li>
-      <li><b>O grupo luta junto:</b> nas batalhas, os outros membros do grupo entram como companheiros. Você escolhe a ação de cada um (atacar, esquivar, poção) ou deixa no automático. O XP do encontro é dividido entre o grupo, como no D&amp;D 2024, e cada personagem guarda os próprios PV e poções.</li>
-      <li><b>Pedir demissão:</b> agora dá para sair do emprego direto pela Carteira de trabalho, de qualquer lugar, com confirmação. O histórico registra a saída.</li>
-      <li><b>HUD sem pixel:</b> retratos ilustrados no grupo, no menu e na luta, e botões, abas e cartões de combate com o visual arredondado, sem as molduras pixeladas.</li>
-      <li><b>5.9.1:</b> Vila do Bosque em terreno plano à beira do lago, longe das trilhas.</li>
+      <li><b>Trabalho de verdade em todos os empregos:</b> chega de questionário. Na cozinha você monta os pedidos e acerta o ponto; na peixaria separa e limpa o pescado; na forja, marcenaria e lapidação acerta os golpes; nas entregas, armazém, cais e rouparia organiza os itens; na recepção e no cassino faz a conta e entrega o troco. O atendente do empório continua no caixa da loja.</li>
+      <li><b>XP por dia de trabalho:</b> cada dia trabalhado dá salário, XP de nível e XP de especialidade no seu ramo (Culinária, Pesca, Forja, Comércio...). Cada nível de especialidade aumenta o salário em 5% e muda o seu cargo (Aprendiz, Auxiliar, Profissional, Especialista, Mestre).</li>
+      <li><b>Fornecedor da peixaria:</b> no empório e peixaria (e no cais das cidades) há um balcão para vender o que você pesca e cumprir as encomendas do dia, que pagam 50% a mais. Entregar sobe sua reputação de fornecedor e aumenta o preço do seu pescado.</li>
+      <li><b>Loja mais simples e lucrativa:</b> painel único em Menu → Minha Loja. Coloque produtos da mochila na prateleira, confira o preço e abra: de dia os clientes compram sozinhos quando o preço está justo, mesmo com você longe. O aluguel caiu de 120 para 30 po por dia, os funcionários ficaram mais baratos e o painel mostra visitantes, vendas e saldo do dia.</li>
+      <li><b>5.10:</b> grupo de até 3 personagens com troca animada, companheiros na luta, demissão pela carteira e HUD sem pixel.</li>
     </ul></div>`;
     await UI.modal({ title: `✦ Novidades da versão ${E.Title.VERSION}`, html, buttons: [{ label: 'Ver o Oráculo', value: 'wish' }, { label: 'Bora jogar!', value: true, cls: 'primary' }] }).then((v) => { if (v === 'wish') E.Wish.open(); });
   };

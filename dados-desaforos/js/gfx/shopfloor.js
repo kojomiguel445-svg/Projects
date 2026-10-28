@@ -200,7 +200,7 @@
   function finish(c) {
     const r = K().shiftFinish(E.Store.hero(), c.token); E.UI.toast(r.message, r.ok ? 'gold' : '');
     sfx(r.ok ? 'success' : 'fail'); c.phase = 'done';
-    c.panel.innerHTML = `<header><span class="cx-led">${r.ok ? r.pay + ' po' : '—'}</span><div><strong>Turno encerrado</strong><small>${U.esc(r.message)}</small></div></header>${r.ok ? `<p class="cx-status">Erros de troco: ${r.errors}. Seu emprego continua registrado na carteira; volte amanhã para outro turno.</p>` : ''}<div class="cx-actions"><button class="btn sm primary" data-leave>Sair do caixa</button></div>`;
+    c.panel.innerHTML = `<header><span class="cx-led">${r.ok ? r.pay + ' po' : '—'}</span><div><strong>Turno encerrado</strong><small>${U.esc(r.message)}</small></div></header>${r.ok ? (E.Workshift && r.specialty ? E.Workshift.summary(r) : '') + `<p class="cx-status">Erros de troco: ${r.errors}. Seu emprego continua registrado na carteira; volte amanhã para outro turno.</p>` : ''}<div class="cx-actions"><button class="btn sm primary" data-leave>Sair do caixa</button></div>`;
     c.panel.querySelector('[data-leave]').onclick = () => { c.panel.remove(); c.panel = null; c.lockMove = false; c.overlay.classList.remove('interviewing'); c.hudAt = 0; };
   }
 

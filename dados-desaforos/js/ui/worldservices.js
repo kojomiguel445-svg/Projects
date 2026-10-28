@@ -85,7 +85,7 @@
   const furnitureModels={bed:'bed',hearth:'furniture',table:'table',chair:'furniture',chest:'crate',wardrobe:'shelf',bookshelf:'shelf',lamp:'furniture'};
   W.decorate=(w,v)=>{
     if(v.servicesDecorated)return;v.servicesDecorated=true;
-    const f=(action,product,label,model,lx,lz,extra={})=>E.Shopfronts.fixture(w,v,{action,product,label,model,icon:{glider:'glider',cook:'cooking',food:'cooking',potion:'potion',weapon:'arsenal',upgrade:'anvil',furniture:'home',jobs:'journal',contracts:'quest',work:'hammer',inn:'bed',home:'home',trade:'scales',alchemy:'potion',pier:'fish',fish:'fish',roulette:'dice',cashier:'coin',arena:'shield',register:'scales',stock:'inventory',display:'shop',contract:'quill',wholesale:'package',staff:'party',professions:'hammer'}[action]||'chat',...extra},lx,lz);
+    const f=(action,product,label,model,lx,lz,extra={})=>E.Shopfronts.fixture(w,v,{action,product,label,model,icon:{glider:'glider',cook:'cooking',food:'cooking',potion:'potion',weapon:'arsenal',upgrade:'anvil',furniture:'home',jobs:'journal',contracts:'quest',work:'hammer',inn:'bed',home:'home',trade:'scales',alchemy:'potion',pier:'fish',fish:'fish',roulette:'dice',cashier:'coin',arena:'shield',register:'scales',stock:'inventory',display:'shop',contract:'quill',wholesale:'package',staff:'party',professions:'hammer',supply:'fish'}[action]||'chat',...extra},lx,lz);
     const x=Math.max(1.5,v.w*.29),back=-v.d*.27,front=v.d*.13;
     if(v.service==='general'){
       f('glider',null,'Examinar planador','glider',-x,back);
@@ -93,6 +93,7 @@
       f('potion','pocao_cura','Examinar poções','shelf',x,back);
       f('pier',null,'Equipamento de pesca','shelf',x,front);
       if(!w.reg.metro)f('wholesale',null,'Comprar lotes do fornecedor','wholesale',-x,back+v.d*.32,{r:2.2});
+      f('supply',null,'Peixaria: vender pescado e encomendas','food',x,back+v.d*.32,{r:2.2});
       f('work',null,'Conversar com o responsável','counter',0,back);
     }else if(v.service==='food'){
       f('food','pao','Comprar pão fresco','food',x,back);
@@ -133,6 +134,7 @@
     }else if(v.service==='pier'){
       f('pier',null,'Examinar varas e iscas','shelf',-x,back);
       f('fish',null,'Negociar pescado','food',x,back);
+      f('supply',null,'Fornecer pescado ao peixeiro','food',x,front);
       f('boat',null,'Alugar barco e pescar no mar','noticeboard',-x,front);
     }else if(v.service==='player-casino'){
       f('casino-license',null,'Licença e contrato do cassino','noticeboard',x,v.d/2-.7);
@@ -200,13 +202,19 @@
     if(list.length>1)actions.push({label:'Ler a próxima vaga',primary:false,run:()=>jobListing(it,page+1)});
     if(it.service==='guild')actions.push({label:'Quero um ofício por conta própria',primary:false,run:()=>professions(it)});
     if(E.Work)actions.push({label:'Ver minha carteira de trabalho',primary:false,run:()=>E.Work.openCard()});
-    W.open({title:def.name,icon:def.icon,text:`${S().jobPay?S().jobPay(id,it.region):def.pay} po por turno · ${def.duration} segundos. ${S().placeName(def.place)}. ${j.contract===id?'Você já foi contratado para esta vaga.':atEmployer?'Pergunte ao responsável sobre a vaga; a entrevista acontece na sala dos fundos.':'Visite a loja indicada e fale com o responsável ou com a placa VAGAS.'}${list.length>1?` Anúncio ${((page%list.length)+list.length)%list.length+1}/${list.length}.`:''}`,actions});
+    W.open({title:def.name,icon:def.icon,text:`${E.Workday?`Até ${E.Workday.pay(h,id,it.region)} po por dia de trabalho, mais XP de nível e de ${E.Workday.specialty(h,id).name.toLowerCase()} · ${E.Workday.FAMILY_NAMES[E.Workday.family(id)]}`:`${S().jobPay?S().jobPay(id,it.region):def.pay} po por turno · ${def.duration} segundos`}. ${S().placeName(def.place)}. ${j.contract===id?'Você já foi contratado para esta vaga.':atEmployer?'Pergunte ao responsável sobre a vaga; a entrevista acontece na sala dos fundos.':'Visite a loja indicada e fale com o responsável ou com a placa VAGAS.'}${list.length>1?` Anúncio ${((page%list.length)+list.length)%list.length+1}/${list.length}.`:''}`,actions});
   }
   function work(it){
     const h=hero(),d=S().data(h),j=S().jobData(h,it.region),def=S().JOBS[j.contract],shift=d.activeShift;
     if(def&&E.Shopfloor&&E.Work&&E.Work.activity(j.contract)==='cashier'&&def.place===it.service)return E.Shopfloor.enter(it);
     if(!def||def.place!==it.service&&!(shift&&shift.region===it.region&&S().JOBS[shift.id].place===it.service))return jobs(it);
     if(j.appointment)return jobs(it);
+    // Todo emprego tem uma atividade prática; o turno antigo de perguntas não é mais usado.
+    if(E.Workday&&E.Workshift){
+      if(shift){d.activeShift=null;save();}
+      const WD=E.Workday,sp=WD.specialty(h,j.contract),done=j.lastShiftDay===E.Sim.clock().day,pay=WD.pay(h,j.contract,it.region);
+      return W.open({title:def.name,icon:def.icon,eyebrow:WD.FAMILY_NAMES[WD.family(j.contract)].toUpperCase(),text:done?`O dia de hoje já foi pago. Volte amanhã para trabalhar de novo. Especialidade: ${sp.name} nível ${sp.lv} (${sp.rank}).`:`${E.Workshift.intro(j.contract)} Paga até ${pay} po, mais XP de nível e de ${sp.name.toLowerCase()} (você está no nível ${sp.lv}, ${sp.rank.toLowerCase()}).`,actions:[{label:done?'Volte amanhã':'Começar o dia de trabalho',disabled:done,run:()=>E.Workshift.start(it)},{label:'Ver minha carteira de trabalho',primary:false,run:()=>E.Work&&E.Work.openCard()}]});
+    }
     if(!shift)return W.open({title:def.name,icon:def.icon,text:`O responsável fornece o material. O turno leva ${def.duration} segundos de trabalho no local e paga até ${S().jobPay?S().jobPay(j.contract,it.region):def.pay} po.`,actions:[{label:'Iniciar meu turno aqui',disabled:j.lastShiftDay===E.Sim.clock().day,run:()=>transaction(()=>S().startShift(h,it.region),()=>work(it))},{label:'Consultar outras vagas daqui',primary:false,run:()=>jobListing(it)}]});
     const sd=S().JOBS[shift.id],step=shift.answers.length,task=sd.tasks[step];if(task)return W.open({title:`Etapa ${step+1} · ${sd.name}`,icon:sd.icon,text:task.q,actions:task.a.map((label,i)=>({label,run:()=>transaction(()=>S().answerTask(h,step,i),()=>work(it))}))});
     W.open({title:'Encerramento do turno',icon:'coin',text:`Trabalho registrado: ${Math.floor(shift.worked)}/${sd.duration} segundos. Permaneça no estabelecimento para concluir a jornada.`,actions:[{label:'Conferir o serviço e receber',disabled:shift.worked<sd.duration,run:()=>transaction(()=>S().finishShift(h,it.region),()=>work(it))}],update:el=>{const s=S().data(h).activeShift;if(!s)return;el.querySelector('.ws-copy').textContent=`Trabalho registrado: ${Math.floor(s.worked)}/${sd.duration} segundos. O responsável confere sua estação.`;el.querySelector('[data-action="0"]').disabled=s.worked<sd.duration;}});
@@ -241,7 +249,7 @@
     if(!it||!hero())return;source=it;
     if(it.service==='player-casino')return E.CasinoOwner&&E.CasinoOwner.use(it);
     if(E.Harbor&&['pier','fish','boat'].includes(it.action))return E.Harbor.open(it,it.action==='fish'?'sell':it.action==='boat'?'boat':'tools');
-    const handlers={glider,food,potion,pick,weapon:weapons,upgrade,furniture,home:i=>property(i,'home'),contract:i=>property(i,'shop'),inn,cook:i=>meal(i,true),eat:i=>meal(i,false),jobs,work,professions,wholesale,contracts,trade,cart,pier:fishingTools,fish,alchemy:i=>craft(i,'alquimia'),smelt:i=>craft(i,'forja'),arena,cashier,roulette:i=>casino(i,'roulette'),dice:i=>casino(i,'dice'),blackjack:i=>E.Casino.open({game:'bj',atTable:true,anchor:i}),slots:i=>E.Casino.open({game:'slots',atTable:true,anchor:i})};
+    const handlers={supply:i=>E.Workshift?E.Workshift.supplier(i):fish(i),glider,food,potion,pick,weapon:weapons,upgrade,furniture,home:i=>property(i,'home'),contract:i=>property(i,'shop'),inn,cook:i=>meal(i,true),eat:i=>meal(i,false),jobs,work,professions,wholesale,contracts,trade,cart,pier:fishingTools,fish,alchemy:i=>craft(i,'alquimia'),smelt:i=>craft(i,'forja'),arena,cashier,roulette:i=>casino(i,'roulette'),dice:i=>casino(i,'dice'),blackjack:i=>E.Casino.open({game:'bj',atTable:true,anchor:i}),slots:i=>E.Casino.open({game:'slots',atTable:true,anchor:i})};
     if(it.service==='player-shop'&&it.action!=='contract')return E.StallLife&&E.StallLife.counter(it.region,it.action||'register');
     return (handlers[it.action]||handlers[{general:'glider',food:'food',smith:'weapon',furniture:'furniture',guild:'jobs',inn:'inn',home:'home',market:'trade',alchemy:'alchemy',pier:'pier',arena:'arena',casino:'roulette'}[it.service]]||(()=>W.open({title:'Estabelecimento',text:'Aproxime-se de uma bancada, produto ou morador para interagir.',actions:[]})))(it);
   };

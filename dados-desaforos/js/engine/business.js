@@ -18,12 +18,12 @@
   const city=r=>region(r)==='aurenna'||!!(E.WD.REGIONS[region(r)]||{}).metro;
   const access=(h,r)=>!!h&&E.Settlements.hasAccess(h,r,'shop');
   const CANDIDATES=Object.freeze([
-    {id:'lia',name:'Lia Monteiro',role:'seller',wage:38,fee:140,desc:'Atendente cuidadosa. Explica o uso real dos produtos e respeita o preço da etiqueta.'},
-    {id:'breno',name:'Breno Vale',role:'stockkeeper',wage:26,fee:120,desc:'Estoquista. Repõe produtos já expostos usando unidades que você deixou na mochila.'},
-    {id:'nara',name:'Nara Leme',role:'seller',wage:45,fee:180,desc:'Vendedora experiente. Atende quem chega ao balcão, sem vender abaixo da etiqueta.'},
-    {id:'otto',name:'Otto Carvalho',role:'stockkeeper',wage:32,fee:140,desc:'Organiza a reposição do mostruário; não compra nada sem você e não cria mercadorias.'}
+    {id:'lia',name:'Lia Monteiro',role:'seller',wage:16,fee:50,desc:'Atendente simpática: chama quem passa na rua e traz mais clientes para a loja.'},
+    {id:'breno',name:'Breno Vale',role:'stockkeeper',wage:12,fee:40,desc:'Estoquista: quando um produto está acabando, repõe com as unidades iguais da sua mochila.'},
+    {id:'nara',name:'Nara Leme',role:'seller',wage:20,fee:60,desc:'Vendedora experiente: atrai ainda mais clientes e nunca vende abaixo da etiqueta.'},
+    {id:'otto',name:'Otto Carvalho',role:'stockkeeper',wage:14,fee:45,desc:'Organiza a reposição do mostruário com o que está na sua mochila; não compra nada sem você.'}
   ]);
-  B.ROLES=Object.freeze({seller:{name:'Atendimento',desc:'Atende clientes que chegaram ao balcão e tenta vender uma unidade ao preço da etiqueta.'},stockkeeper:{name:'Reposição',desc:'Repõe até cinco unidades de um produto já exposto usando o estoque da sua mochila.'}});
+  B.ROLES=Object.freeze({seller:{name:'Atendimento',desc:'Chama clientes: com um atendente, a loja recebe cerca de 60% mais visitantes.'},stockkeeper:{name:'Reposição',desc:'Repõe até cinco unidades de um produto já exposto usando o estoque da sua mochila.'}});
   B.data=(h=hero())=>{
     if(!h)return null;const d=h.business=h.business&&typeof h.business==='object'&&!Array.isArray(h.business)?h.business:{};
     d.version=1;d.shops=d.shops&&typeof d.shops==='object'&&!Array.isArray(d.shops)?d.shops:{};d.serial=Number.isSafeInteger(d.serial)&&d.serial>=0?d.serial:0;
@@ -148,7 +148,7 @@
     }
     return res.ok;
   }
-  B.arrivalInterval=(h,r)=>clock().night?65:city(r)?10:16;
+  B.arrivalInterval=(h,r)=>{const base=city(r)?9:15,sellers=h?B.staff(h,r).filter(e=>e.role==='seller'&&e.active).length:0;return clock().night?999:base*(sellers?.62:1)/(1+Math.max(0,sellers-1)*.15);};
   B.tick=dt=>{
     const h=hero();if(!h||!Number.isFinite(dt)||dt<=0||typeof document!=='undefined'&&document.hidden)return;
     if(E.WG&&typeof E.WG.mode==='function'&&!['world','interior'].includes(E.WG.mode()))return;
@@ -173,8 +173,8 @@
         if(e.arrears||e.paidThrough<cl.day)continue;
         const cadence=e.role==='seller'?10:12;e.worked=Math.min(cadence,(Number(e.worked)||0)+Math.min(.25,dt));
         if(e.worked<cadence)continue;
-        if(e.role==='seller'&&E.WorldServices&&E.WorldServices.active)continue;
-        const acted=e.role==='seller'?attend(h,r,s,e):restock(h,r,s);
+        // O atendente aumenta o movimento (ver arrivalInterval); só o repositor age aqui.
+        const acted=e.role==='seller'?false:restock(h,r,s);
         // Bounded attempts; even a stubborn client is processed only once per interval.
         e.worked=0;if(acted){e.actions=(Number(e.actions)||0)+1;save(h,r);}
       }

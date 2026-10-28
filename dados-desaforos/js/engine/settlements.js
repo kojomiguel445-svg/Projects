@@ -9,8 +9,8 @@
   const save = () => { E.Store.save(); U.emit('settlement:changed'); };
   const result = (ok,message,extra={}) => Object.assign({ok,message},extra);
   const integer = (n,min,max) => Number.isInteger(Number(n)) && Number(n)>=min && Number(n)<=max;
-  SS.PRICES = Object.freeze({home:Object.freeze({buy:9000,rent:180}),shop:Object.freeze({buy:6500,rent:120}),room:Object.freeze({rent:45}),casino:Object.freeze({buy:22000,rent:450})});
-  const CITY_PRICES=Object.freeze({home:Object.freeze({buy:28000,rent:540}),shop:Object.freeze({buy:18000,rent:360}),room:Object.freeze({rent:120}),casino:Object.freeze({buy:48000,rent:900})});
+  SS.PRICES = Object.freeze({home:Object.freeze({buy:9000,rent:180}),shop:Object.freeze({buy:2800,rent:30}),room:Object.freeze({rent:45}),casino:Object.freeze({buy:22000,rent:450})});
+  const CITY_PRICES=Object.freeze({home:Object.freeze({buy:28000,rent:540}),shop:Object.freeze({buy:8000,rent:80}),room:Object.freeze({rent:120}),casino:Object.freeze({buy:48000,rent:900})});
   SS.isMetro=r=>SS.region(r)==='aurenna'||!!((E.WD.REGIONS[SS.region(r)]||{}).metro);
   SS.prices=(r,kind)=>{const table=SS.isMetro(r)?CITY_PRICES:SS.PRICES;return kind?table[kind]:table;};
   SS.marketScale=r=>SS.isMetro(r)?1.65:1;

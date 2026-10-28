@@ -46,3 +46,11 @@ de produção 5.3.1 (`dpl_B1hjBGYCHBUraYPjSFCMqfxEdFXA`), conferido por SHA-1 (c
   personagem; com o grupo de pé, quem estabiliza a 0 PV espera a luta acabar); demissão pela carteira
   (`E.Work.confirmResign`); retratos ilustrados suaves (`js/gfx/portraits.js`) e fim das molduras de
   `pixel-ui.css` (arquivo não é mais carregado). Teste: `tests/plan-party.json`.
+- [x] 5.11.0: trabalho prático em todos os empregos (`js/engine/workday.js` gera e confere as tarefas;
+  `js/ui/workshift.js` desenha cozinha, bancada do pescado, ofício, triagem e troco; o atendente do empório
+  segue no caixa 3D). Recompensa única por dia (`E.Workday.reward`, também usada pelo caixa): salário com
+  +5% por nível de especialidade, até 15% do XP que falta para o próximo nível e XP do ofício do emprego.
+  Fornecedor da peixaria (`E.Workday.orders/deliver/sellFish`, bancada `supply` no empório e no cais).
+  Loja própria: vendas automáticas pelo preço (`E.Vendor.visit/tick/summary`), painel único
+  (`js/ui/vendor.js`), aluguel 30 po/dia (80 nas cidades), funcionários mais baratos (atendente = mais
+  visitantes). Testes: `tests/plan-workday.json`, `tests/plan-shop.json`.

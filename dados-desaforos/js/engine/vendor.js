@@ -35,7 +35,8 @@
     s.stocks = Array.isArray(s.stocks) ? s.stocks : []; s.clients = Array.isArray(s.clients) ? s.clients : [];
     s.history = Array.isArray(s.history) ? s.history : []; s.revenue = Number(s.revenue) || 0;
     s.sales = Number(s.sales) || 0; s.reputation = Number(s.reputation) || 0; s.arrival = Number(s.arrival) || 0;
-    s.open = !!s.open;
+    s.open = !!s.open; s.events = Array.isArray(s.events) ? s.events.slice(0, 14) : [];
+    s.today = s.today && typeof s.today === 'object' ? s.today : { day: clock().day, visitors: 0, sales: 0, revenue: 0, expensive: 0, missed: {} };
     return s;
   };
   const life = (h) => E.Life && E.Life.data ? E.Life.data(h) : (h.life = h.life || {});
@@ -125,7 +126,7 @@
     const s = V.shop(h, region);
     if (!s.stocks.some((x) => x.quantity > 0)) return result(false, 'Coloque ao menos um item no mostruário antes de abrir.');
     s.open = true; if (!s.initialized) { s.initialized = true; s.arrival = 23; }
-    save(h, region); return result(true, 'Portas abertas. Os clientes chegarão enquanto você joga.');
+    save(h, region); return result(true, 'Loja aberta! De dia os clientes entram e compram sozinhos quando o preço está justo, mesmo com você longe.');
   };
   V.closeShop = (h, region) => { const s = V.shop(h, region); s.open = false; save(h, region); return result(true, 'Ponto fechado. Seu estoque continua guardado.'); };
   V.PERSONALITIES = [
@@ -154,21 +155,64 @@
     return { name: c.name, personality: p.name, role: p.role, clue: p.clue, request: categories[c.need], turnsLeft: Math.max(0, c.patience - c.turns) };
   };
   V.arrivalInterval = (region) => E.Business && E.Business.arrivalInterval ? E.Business.arrivalInterval(hero(), region) : clock().night ? 65 : 25;
+  // Preço justo de referência (já ajustado à região quando o produto foi exposto) e ritmo de venda pelo preço.
+  V.fair = (e) => Math.max(1, Math.round(Number(e && e.item && e.item.baseValue) || 1));
+  V.demand = (e) => { const r = e.price / V.fair(e); return r <= 1 ? { id: 'fast', label: 'Vende rápido' } : r <= 1.2 ? { id: 'ok', label: 'Vende bem' } : r <= 1.45 ? { id: 'slow', label: 'Vende devagar' } : { id: 'none', label: 'Caro demais' }; };
+  // Dia da loja: visitantes, vendas e receita; ao virar o dia o resumo fica em "ontem".
+  const roll = (h, region, s) => {
+    const day = clock().day; if (s.today.day === day) return;
+    if (s.today.visitors || s.today.sales) {
+      s.yesterday = Object.assign({}, s.today);
+      if (hero() === h && E.UI && s.today.sales) E.UI.toast(`Sua loja ontem: ${s.today.sales} venda(s), +${s.today.revenue} po.`, 'gold');
+    }
+    s.today = { day, visitors: 0, sales: 0, revenue: 0, expensive: 0, missed: {} };
+  };
+  // Um visitante entra, procura o que precisa e compra sozinho se o preço couber no que acha justo.
+  V.visit = (h, region, rnd = U.rand) => {
+    const s = V.shop(h, region), d = V.data(h), c = clock(); roll(h, region, s);
+    const p = V.PERSONALITIES[Math.floor(rnd() * V.PERSONALITIES.length)], need = p.needs[Math.floor(rnd() * p.needs.length)], name = NAMES[Math.floor(rnd() * NAMES.length)];
+    const stock = s.stocks.filter((x) => x.quantity > 0);
+    let pool = stock.filter((x) => x.item.category === need), impulse = false;
+    if (!pool.length && rnd() < .55) { pool = stock; impulse = true; }
+    const ev = { id: 'v' + (++d.serial), name, at: c.elapsed, portrait: Math.floor(rnd() * 5) };
+    s.today.visitors++;
+    const e = pool.slice().sort((a, b) => a.price / V.fair(a) - b.price / V.fair(b))[0];
+    const tolerance = (impulse ? 1.02 : 1.2) + Math.min(.25, s.reputation / 400) + (p.margin - 1) * .35;
+    if (!e) { s.today.missed[need] = (s.today.missed[need] || 0) + 1; Object.assign(ev, { bought: false, text: `${name} procurava ${categories[need] || 'algo útil'} e não encontrou.` }); }
+    else if (e.price > V.fair(e) * tolerance) { s.today.expensive++; Object.assign(ev, { bought: false, text: `${name} achou caro: ${e.item.name} por ${e.price} po (justo: ${V.fair(e)} po).` }); }
+    else {
+      const want = e.kind === 'weapon' ? 1 : 1 + (rnd() < .35 ? 1 : 0) + (rnd() < .12 ? 1 : 0), qty = Math.min(want, e.quantity), gold = e.price * qty;
+      e.quantity -= qty; h.gold += gold; s.revenue += gold; s.sales += qty; s.today.sales += qty; s.today.revenue += gold;
+      s.reputation = Math.min(100, s.reputation + (e.price <= V.fair(e) ? 1 : .5));
+      if (!e.quantity) s.stocks = s.stocks.filter((x) => x !== e);
+      s.history.unshift({ day: c.day, client: name, item: e.item.name, gold }); s.history.length = Math.min(s.history.length, 20);
+      Object.assign(ev, { bought: true, item: e.item.name, qty, gold, text: `${name} comprou ${qty} × ${e.item.name} (+${gold} po).` });
+      if (E.Life && E.Life.ev) E.Life.ev('profit', 1, { amount: gold });
+      if (E.Life && E.Life.addXp && qty) E.Life.addXp(h, 'comercio', 1);
+    }
+    s.events.unshift(ev); s.events.length = Math.min(s.events.length, 14);
+    save(h, region); U.emit('vendor:visit', { heroId: h.id, region, event: ev });
+    return ev;
+  };
   V.tick = (dt) => {
     const h = hero(); if (!h || !Number.isFinite(dt) || dt <= 0) return;
     const d = V.data(h), c = clock();
-    for (const [region, s] of Object.entries(d.shops)) {
-      let changed = false;
-      const before = s.clients.length;
-      s.clients = s.clients.filter((x) => x.state === 'waiting' && x.expires > c.elapsed);
-      changed = s.clients.length !== before;
-      if (s.open && !access(h, region)) { s.open = false; changed = true; }
-      if (s.open && s.stocks.some((x) => x.quantity > 0)) {
-        s.arrival = Math.min(130, s.arrival + Math.min(dt, 5));
-        if (s.arrival >= V.arrivalInterval(region) && s.clients.length < 3) { s.arrival -= V.arrivalInterval(region); s.clients.push(V.makeClient(h, region)); changed = true; }
-      }
-      if (changed) save(h, region);
+    for (const [region, s0] of Object.entries(d.shops)) {
+      const s = V.shop(h, region); roll(h, region, s);
+      if (s.clients.length) { s.clients = []; save(h, region); }
+      if (s.open && !access(h, region)) { s.open = false; save(h, region); continue; }
+      if (!s.open || c.night || !s.stocks.some((x) => x.quantity > 0)) continue;
+      s.arrival = Math.min(130, (Number(s.arrival) || 0) + Math.min(dt, 5));
+      const every = V.arrivalInterval(region);
+      if (s.arrival >= every) { s.arrival -= every; V.visit(h, region); }
     }
+  };
+  // Resumo para o painel: hoje, custos do dia e lucro estimado.
+  V.summary = (h, region) => {
+    const s = V.shop(h, region); roll(h, region, s);
+    const p = prop(h, region), rent = p && p.mode !== 'owned' && E.Settlements ? E.Settlements.prices(region, 'shop').rent : 0;
+    const wages = E.Business && E.Business.staff ? E.Business.staff(h, region).reduce((n, e) => n + (e.wage || 0), 0) : 0;
+    return { today: s.today, yesterday: s.yesterday || null, rent, wages, profit: s.today.revenue - rent - wages, owned: !!(p && p.mode === 'owned') };
   };
   V.dismiss = (h, region, clientId) => {
     const s = V.shop(h, region), c = s.clients.find((x) => x.id === clientId && x.state === 'waiting');

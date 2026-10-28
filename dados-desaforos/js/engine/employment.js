@@ -271,9 +271,13 @@
     const cur = K.current(h), c = K.card(h), esc = U.esc;
     const row = (k, v) => `<div class="wc-row"><span>${esc(k)}</span><b>${esc(v)}</b></div>`;
     const status = cur ? 'Empregado' : 'Desempregado';
-    const job = cur ? [row('Emprego atual', cur.def.name), row('Estabelecimento', `${SS.placeName(cur.def.place)} · ${SS.regionName(cur.region)}`), row('Função', cur.def.name), row('Salário', `${SS.jobPay(cur.id, cur.region)} po por turno`), row('Desde', `dia ${cur.since}`), row('Turnos pagos', String(cur.data.shifts || 0))].join('') : row('Emprego atual', 'Nenhum');
+    const WDy = E.Workday, sp = cur && WDy ? WDy.specialty(h, cur.id) : null;
+    const job = cur ? [row('Emprego atual', cur.def.name), row('Estabelecimento', `${SS.placeName(cur.def.place)} · ${SS.regionName(cur.region)}`), row('Atividade', WDy ? WDy.FAMILY_NAMES[WDy.family(cur.id)] : cur.def.name),
+      row('Salário', WDy ? `até ${WDy.pay(h, cur.id, cur.region)} po por dia${sp.bonus ? ` (+${sp.bonus}% de especialidade)` : ''}` : `${SS.jobPay(cur.id, cur.region)} po por turno`),
+      ...(sp ? [row('Especialidade', `${sp.name} nível ${sp.lv} · ${sp.rank}`)] : []), row('Desde', `dia ${cur.since}`), row('Dias trabalhados', String(cur.data.shifts || 0))].join('') : row('Emprego atual', 'Nenhum');
+    const sup = WDy && h.supplier && h.supplier.rep > 0 ? row('Fornecedor da peixaria', `${WDy.tier(h).name} · ${h.supplier.delivered || 0} peixes entregues`) : '';
     const hist = c.history.slice().reverse().map(x => `<li><b>${esc(x.title)}</b> · ${esc(SS.regionName(x.region))}<small>${x.from ? 'dia ' + x.from + ' a ' : 'até '}dia ${x.to} · ${x.shifts || 0} turno(s) · ${esc(x.reason)}</small></li>`).join('');
-    return `<div class="work-card"><div class="wc-head"><span class="wc-photo" aria-hidden="true">${esc((h.name || '?').slice(0, 1).toUpperCase())}</span><div><small>Carteira de trabalho</small><strong>${esc(h.name || 'Viajante')}</strong></div><span class="wc-status ${cur ? 'on' : ''}">${status}</span></div>${job}<div class="wc-hist"><small>Histórico profissional</small>${hist ? `<ul>${hist}</ul>` : '<p>Nenhum emprego anterior registrado.</p>'}</div><p class="wc-note">Apenas um emprego por vez. Para trocar de vaga, peça demissão aqui na carteira ou no próprio estabelecimento.</p></div>`;
+    return `<div class="work-card"><div class="wc-head"><span class="wc-photo" aria-hidden="true">${esc((h.name || '?').slice(0, 1).toUpperCase())}</span><div><small>Carteira de trabalho</small><strong>${esc(h.name || 'Viajante')}</strong></div><span class="wc-status ${cur ? 'on' : ''}">${status}</span></div>${job}${sup}<div class="wc-hist"><small>Histórico profissional</small>${hist ? `<ul>${hist}</ul>` : '<p>Nenhum emprego anterior registrado.</p>'}</div><p class="wc-note">Apenas um emprego por vez. Cada dia de trabalho dá salário, XP de nível e XP de especialidade; cada nível de especialidade aumenta o salário em 5%. Para trocar de vaga, peça demissão aqui na carteira ou no próprio estabelecimento.</p></div>`;
   };
   // Demissão vale de qualquer lugar: o vínculo do personagem ativo termina e entra no histórico.
   K.resign = (h = hero()) => {
@@ -294,7 +298,7 @@
     const h = hero(); if (!h || !E.WorldServices) return;
     E.UI.closeAll && E.UI.closeAll();
     const cur = K.current(h);
-    E.WorldServices.open({ title: 'Carteira de trabalho', icon: 'journal', eyebrow: 'DOCUMENTOS', text: '', html: K.cardHtml(h), actions: cur ? [{ label: 'Mostrar meu local de trabalho', run: () => E.WorldServices.guide(cur.def.place, cur.region) }, { label: 'Pedir demissão', primary: false, run: () => K.confirmResign() }] : [{ label: 'Procurar vagas na Casa dos Ofícios', run: () => E.WorldServices.guide('guild') }] });
+    E.WorldServices.open({ title: 'Carteira de trabalho', icon: 'journal', eyebrow: 'DOCUMENTOS', text: '', html: K.cardHtml(h), actions: [...(cur ? [{ label: 'Mostrar meu local de trabalho', run: () => E.WorldServices.guide(cur.def.place, cur.region) }] : [{ label: 'Procurar vagas na Casa dos Ofícios', run: () => E.WorldServices.guide('guild') }]), { label: 'Peixaria: vender pescado e encomendas', primary: false, run: () => E.WorldServices.guide('general') }, ...(cur ? [{ label: 'Pedir demissão', primary: false, run: () => K.confirmResign() }] : [])] });
   };
   // ------------------------------------------------------------ expediente no caixa
   // Valores em peças de prata (pp): 1 po = 10 pp. O dinheiro da gaveta é da loja; o salário sai uma vez por dia.
@@ -381,7 +385,10 @@
     const j = legacyJobData(h, s.region), cl = clock(), d = SS.data(h);
     if (j.contract !== s.job || j.lastShiftDay === cl.day || !Number.isFinite(h.gold)) { shift = null; return result(false, 'Este turno não pode ser pago.'); }
     const drawer = coinSum(s.drawer), balanced = drawer === s.float + s.sales;
-    const acc = Math.max(0, 1 - s.errors / (s.customers.length * 1.5)), pay = Math.round(SS.jobPay(s.job, s.region) * (.6 + .4 * acc));
+    const acc = Math.max(0, 1 - s.errors / (s.customers.length * 1.5));
+    // Mesmo pagamento de todos os empregos: salário com bônus de especialidade, XP de nível e XP de comércio.
+    if (E.Workday) { const r = E.Workday.reward(h, s.job, s.region, acc); shift = null; if (r.ok) r.message = `Caixa fechado: ${s.served} clientes, ${K.money(s.sales)} em vendas${balanced ? ', gaveta conferida' : ''}. Salário: ${r.pay} po.`; return Object.assign(r, { errors: s.errors, sales: s.sales, served: s.served, balanced }); }
+    const pay = Math.round(SS.jobPay(s.job, s.region) * (.6 + .4 * acc));
     j.lastShiftDay = cl.day; j.shifts = (j.shifts || 0) + 1; d.reputation += Math.max(0, 3 - s.errors); h.gold += pay;
     if (E.Sim) { const sd = E.Sim.data(h); sd.hunger = Math.max(0, sd.hunger - 3); }
     if (E.Life && E.Life.addXp && E.L && E.L.PROFS && E.L.PROFS.comercio) E.Life.addXp(h, 'comercio', 4 + Math.round(acc * 6));

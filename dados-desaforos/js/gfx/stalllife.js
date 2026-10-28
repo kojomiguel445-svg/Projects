@@ -51,8 +51,8 @@
   S.counter = (region = E.Settlements.region(), action = 'register') => {
     const context = nearby(region); if (!context) return;
     if (!E.Vendor.access(hero(), region)) return contract(region);
-    if (action === 'stock') return stock(region);
-    if (action === 'display') return display(region);
+    // Balcão, caixotes e mostruário abrem o mesmo painel simples da loja.
+    if (['register', 'stock', 'display'].includes(action)) { close(); return E.Vendor.open(region); }
     if (action === 'custom') return customize(region);
     if (action === 'staff') return employees(region);
     const h = hero(), shop = E.Vendor.shop(h, region), p = E.Vendor.property(h, region);
@@ -102,23 +102,18 @@
     const context=nearby(region);if(!context)return;
     const B=E.Business,h=hero();if(!B)return open({title:'Equipe do ponto',anchor:context.anchor,text:'O livro de funcionários está sendo preparado.'});
     const staff=B.staff(h,region),candidates=B.candidates(h,region),rows=hiring?candidates:staff,employee=rows.length?rows[((index%rows.length)+rows.length)%rows.length]:null;
-    if(!hiring&&!employee)return open({title:'Uma equipe para sua loja',anchor:context.anchor,text:'Contrate pessoas para atender clientes ou repor o mostruário com mercadorias que você já possui. A diária é paga no início; sem pagamento, o funcionário suspende o trabalho. Eles trabalham enquanto o jogo está ativo.',actions:[{label:'Conhecer candidatos',run:()=>employees(region,0,true)}]});
+    if(!hiring&&!employee)return open({title:'Uma equipe para sua loja',anchor:context.anchor,text:'Funcionários são opcionais. Um atendente chama mais clientes para a loja; um repositor reabastece as prateleiras com os produtos iguais da sua mochila. A diária é cobrada sozinha a cada dia do jogo.',actions:[{label:'Conhecer candidatos',run:()=>employees(region,0,true)}]});
     if(!employee)return open({title:'Candidatos do dia',anchor:context.anchor,text:'Não há mais candidatos disponíveis hoje. Confira a equipe contratada ou volte no próximo dia do jogo.',actions:[{label:'Minha equipe',run:()=>employees(region)}]});
     const wage=employee.wage||0,role=employee.role==='stockkeeper'?'Repositor':'Atendente',arrears=Number(employee.arrears)||0,active=employee.active!==false&&!arrears;
-    if(hiring)return open({title:employee.name,anchor:context.anchor,icon:'party',text:`${employee.desc||employee.description||'Procura um posto no comércio local.'} Diária de ${wage} po${employee.fee?` e contratação de ${employee.fee} po`:''}. Atendentes negociam com visitantes; repositores transferem produtos da sua mochila para as etiquetas já existentes.`,actions:[{label:`Contratar · ${wage+(employee.fee||0)} po hoje`,disabled:h.gold<wage+(employee.fee||0),run:()=>{notify(B.hire(h,region,employee.id));employees(region);}},{label:'Próximo candidato',disabled:candidates.length<2,run:()=>employees(region,index+1,true)},{label:'Voltar à equipe',run:()=>employees(region)}]});
-    return open({title:employee.name+' · '+role,anchor:context.anchor,icon:'party',text:`Diária: ${wage} po. ${active?'Pagamento em dia; funcionário disponível no ponto.':'Trabalho suspenso até regularizar os salários.'}${arrears?` Há ${arrears} po pendentes.`:''} ${employee.role==='stockkeeper'?'Repõe apenas produtos já etiquetados usando seu estoque da mochila.':'Atende visitantes com ofertas honestas, respeitando a etiqueta e o orçamento.'}`,actions:[{label:employee.role==='stockkeeper'?'Designar para atendimento':'Designar para reposição',run:()=>{notify(B.assign(h,region,employee.id,employee.role==='stockkeeper'?'seller':'stockkeeper'));employees(region,index);}},{label:'Regularizar salários da equipe',disabled:!staff.some(e=>e.arrears>0||e.active===false),run:()=>{notify(B.payWages(h,region));employees(region,index);}},{label:'Próximo funcionário',disabled:staff.length<2,run:()=>employees(region,index+1)},{label:'Contratar mais uma pessoa',run:()=>employees(region,0,true)},{label:'Encerrar contrato deste funcionário',primary:false,run:()=>open({title:'Encerrar contrato',anchor:context.anchor,text:`Dispensar ${employee.name}? A diária já paga não é devolvida e os produtos permanecem na sua loja.`,actions:[{label:'Confirmar dispensa',run:()=>{notify(B.dismiss(h,region,employee.id));employees(region);}},{label:'Continuar com a equipe',run:()=>employees(region,index)}]})}]});
+    if(hiring)return open({title:employee.name,anchor:context.anchor,icon:'party',text:`${employee.desc||employee.description||'Procura um posto no comércio local.'} Diária de ${wage} po${employee.fee?` e contratação de ${employee.fee} po`:''}. Atendentes trazem mais clientes; repositores reabastecem as prateleiras com produtos da sua mochila.`,actions:[{label:`Contratar · ${wage+(employee.fee||0)} po hoje`,disabled:h.gold<wage+(employee.fee||0),run:()=>{notify(B.hire(h,region,employee.id));employees(region);}},{label:'Próximo candidato',disabled:candidates.length<2,run:()=>employees(region,index+1,true)},{label:'Voltar à equipe',run:()=>employees(region)}]});
+    return open({title:employee.name+' · '+role,anchor:context.anchor,icon:'party',text:`Diária: ${wage} po. ${active?'Pagamento em dia; funcionário disponível no ponto.':'Trabalho suspenso até regularizar os salários.'}${arrears?` Há ${arrears} po pendentes.`:''} ${employee.role==='stockkeeper'?'Repõe apenas produtos já etiquetados usando seu estoque da mochila.':'Chama clientes para a loja: cerca de 60% mais visitantes durante o dia.'}`,actions:[{label:employee.role==='stockkeeper'?'Designar para atendimento':'Designar para reposição',run:()=>{notify(B.assign(h,region,employee.id,employee.role==='stockkeeper'?'seller':'stockkeeper'));employees(region,index);}},{label:'Regularizar salários da equipe',disabled:!staff.some(e=>e.arrears>0||e.active===false),run:()=>{notify(B.payWages(h,region));employees(region,index);}},{label:'Próximo funcionário',disabled:staff.length<2,run:()=>employees(region,index+1)},{label:'Contratar mais uma pessoa',run:()=>employees(region,0,true)},{label:'Encerrar contrato deste funcionário',primary:false,run:()=>open({title:'Encerrar contrato',anchor:context.anchor,text:`Dispensar ${employee.name}? A diária já paga não é devolvida e os produtos permanecem na sua loja.`,actions:[{label:'Confirmar dispensa',run:()=>{notify(B.dismiss(h,region,employee.id));employees(region);}},{label:'Continuar com a equipe',run:()=>employees(region,index)}]})}]});
   }
   function ledger(region) {
     const context = nearby(region); if (!context) return;
     const s = E.Vendor.shop(hero(), region), last = s.history.slice(0, 3);
     return open({ title: 'Livro-caixa', anchor: context.anchor, text: `${s.sales} vendas · ${s.revenue} po recebidos · reputação ${s.reputation}/100.`, html: last.length ? `<div class="stall-receipts">${last.map(r => `<p>${esc(r.client)} · ${esc(r.item)}<strong>+${r.gold} po</strong></p>`).join('')}</div>` : '<p>A primeira venda ainda será anotada.</p>' });
   }
-  S.use = it => {
-    const w = actualWorld(), st = state(w), node = st && st.clients.get(it.clientId), c = E.Vendor.shop(hero(), it.region).clients.find(c => c.id === it.clientId && c.state === 'waiting');
-    if (!node || !c || node.phase === 'leaving') return E.UI.toast('Esse visitante já seguiu caminho.');
-    if (node.phase !== 'waiting') return E.UI.toast(`${c.name} está se aproximando do balcão.`);
-    return conversation(w, node, c, 0);
-  };
+  S.use = it => { const w = actualWorld(), st = state(w), node = st && st.clients.get(it.clientId); E.UI.toast(node && node.event ? node.event.text : 'Os clientes compram sozinhos no balcão.'); };
   function conversation(w, node, client, index, previousDraft = '', previousPrice) {
     const h = hero(), region = w.id, shop = E.Vendor.shop(h, region), stocks = shop.stocks, desc = E.Vendor.describeClient(client);
     if (!stocks.length) return open({ title: client.name, anchor: node.ia, text: 'Não há produtos expostos neste momento. Leve mais mercadorias aos caixotes.', actions: [{ label: 'Agradecer a visita', run: () => { notify(E.Vendor.dismiss(h, region, client.id)); close(); } }] });
@@ -232,13 +227,14 @@
       syncEmployees(w,st);
       const sig=`${h.id}|${p&&p.name}|${p&&p.skin}|${shop.open}|${fingerprint(shop)}`;
       if(sig!==st.lastStock){st.lastStock=sig;stockDisplay(w,st,shop,p);}
-      const live=shop.open&&valid?shop.clients.filter(c=>c.state==='waiting'):[];
-      for(const node of st.clients.values())if(!live.some(c=>c.id===node.id))leave(w,st,node);
-      for(const c of live.slice(0,3))if(!st.clients.has(c.id)){
-        if(st.clients.size>=5){const old=[...st.clients.values()].find(n=>n.phase==='leaving');if(old)removeClient(w,st,old);}
-        if(st.clients.size<5)addClient(w,st,c);
+      // Cada visita registrada pelo motor vira um visitante que vem até o balcão, compra (ou não) e vai embora.
+      st.seen=st.seen||new Set();const nowT=E.Sim.clock().elapsed;
+      for(const ev of (shop.events||[]).slice(0,4).reverse()){
+        if(st.seen.has(ev.id))continue;st.seen.add(ev.id);
+        if(!(shop.open&&valid)||!(ev.at>nowT-12)||st.clients.size>=5)continue;
+        const node=addClient(w,st,{id:ev.id,name:ev.name,portrait:ev.portrait||0});node.event=ev;
       }
-      let q=0;for(const c of live){const n=st.clients.get(c.id);if(!n)continue;n.target=localPoint(st.venue,0,(st.venue.d||7)*.12+q*1.08);q++;}
+      let q=0;for(const n of st.clients.values()){if(n.phase==='leaving')continue;n.target=localPoint(st.venue,0,(st.venue.d||7)*.12+q*1.08);q++;}
     }
     for(const node of [...st.clients.values()]){
       node.t+=dt;let goal;
@@ -256,8 +252,9 @@
       } else if(node.phase==='leaving'){node.next++;}
       else if(node.phase==='arriving'){
         if(node.next<node.route.length)node.next++;
-        else{node.phase='waiting';node.client.arrivedAtCounter=true;if(!w.interactables.includes(node.ia)){w.interactables.push(node.ia);w.nearKey=null;}}
+        else{node.phase='waiting';node.waited=0;}
       }
+      else if(node.phase==='waiting'){node.waited=(node.waited||0)+dt;if(node.waited>1.8)leave(w,st,node);}
       node.sprite.position.set(node.x,floor(w,node.x,node.z)+.025,node.z);
       node.ia.x=node.x;node.ia.z=node.z;
       const far=w.hero&&Math.hypot(w.hero.x-node.x,w.hero.z-node.z)>65;node.sprite.visible=!far;
