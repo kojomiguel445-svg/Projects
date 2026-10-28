@@ -15,8 +15,8 @@ de produção 5.3.1 (`dpl_B1hjBGYCHBUraYPjSFCMqfxEdFXA`), conferido por SHA-1 (c
 
 ## Etapas
 - [x] 1. Mundo (5.3.2, em produção): construções assentadas, vilas niveladas, placas legíveis,
-  transição cidade-natureza. **Pendente:** vila do Bosque continua na encosta (23 m) para não
-  alterar a floresta; mudar exige trocar `w.reg.biome!=='forest'` em `villages.js` (layout).
+  transição cidade-natureza. Vila do Bosque corrigida na 5.9.1: a busca de local evita trilhas
+  e poupa árvores (desnível 23,3 → 3,0 m; pedestais 9,8 → 0,5 m; trilha mais próxima a 5,3 m).
 - [x] 2. HUD (5.4.0, em produção): HUD e menus translúcidos, marcador de interação, recuo quando parado, transições
 - [x] 3. Pesca (5.5.0, em produção): pesca sentada em bancos, tensão da linha, varas com atributos, raridades, peixes de mar aberto, revelação de raros
 - [x] 4. Carteira de trabalho e entrevista (5.6.0, em produção): carteira no menu, um emprego por vez (inclusive
@@ -34,3 +34,5 @@ de produção 5.3.1 (`dpl_B1hjBGYCHBUraYPjSFCMqfxEdFXA`), conferido por SHA-1 (c
 - [x] 5.9.0 (em produção): guilda e diárias por personagem; entrevista/turno presos ao personagem;
   HUD mais próximo de Genshin (grupo de personagens com troca 1-4, menu redondo, ícones soltos,
   barra de vida fina, faixa com nome da área, UID).
+- [x] 5.9.1: vila do Bosque em terreno plano à beira do lago, sem cobrir trilhas; o ponto mais
+  baixo do terraço fica acima da água (corrigiu também a ponta alagada da rua das Montanhas).
