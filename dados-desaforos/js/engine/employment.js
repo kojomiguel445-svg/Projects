@@ -75,7 +75,7 @@
   };
 
   // ------------------------------------------------------------ avaliação por regras
-  const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
   // Negações e intenções contrárias ("para evitar roubos") anulam o sinal da palavra seguinte.
   const NEG = new Set(['nao', 'nunca', 'jamais', 'nem', 'sem', 'evitar', 'evito', 'impedir', 'impeco', 'prevenir', 'contra', 'combater']);
   // Quando quem grita ou xinga é o cliente, a frase descreve a situação, não a conduta do candidato.

@@ -1,7 +1,10 @@
 {
- "vercel.json": "61a3f3d59ba629464865263891c17991ffb5509c",
- "tools/build.mjs": "fff12f589f291214c43d0379bd8ffeab76354297",
- "tools/deploy-plan.json": "4850d8b02c1c17c95d99e3ba8877688d62b98a80",
+ "css/fishing.css": "8210eee1b28090f23083d5da365a1bc1b62c8616",
  "css/hud.css": "c14384a85d10902dba5c9e7f90bae2e4bf9e4633",
- "css/fishing.css": "8210eee1b28090f23083d5da365a1bc1b62c8616"
+ "css/work.css": "f98dfdd6a4fb63adb37ef455770fda645b0d6106",
+ "js/engine/employment.js": "81e3ef9dc1177654b7795da93165f043317563db",
+ "js/gfx/workplace.js": "88f25ecb650e5167a94c869491e02141891041ea",
+ "tools/build.mjs": "c69e795f21466f8fea1e18bf5ee20d44b27328a2",
+ "tools/deploy-plan.json": "4850d8b02c1c17c95d99e3ba8877688d62b98a80",
+ "vercel.json": "61a3f3d59ba629464865263891c17991ffb5509c"
 }

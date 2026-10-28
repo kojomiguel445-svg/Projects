@@ -10,6 +10,7 @@ de produção 5.3.1 (`dpl_B1hjBGYCHBUraYPjSFCMqfxEdFXA`), conferido por SHA-1 (c
 3. `create_deployment` com os arquivos de `<pasta>/deploy-files.json` (prévia primeiro, depois
    `target: production` referenciando os mesmos SHA). O build (`tools/build.mjs`) baixa a base
    imutável, aplica as diferenças e confere cada arquivo por SHA-1.
+   O build confere por SHA-1 tanto as diferenças quanto os arquivos novos enviados (`sums`).
 4. Testes locais: `python3 -m http.server 8765` na pasta e `node tests/harness.cjs <roteiro> <saída>`.
 
 ## Etapas
@@ -18,6 +19,9 @@ de produção 5.3.1 (`dpl_B1hjBGYCHBUraYPjSFCMqfxEdFXA`), conferido por SHA-1 (c
   alterar a floresta; mudar exige trocar `w.reg.biome!=='forest'` em `villages.js` (layout).
 - [x] 2. HUD (5.4.0, em produção): HUD e menus translúcidos, marcador de interação, recuo quando parado, transições
 - [x] 3. Pesca (5.5.0, em produção): pesca sentada em bancos, tensão da linha, varas com atributos, raridades, peixes de mar aberto, revelação de raros
-- [ ] 4. Carteira de trabalho e entrevista
+- [x] 4. Carteira de trabalho e entrevista (5.6.0): carteira no menu, um emprego por vez (inclusive
+  saves antigos/duplicados), convite do responsável, sala dos fundos com os dois sentados e entrevista
+  livre avaliada por regras (`js/engine/employment.js`, `js/gfx/workplace.js`, `tests/plan-work.json`).
+  Sem servidor de jogo neste projeto Vercel: a validação roda no motor do cliente, não num servidor.
 - [ ] 5. Trabalho no caixa
 - [ ] 6. Moradias
