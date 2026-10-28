@@ -1,8 +1,10 @@
 {
  "css/fishing.css": "8210eee1b28090f23083d5da365a1bc1b62c8616",
+ "css/home.css": "1700781bfb396b21b660283b51c8d132a6ffbc5d",
  "css/hud.css": "c14384a85d10902dba5c9e7f90bae2e4bf9e4633",
  "css/work.css": "f98dfdd6a4fb63adb37ef455770fda645b0d6106",
  "js/engine/employment.js": "81e3ef9dc1177654b7795da93165f043317563db",
+ "js/gfx/homedecor.js": "b192e98dd4faad6892c3c833ede2249b326da711",
  "js/gfx/shopfloor.js": "ad159b42b7d301b7be1f0291df30b8efd48b6d21",
  "js/gfx/workplace.js": "88f25ecb650e5167a94c869491e02141891041ea",
  "tools/build.mjs": "c69e795f21466f8fea1e18bf5ee20d44b27328a2",
