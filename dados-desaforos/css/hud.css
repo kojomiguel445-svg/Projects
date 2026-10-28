@@ -1,6 +1,6 @@
 /* Elarion 5.4 · HUD e menus.
    Composição de RPG de mundo aberto: vidro translúcido, contornos finos, pílulas e círculos.
-   Carregado depois de pixel-ui.css; as molduras pixeladas ficam só no combate. */
+   Desde a 5.10 as molduras pixeladas (pixel-ui.css) saíram de vez: tudo segue este visual. */
 :root {
   --g-glass: rgba(16, 20, 32, .5);
   --g-glass-2: rgba(16, 20, 32, .74);
@@ -221,7 +221,7 @@ body.reduced .screen,body.reduced .screen > .screen-body,body.reduced .modal,bod
 #hud .pt-name { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; max-width: 120px; font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px #000, 0 0 8px rgba(0,0,0,.6); }
 #hud .pt-hp { display: block; width: 74px; height: 4px; border-radius: 2px; background: rgba(10,14,22,.55); box-shadow: 0 0 0 1px rgba(255,255,255,.25); overflow: hidden; }
 #hud .pt-hp b { display: block; height: 100%; background: #9be35a; }
-#hud .pt-face { position: relative; width: 54px; height: 54px; border-radius: 50%; background: rgba(16,20,32,.55) 50% 14% / 170% no-repeat; image-rendering: pixelated; box-shadow: 0 0 0 2px rgba(255,255,255,.55), 0 4px 10px rgba(0,0,0,.35); transition: transform .25s var(--g-ease), box-shadow .25s; }
+#hud .pt-face { position: relative; width: 54px; height: 54px; border-radius: 50%; background: radial-gradient(circle at 50% 30%, rgba(255,255,255,.22), rgba(16,20,32,.7)) center / cover no-repeat; box-shadow: 0 0 0 2px rgba(255,255,255,.55), 0 4px 10px rgba(0,0,0,.35); transition: transform .25s var(--g-ease), box-shadow .25s; }
 #hud .pt-key { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 5px; background: rgba(16,20,32,.55); box-shadow: 0 0 0 1px rgba(255,255,255,.45) inset; font-size: 12px; font-weight: 800; }
 #hud .pt.on .pt-face { box-shadow: 0 0 0 2.5px #f3dca6, 0 0 16px rgba(243,220,166,.5), 0 4px 10px rgba(0,0,0,.35); }
 #hud .pt.on .pt-name { color: #f3dca6; }
@@ -253,3 +253,124 @@ body.touch .mobile-actions .sprint-btn { display: grid; place-items: center; wid
 body.touch .mobile-actions .sprint-btn.running, body.touch .mobile-actions .sprint-btn[aria-pressed="true"] { background: rgba(243,220,166,.85); color: var(--g-ink); }
 body.touch .mobile-actions .icon-btn::after { content: none; }
 body.touch #hud .uid { bottom: calc(2px + var(--safe-b)); font-size: 9.5px; }
+
+/* ---------- 5.10 · grupo de 3, troca com efeito e visual sem pixel ---------- */
+/* Retratos ilustrados: o desenho preenche o círculo; o anel acende na cor da "visão" de quem está em campo. */
+#hud .pt-face { background-size: cover; background-position: center 30%; overflow: hidden; }
+#hud .pt-face::before { content: ''; position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle at 50% 120%, color-mix(in srgb, var(--el, #ece5d8) 55%, transparent), transparent 60%); mix-blend-mode: screen; pointer-events: none; }
+#hud .pt.on .pt-face { box-shadow: 0 0 0 2.5px var(--el, #f3dca6), 0 0 18px color-mix(in srgb, var(--el, #f3dca6) 60%, transparent), 0 4px 10px rgba(0,0,0,.35); }
+#hud .pt.on .pt-name { color: #fff; }
+#hud .pt.on .pt-hp { width: 86px; }
+#hud .pt-key { border-radius: 4px; background: rgba(16,20,32,.62); }
+#hud .pt.on .pt-key { background: var(--g-cream); color: var(--g-ink); box-shadow: none; }
+/* recarga de 1 s depois da troca: as outras vagas escurecem e um ponteiro claro varre o retrato */
+#hud .pt-cd { position: absolute; inset: 0; border-radius: 50%; pointer-events: none; opacity: 0; }
+#hud .party.cd .pt:not(.on) .pt-cd { opacity: 1; background: conic-gradient(transparent var(--a, 0deg), rgba(10,14,22,.62) 0); animation: ptCd 1s linear forwards; }
+#hud .party.cd .pt:not(.on) { cursor: default; }
+@property --a { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+@keyframes ptCd { from { --a: 0deg; } to { --a: 360deg; } }
+#hud .pt.swap .pt-face { animation: ptSwap2 .6s var(--g-ease); }
+@keyframes ptSwap2 { 0% { transform: scale(.8); filter: brightness(2.2); } 45% { transform: scale(1.16); filter: brightness(1.4); } 100% { transform: scale(1); filter: none; } }
+#hud .pt.swap::after { content: ''; position: absolute; right: 28px; width: 70px; height: 70px; border-radius: 50%; border: 2px solid var(--el, #fff); animation: ptRing .6s ease-out forwards; pointer-events: none; }
+#hud .pt { position: relative; }
+@keyframes ptRing { from { transform: scale(.6); opacity: 1; } to { transform: scale(1.5); opacity: 0; } }
+body.touch #hud .pt.swap::after { right: 22px; width: 54px; height: 54px; }
+
+/* Perfil do menu e lista de heróis com o retrato ilustrado. */
+.profile .avatar { border-radius: 50%; border: 3px solid var(--g-gold); box-shadow: 0 0 0 4px rgba(217,191,134,.18); background: radial-gradient(circle at 50% 30%, #4a5a8a, #1e2438); place-items: center; }
+.profile .avatar img { width: 100%; height: 100%; object-fit: cover; image-rendering: auto; margin: 0; }
+.pick-face { width: 84px; height: 84px; display: block; margin: 0 auto 4px; border-radius: 50%; background: radial-gradient(circle at 50% 30%, #6a7aa8, #2a3150); box-shadow: 0 0 0 2px #d9bf86; }
+.heroes-top { display: flex; justify-content: flex-end; margin: 0 0 12px; }
+
+/* Tela Configurar grupo */
+.party-screen .screen-body { display: flex; justify-content: center; }
+.pts { width: min(900px, 100%); }
+.pts-tip { color: var(--ink-2, #5b6275); font-size: 13px; line-height: 1.5; margin: 0 0 14px; }
+.pts-slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.pts-slot { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 18px 10px 14px; border-radius: 18px; border: 0; background: linear-gradient(180deg, #2c344c, #1c2234); color: #f6f1e7; box-shadow: 0 0 0 1px rgba(255,255,255,.12) inset, 0 10px 24px rgba(20,24,40,.25); cursor: pointer; transition: transform .18s var(--g-ease), box-shadow .18s; }
+.pts-slot:hover { transform: translateY(-2px); }
+.pts-slot.sel { box-shadow: 0 0 0 2px #f3dca6 inset, 0 0 0 4px rgba(243,220,166,.25), 0 12px 26px rgba(20,24,40,.3); }
+.pts-slot .pts-n { position: absolute; top: 10px; left: 12px; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 6px; background: rgba(255,255,255,.12); font-size: 12px; font-weight: 800; }
+.pts-face { width: 108px; height: 108px; border-radius: 50%; background: radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--el, #8fa0c8) 45%, #3a4466), #1a2032) center 30% / cover no-repeat; box-shadow: 0 0 0 3px var(--el, rgba(255,255,255,.25)), 0 0 22px color-mix(in srgb, var(--el, #fff) 35%, transparent); display: grid; place-items: center; }
+.pts-slot.empty .pts-face { box-shadow: 0 0 0 2px rgba(255,255,255,.18) inset; background: rgba(255,255,255,.05); }
+.pts-face b { font-size: 34px; color: rgba(255,255,255,.55); }
+.pts-name { font-size: 16px; font-weight: 800; }
+.pts-slot small { font-size: 11.5px; color: rgba(246,241,231,.72); text-align: center; }
+.pts-hp { display: block; width: 70%; height: 5px; border-radius: 3px; background: rgba(0,0,0,.4); overflow: hidden; }
+.pts-hp b { display: block; height: 100%; background: #9be35a; }
+.pts-slot em { position: absolute; top: 10px; right: 10px; font-style: normal; font-size: 10px; font-weight: 800; letter-spacing: .06em; padding: 3px 8px; border-radius: 999px; background: #f3dca6; color: #3b3424; }
+.pts-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 16px 0 6px; }
+.pts-h { margin: 18px 0 10px; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: #8c713e; }
+.pts-roster { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.pts-hero { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 8px; border-radius: 14px; border: 0; background: #f8f4ec; color: var(--ink, #2c3142); box-shadow: 0 0 0 1px #ded4c0 inset; cursor: pointer; transition: transform .15s var(--g-ease), box-shadow .15s; }
+.pts-hero:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 0 0 2px #c99a4a inset; }
+.pts-hero.in { background: #fffaf0; box-shadow: 0 0 0 2px #d9bf86 inset; }
+.pts-hero:disabled { opacity: .45; cursor: not-allowed; }
+.pts-mini { width: 64px; height: 64px; border-radius: 50%; background: radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--el, #8fa0c8) 40%, #5a6488), #2a3150) center 30% / cover no-repeat; box-shadow: 0 0 0 2px var(--el, #d9bf86); }
+.pts-hero b { font-size: 14px; } .pts-hero small { font-size: 11px; color: var(--ink-2, #5b6275); }
+.pts-hero em { position: absolute; top: 8px; right: 8px; font-style: normal; font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 999px; background: #343d55; color: #f3dca6; }
+@media (max-width: 640px) {
+  .pts-slots { gap: 8px; }
+  .pts-slot { padding: 14px 4px 10px; border-radius: 14px; }
+  .pts-face { width: 72px; height: 72px; }
+  .pts-name { font-size: 13px; }
+  .pts-slot small { font-size: 10px; }
+  .pts-slot em { top: auto; bottom: -9px; right: 50%; transform: translateX(50%); }
+  .pts-roster { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+}
+
+/* ---------- combate sem molduras de pixel ---------- */
+.order { background: rgba(16,20,32,.6); box-shadow: 0 0 0 1px rgba(255,255,255,.14) inset; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.order .o { background: radial-gradient(circle at 50% 30%, #4a5a8a, #1e2438); }
+.order .o.hero img, .order .o.ally img { width: 100%; height: 100%; object-fit: cover; image-rendering: auto; margin: 0; }
+.order .o.ally { border-color: #9be35a; }
+.ecard, .hcard, .acard, .boss-bar { border: 0; box-shadow: 0 0 0 1px rgba(255,255,255,.14) inset, 0 8px 22px rgba(0,0,0,.28); background: rgba(16,20,32,.68); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.ecard.sel { box-shadow: 0 0 0 1.5px #f3dca6 inset, 0 0 18px rgba(243,220,166,.25); }
+.hcard { border-radius: 16px; }
+.cmd-tabs button { border: 0; border-radius: 999px; background: rgba(16,20,32,.62); color: var(--g-cream); box-shadow: 0 0 0 1px rgba(255,255,255,.14) inset; }
+.cmd-tabs button.on { background: var(--g-cream); color: var(--g-ink); box-shadow: none; }
+.cmd .act { border: 0; border-radius: 14px; background: rgba(22,28,44,.82); box-shadow: 0 0 0 1px rgba(255,255,255,.14) inset, 0 6px 16px rgba(0,0,0,.22); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.cmd .act:hover:not(:disabled) { box-shadow: 0 0 0 1.5px #f3dca6 inset, 0 6px 16px rgba(0,0,0,.22); filter: none; }
+.cmd .act.main { background: linear-gradient(180deg, #fbf4e4, #e6dac0); color: var(--g-ink); box-shadow: 0 0 0 1px rgba(255,255,255,.7) inset, 0 6px 16px rgba(0,0,0,.22); }
+.cmd .act.end { background: rgba(120,52,52,.72); box-shadow: 0 0 0 1px rgba(255,160,150,.35) inset; }
+.cmd .act.toggle.on { box-shadow: 0 0 0 1.5px #ffb84d inset; }
+.cmd .act.sub { background: linear-gradient(180deg, rgba(56,44,84,.9), rgba(32,26,52,.9)); }
+.acards { gap: 8px; }
+.acard { border-radius: 14px; padding: 6px 10px 6px 6px; }
+.acard img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; image-rendering: auto; background: radial-gradient(circle at 50% 30%, #4a5a8a, #1e2438); box-shadow: 0 0 0 2px rgba(155,227,90,.7); }
+.acard.cur { box-shadow: 0 0 0 1.5px #f3dca6 inset, 0 0 16px rgba(243,220,166,.3); }
+.acard.down img { filter: grayscale(1); opacity: .6; }
+.ac-auto { justify-self: start; padding: 5px 12px; border: 0; border-radius: 999px; background: rgba(16,20,32,.7); color: var(--g-cream); font: inherit; font-size: 11px; font-weight: 800; box-shadow: 0 0 0 1px rgba(255,255,255,.18) inset; cursor: pointer; }
+.ac-auto.on { background: #f3dca6; color: #3b3424; }
+.ally-cmd { display: flex; flex-direction: column; gap: 8px; }
+.ac-head { display: flex; align-items: center; gap: 10px; padding: 8px 12px 8px 8px; border-radius: 999px; background: rgba(16,20,32,.72); box-shadow: 0 0 0 1px rgba(155,227,90,.45) inset; color: #fff; }
+.ac-head img { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; background: radial-gradient(circle at 50% 30%, #4a5a8a, #1e2438); }
+.ac-head small { display: block; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: #9be35a; }
+.ac-head b { font-size: 14px; }
+.ac-head .ac-hp { margin-left: auto; font-size: 12px; font-weight: 800; color: rgba(255,255,255,.8); }
+.party-result { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 4px auto 0; }
+.party-result small { color: rgba(255,255,255,.72); font-size: 12px; }
+.pr-m { padding: 6px 14px; border-radius: 999px; background: rgba(16,20,32,.62); box-shadow: 0 0 0 1px rgba(255,255,255,.16) inset; font-size: 13px; color: #fff; }
+.pr-m.down { box-shadow: 0 0 0 1px rgba(255,150,140,.4) inset; }
+
+/* ---------- restos do visual em pixel: interações, ajustes e painéis ---------- */
+.prompt { border-radius: 12px; }
+.prompt .key { border-radius: 8px; }
+.bar, .bar > i, .survival-food > i { border-radius: 999px; }
+.screen-head .close { border-radius: 50%; }
+.coop-bar .cb-p img, .on-p img, .cv-e img, .cv-a img { image-rendering: auto; object-fit: cover; border-radius: 50%; }
+.pick:has(> .pick-face) { display: flex; flex-direction: column; justify-content: flex-start; align-items: stretch; }
+/* Durante conversas e painéis de serviço o grupo sai da frente, como no Genshin. */
+body:has(.world-service-panel) #hud .party, body:has(.dlg-wrap) #hud .party { opacity: 0; pointer-events: none; transition: opacity .2s; }
+/* Telas baixas (celular deitado): companheiros viram fichas compactas lado a lado acima do cartão do herói. */
+@media (max-height: 520px) {
+  .acards { display: flex; flex-direction: row; flex-wrap: wrap; align-items: flex-end; gap: 6px; width: auto; max-width: 46vw; }
+  .acard { flex-direction: column; align-items: center; gap: 2px; width: 66px; padding: 5px 4px; border-radius: 12px; }
+  .acard img { width: 34px; height: 34px; }
+  .acard > div { width: 100%; text-align: center; }
+  .acard b { font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .acard small { display: none; }
+  .acard .bar { height: 4px; margin: 2px 0 0; }
+  .ac-auto { flex-basis: 100%; width: max-content; padding: 4px 10px; font-size: 10px; }
+  .ac-head { padding: 5px 10px 5px 5px; } .ac-head img { width: 30px; height: 30px; } .ac-head b { font-size: 12px; }
+}

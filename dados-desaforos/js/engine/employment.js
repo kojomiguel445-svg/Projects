@@ -273,13 +273,28 @@
     const status = cur ? 'Empregado' : 'Desempregado';
     const job = cur ? [row('Emprego atual', cur.def.name), row('Estabelecimento', `${SS.placeName(cur.def.place)} · ${SS.regionName(cur.region)}`), row('Função', cur.def.name), row('Salário', `${SS.jobPay(cur.id, cur.region)} po por turno`), row('Desde', `dia ${cur.since}`), row('Turnos pagos', String(cur.data.shifts || 0))].join('') : row('Emprego atual', 'Nenhum');
     const hist = c.history.slice().reverse().map(x => `<li><b>${esc(x.title)}</b> · ${esc(SS.regionName(x.region))}<small>${x.from ? 'dia ' + x.from + ' a ' : 'até '}dia ${x.to} · ${x.shifts || 0} turno(s) · ${esc(x.reason)}</small></li>`).join('');
-    return `<div class="work-card"><div class="wc-head"><span class="wc-photo" aria-hidden="true">${esc((h.name || '?').slice(0, 1).toUpperCase())}</span><div><small>Carteira de trabalho</small><strong>${esc(h.name || 'Viajante')}</strong></div><span class="wc-status ${cur ? 'on' : ''}">${status}</span></div>${job}<div class="wc-hist"><small>Histórico profissional</small>${hist ? `<ul>${hist}</ul>` : '<p>Nenhum emprego anterior registrado.</p>'}</div><p class="wc-note">Apenas um emprego por vez. Para aceitar outra vaga, peça demissão no estabelecimento atual.</p></div>`;
+    return `<div class="work-card"><div class="wc-head"><span class="wc-photo" aria-hidden="true">${esc((h.name || '?').slice(0, 1).toUpperCase())}</span><div><small>Carteira de trabalho</small><strong>${esc(h.name || 'Viajante')}</strong></div><span class="wc-status ${cur ? 'on' : ''}">${status}</span></div>${job}<div class="wc-hist"><small>Histórico profissional</small>${hist ? `<ul>${hist}</ul>` : '<p>Nenhum emprego anterior registrado.</p>'}</div><p class="wc-note">Apenas um emprego por vez. Para trocar de vaga, peça demissão aqui na carteira ou no próprio estabelecimento.</p></div>`;
+  };
+  // Demissão vale de qualquer lugar: o vínculo do personagem ativo termina e entra no histórico.
+  K.resign = (h = hero()) => {
+    const cur = K.current(h); if (!cur) return result(false, 'Sua carteira não registra nenhum emprego agora.');
+    if (shift && mine(shift)) shift = null;
+    const res = SS.resign(h, cur.region);
+    return res.ok ? result(true, `Você pediu demissão de ${cur.def.name} em ${SS.placeName(cur.def.place)}. A carteira já registra a saída; turnos concluídos continuam pagos.`, { job: cur.id, region: cur.region }) : res;
+  };
+  K.confirmResign = (back = K.openCard) => {
+    const h = hero(), cur = K.current(h), W = E.WorldServices; if (!h || !W) return;
+    if (!cur) return K.openCard();
+    W.open({ title: 'Pedir demissão', icon: 'journal', eyebrow: 'CARTEIRA DE TRABALHO', text: `Deixar o cargo de ${cur.def.name} em ${SS.placeName(cur.def.place)} (${SS.regionName(cur.region)})? Turnos já concluídos continuam pagos; um turno em andamento não gera salário. Depois você pode procurar outra vaga e fazer uma nova entrevista.`, actions: [
+      { label: 'Confirmar demissão', run: () => { const r = K.resign(h); if (E.Audio && E.Audio.sfx) E.Audio.sfx(r.ok ? 'open' : 'error'); W.open({ title: r.ok ? 'Demissão registrada' : 'Não foi possível', icon: 'journal', eyebrow: 'CARTEIRA DE TRABALHO', text: r.message, actions: [{ label: 'Ver minha carteira', run: () => K.openCard() }, { label: 'Procurar vagas na Casa dos Ofícios', primary: false, run: () => W.guide('guild') }] }); } },
+      { label: 'Continuar no emprego', primary: false, run: () => back() },
+    ] });
   };
   K.openCard = () => {
     const h = hero(); if (!h || !E.WorldServices) return;
     E.UI.closeAll && E.UI.closeAll();
     const cur = K.current(h);
-    E.WorldServices.open({ title: 'Carteira de trabalho', icon: 'journal', eyebrow: 'DOCUMENTOS', text: '', html: K.cardHtml(h), actions: cur ? [{ label: 'Mostrar meu local de trabalho', run: () => E.WorldServices.guide(cur.def.place, cur.region) }] : [{ label: 'Procurar vagas na Casa dos Ofícios', run: () => E.WorldServices.guide('guild') }] });
+    E.WorldServices.open({ title: 'Carteira de trabalho', icon: 'journal', eyebrow: 'DOCUMENTOS', text: '', html: K.cardHtml(h), actions: cur ? [{ label: 'Mostrar meu local de trabalho', run: () => E.WorldServices.guide(cur.def.place, cur.region) }, { label: 'Pedir demissão', primary: false, run: () => K.confirmResign() }] : [{ label: 'Procurar vagas na Casa dos Ofícios', run: () => E.WorldServices.guide('guild') }] });
   };
   // ------------------------------------------------------------ expediente no caixa
   // Valores em peças de prata (pp): 1 po = 10 pp. O dinheiro da gaveta é da loja; o salário sai uma vez por dia.

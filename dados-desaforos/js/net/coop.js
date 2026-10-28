@@ -9,14 +9,16 @@
 
   const portraitCache = {};
   CO.portrait = (a) => {
+    if (E.Portrait) return E.Portrait.url({ look: a.look, cls: a.cls, species: a.species });
     const k = a.id + JSON.stringify(a.look || {});
     if (!portraitCache[k]) portraitCache[k] = E.SP.portrait(E.CH.draw({ look: E.CH.normalize(a.look, a.cls, a.species), species: a.species, frame: 'idle0' }), 2);
     return portraitCache[k];
   };
 
   // instantâneo do meu herói para lutar como aliado
-  CO.snapshot = () => {
-    const h = E.Store.hero(); if (!h) return null;
+  // também usado pelos companheiros do grupo local (js/engine/party.js)
+  CO.snapshot = () => { const h = E.Store.hero(); return h ? CO.snapshotOf(h, NET().me) : null; };
+  CO.snapshotOf = (h, id) => {
     const prof = C.attackProfile(h);
     let atk = { name: prof.name, toHit: prof.toHit, dmg: `${prof.dice}${prof.dmgMod ? (prof.dmgMod > 0 ? '+' : '') + prof.dmgMod : ''}`, type: prof.type, ranged: !!prof.ranged };
     // conjuradores usam o melhor truque de ataque, se for melhor que a arma
@@ -29,7 +31,7 @@
       void id;
     }
     const wi = E.SP.heroWeaponInfo(h);
-    return { id: NET().me, name: h.name, cls: h.cls, species: h.species, level: h.level, look: E.CH.normalize(h.look, h.cls, h.species), weapon: Object.assign({}, wi, { type: E.SP.heroWeaponType(h) }), maxHp: C.maxHp(h), hp: Math.max(1, h.hp), ac: C.ac(h), init: C.initiative(h), toHit: atk.toHit, dmg: atk.dmg, dtype: atk.type, atkName: atk.name, ranged: atk.ranged, potions: (h.inventory || {}).pocao_cura || 0 };
+    return { id, name: h.name, cls: h.cls, species: h.species, level: h.level, look: E.CH.normalize(h.look, h.cls, h.species), weapon: Object.assign({}, wi, { type: E.SP.heroWeaponType(h) }), maxHp: C.maxHp(h), hp: Math.max(1, h.hp), ac: C.ac(h), init: C.initiative(h), toHit: atk.toHit, dmg: atk.dmg, dtype: atk.type, atkName: atk.name, ranged: atk.ranged, potions: (h.inventory || {}).pocao_cura || 0 };
   };
 
   const send = (to, data) => NET().send({ t: 'coop', to, data });

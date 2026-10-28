@@ -10,7 +10,7 @@
     const sig = `${C.species(h).name} ${C.cls(h).name.toLowerCase()} · ${E.H.BACKGROUNDS[h.background].name}. ${h.kills && Object.keys(h.kills).length ? `${Object.values(h.kills).reduce((a, b) => a + b, 0)} criaturas derrotadas.` : 'A jornada mal começou.'}`;
     const el = U.h(`<section id="menu" class="layer">
       <aside class="menu-side">
-        <div class="profile"><div class="avatar"><img src="${UI.heroPortrait(h)}" alt=""></div><div><div class="pn">${U.esc(h.name)}</div><div class="pl">Nível ${h.level} · ${C.cls(h).name}</div><div class="uid">UID ${E.Net && E.Net.isActiveAccount && E.Net.isActiveAccount() ? E.Net.user.uid : st.uid}${E.Acc.current() ? ' · ' + U.esc(E.Acc.current().name) : ' · convidado'}</div></div></div>
+        <div class="profile"><div class="avatar"><img src="${E.Portrait ? E.Portrait.url(h) : UI.heroPortrait(h)}" alt=""></div><div><div class="pn">${U.esc(h.name)}</div><div class="pl">Nível ${h.level} · ${C.cls(h).name}</div><div class="uid">UID ${E.Net && E.Net.isActiveAccount && E.Net.isActiveAccount() ? E.Net.user.uid : st.uid}${E.Acc.current() ? ' · ' + U.esc(E.Acc.current().name) : ' · convidado'}</div></div></div>
         <div class="adv-strip"><div><b>Rank de Aventura ${E.Adv.ar()}</b><small>Nível de Mundo ${E.Adv.worldWL()}</small></div><div class="bar"><i style="width:${Math.min(100, E.Adv.data().xp / E.Adv.need(E.Adv.ar()) * 100)}%"></i></div><small>${E.Adv.data().xp} / ${E.Adv.need(E.Adv.ar())} EXP</small></div>
         <div class="sig">“${U.esc(sig)}”</div>
         <div class="wallet"><span class="cur"><span class="ci gem">💎</span>${st.gems}</span><span class="cur"><span class="ci seal">🌟</span>${st.seals}</span><span class="cur"><span class="ci gold">🪙</span>${h.gold} po</span></div>
@@ -36,6 +36,7 @@
       ['chronicle', 'Crônicas', () => E.Wonders.chronicle()],
       ['inventory', 'Inventário', () => E.Journal.inventory()],
       ['bestiary', 'Bestiário', () => E.Journal.bestiary()],
+      ['party', 'Grupo', () => E.PartyUI.open()],
       ['heroes', 'Heróis', () => E.Journal.heroes()],
       ['rules', 'Regras 5.5', () => E.Journal.rules()],
       ['adventure', 'Aventura', () => E.Journal.adventure()],

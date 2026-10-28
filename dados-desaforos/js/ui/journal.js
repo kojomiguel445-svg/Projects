@@ -142,10 +142,11 @@
     const el = UI.screen('Heróis');
     const body = el.querySelector('.screen-body');
     const draw = () => {
-      body.innerHTML = '<div class="pick-grid"></div>';
+      body.innerHTML = '<div class="heroes-top"><button class="btn sm" data-party><span class="ico">✦</span>Configurar grupo (até 3)</button></div><div class="pick-grid"></div>';
+      body.querySelector('[data-party]').onclick = () => E.PartyUI.open();
       const g = body.querySelector('.pick-grid');
       for (const h of E.state.heroes.filter((x) => !x.deleted)) {
-        const b = U.h(`<button class="pick ${h.id === E.state.activeHero ? 'on' : ''}" ${h.dead ? 'style="opacity:.5"' : ''}><img src="${UI.heroPortrait(h)}" style="width:72px;image-rendering:pixelated;display:block;margin:0 auto" alt=""><div class="pn" style="text-align:center">${U.esc(h.name)}</div><div class="pd" style="text-align:center">Nv. ${h.level} ${C.cls(h).name} ${C.species(h).name}${h.dead ? ' · ☠ morto' : ''}</div></button>`);
+        const b = U.h(`<button class="pick ${h.id === E.state.activeHero ? 'on' : ''}" ${h.dead ? 'style="opacity:.5"' : ''}><img src="${E.Portrait ? E.Portrait.url(h) : UI.heroPortrait(h)}" class="pick-face" alt=""><div class="pn" style="text-align:center">${U.esc(h.name)}</div><div class="pd" style="text-align:center">Nv. ${h.level} ${C.cls(h).name} ${C.species(h).name}${h.dead ? ' · ☠ morto' : ''}${E.Party && E.Party.has(h.id) ? ' · no grupo' : ''}</div></button>`);
         b.onclick = async () => {
           if (h.dead || h.id === E.state.activeHero) return;
           if (await UI.confirm('Trocar de herói', `Jogar com ${h.name}?`)) { E.state.activeHero = h.id; E.Store.save(); UI.closeAll(); E.Game.enterWorld(); }
@@ -175,7 +176,7 @@
       <h4>Níveis</h4><p>XP por nível: 300 (2), 900 (3), 2.700 (4), 6.500 (5), 14.000 (6), 23.000 (7), 34.000 (8), 48.000 (9), 64.000 (10). Nos níveis 4 e 8 você recebe um Aumento de Valor de Atributo.</p>
       <h4>Armas do Oráculo</h4><p>★3 Incomum (+1), ★4 Rara (+2), ★5 Muito Rara (+3) — o bônus soma no ataque e no dano (ou no ataque mágico e na CD, para Catalisadores). Proficiência importa: sem ela, o Bônus de Proficiência não entra no ataque.</p>
       <h4>Vida e viagem</h4><p>Um dia dura quatro minutos de jogo. Só correr consome vigor. Caminhar, correr e lutar dão fome; com a saciedade vazia você não pode correr e sofre −2 nos ataques e no dano físico. Cozinhe nas fogueiras e durma na cama de um quarto alugado ou de sua casa.</p>
-      <h4>Atalhos</h4><p><b>WASD</b> andar · <b>Shift ou botão de corrida</b> correr · <b>Espaço</b> pular; segure no ar para usar seu planador comprado e equipado · <b>F</b> interagir · <b>M</b> mapa · <b>J</b> missões · <b>C</b> personagem · <b>I</b> arsenal · <b>O</b> Oráculo · <b>Esc</b> menu. No celular, toque pular uma vez enquanto estiver no ar para abrir o planador.</p>
+      <h4>Atalhos</h4><p><b>WASD</b> andar · <b>Shift ou botão de corrida</b> correr · <b>Espaço</b> pular; segure no ar para usar seu planador comprado e equipado · <b>F</b> interagir · <b>M</b> mapa · <b>J</b> missões · <b>C</b> personagem · <b>I</b> arsenal · <b>O</b> Oráculo · <b>1–3</b> trocar de personagem · <b>L</b> grupo · <b>Esc</b> menu. No celular, toque pular uma vez enquanto estiver no ar para abrir o planador.</p>
       <h4>Fonte</h4><p>Regras do System Reference Document 5.2 (CC-BY-4.0) e do Livro do Jogador 2024, resumidas para combate solo por turnos.</p></div>`;
     UI.open(el);
   };

@@ -180,7 +180,14 @@
       if (hc.sb.haste && h.hp > 0) this.turn.attacksLeft = 1;
       for (const k of Object.keys(hc.sb)) { if (k === 'advNext' || k === 'advD20') continue; if (--hc.sb[k] <= 0) { delete hc.sb[k]; if (k === 'dup') this.say('O duplo ilusório se desfaz.', 'sys'); } }
       if (hc.raging) { hc.rageRounds++; if (hc.rageRounds > 100) { hc.raging = false; this.say('A Fúria se esgota.', 'sys'); } }
-      // inconsciente: teste de resistência contra a morte
+      // inconsciente: teste de resistência contra a morte (estabilizado, espera o grupo terminar a luta)
+      if (h.hp > 0) hc.stable = false;
+      if (h.hp <= 0 && hc.stable) {
+        if (!this.allies.some((a) => !a.down)) { this.say('Sem ninguém de pé no grupo, as criaturas perdem o interesse e vão embora…', 'sys'); return this.finish('down'); }
+        this.say(`${h.name} está estabilizado e inconsciente. O grupo continua a luta.`, 'sys');
+        await U.wait(400);
+        return this.endHeroTurn(true);
+      }
       if (h.hp <= 0) return this.deathSave();
       // efeitos contínuos (Raio Lunar, Guardiões Espirituais…)
       if (hc.dots.length && hc.conc) await this.tickDots();
@@ -220,6 +227,8 @@
       this.P.update();
       if (h.deathSaves.f >= 3) return this.finish('dead');
       if (h.deathSaves.s >= 3) {
+        // com companheiros de pé, a luta continua; o herói estabilizado não faz mais testes
+        if (this.allies.some((a) => !a.down)) { this.hc.stable = true; h.deathSaves = { s: 0, f: 0 }; this.say(`${h.name} se estabiliza. O grupo continua lutando!`, 'sys'); await U.wait(400); return this.endHeroTurn(true); }
         this.say(`${h.name} se estabiliza. As criaturas perdem o interesse e vão embora…`, 'sys');
         return this.finish('down');
       }

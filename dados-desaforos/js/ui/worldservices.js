@@ -194,7 +194,7 @@
     const def=list[((page%list.length)+list.length)%list.length],id=def.id,actions=[];
     if(j.contract===id){
       actions.push({label:atEmployer?'Começar meu trabalho aqui':'Mostrar meu local de trabalho',run:()=>atEmployer?work(it):W.guide(def.place,it.region)});
-      actions.push({label:'Deixar este emprego',primary:false,run:()=>W.open({title:'Encerrar contrato de trabalho',icon:'journal',text:'Você pode escolher outro caminho. Um turno ainda não concluído não gera salário.',actions:[{label:'Encerrar meu contrato',run:()=>transaction(()=>S().resign(h,it.region),()=>jobListing(it,page))},{label:'Continuar neste emprego',primary:false,run:()=>jobListing(it,page)}]})});
+      actions.push({label:'Pedir demissão',primary:false,run:()=>E.Work?E.Work.confirmResign(()=>jobListing(it,page)):W.open({title:'Pedir demissão',icon:'journal',text:'Um turno ainda não concluído não gera salário.',actions:[{label:'Confirmar demissão',run:()=>transaction(()=>S().resign(h,it.region),()=>jobListing(it,page))},{label:'Continuar neste emprego',primary:false,run:()=>jobListing(it,page)}]})});
     }
     else actions.push({label:atEmployer?'Perguntar sobre a vaga ao responsável':'Encontrar este empregador',run:()=>atEmployer?(E.Workplace?E.Workplace.invite(it,id):transaction(()=>S().scheduleInterview(h,it.region,id,{atEmployer:true}),()=>jobs(it,page))):W.guide(def.place,it.region)});
     if(list.length>1)actions.push({label:'Ler a próxima vaga',primary:false,run:()=>jobListing(it,page+1)});

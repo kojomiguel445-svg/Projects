@@ -84,12 +84,12 @@
   G.whatsNew = async () => {
     E.state.seenVersion = E.Title.VERSION; E.Store.save();
     const html = `<div class="whatsnew"><ul>
-      <li><b>Vila do Bosque:</b> a vila mudou para um terreno plano à beira do lago, sem cobrir as trilhas da floresta. A rua não é mais uma rampa e as lojas ficam no nível do chão.</li>
-      <li><b>Vila das Montanhas:</b> a ponta da rua não fica mais embaixo d'água.</li>
-      <li><b>Grupo de personagens:</b> seus personagens aparecem à direita da tela. Toque no retrato ou use as teclas 1 a 4 para trocar na hora, sem sair do lugar.</li>
-      <li><b>Cada personagem com a própria carreira:</b> emprego, ofício, contratos da guilda e diárias pertencem a quem conquistou. Um personagem novo começa do zero.</li>
-      <li><b>HUD renovado:</b> menu redondo ao lado do minimapa, ícones leves no topo, barra de vida fina com nível, nome da área ao chegar numa região e UID no canto.</li>
-      <li><b>Personalizar casa (5.8):</b> móveis novos, papéis de parede e pisos com prévia.</li>
+      <li><b>Grupo de até 3:</b> monte sua equipe em <b>Menu → Grupo</b> (ou tecla L). Quem está no grupo aparece à direita e troca com as teclas 1 a 3.</li>
+      <li><b>Troca com efeito de luz:</b> quem sai se desfaz em fagulhas da cor da sua classe e quem entra surge num redemoinho de luz. Há uma recarga de 1 segundo entre trocas.</li>
+      <li><b>O grupo luta junto:</b> nas batalhas, os outros membros do grupo entram como companheiros. Você escolhe a ação de cada um (atacar, esquivar, poção) ou deixa no automático. O XP do encontro é dividido entre o grupo, como no D&amp;D 2024, e cada personagem guarda os próprios PV e poções.</li>
+      <li><b>Pedir demissão:</b> agora dá para sair do emprego direto pela Carteira de trabalho, de qualquer lugar, com confirmação. O histórico registra a saída.</li>
+      <li><b>HUD sem pixel:</b> retratos ilustrados no grupo, no menu e na luta, e botões, abas e cartões de combate com o visual arredondado, sem as molduras pixeladas.</li>
+      <li><b>5.9.1:</b> Vila do Bosque em terreno plano à beira do lago, longe das trilhas.</li>
     </ul></div>`;
     await UI.modal({ title: `✦ Novidades da versão ${E.Title.VERSION}`, html, buttons: [{ label: 'Ver o Oráculo', value: 'wish' }, { label: 'Bora jogar!', value: true, cls: 'primary' }] }).then((v) => { if (v === 'wish') E.Wish.open(); });
   };

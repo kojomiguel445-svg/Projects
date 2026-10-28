@@ -36,3 +36,9 @@ de produção 5.3.1 (`dpl_B1hjBGYCHBUraYPjSFCMqfxEdFXA`), conferido por SHA-1 (c
   barra de vida fina, faixa com nome da área, UID).
 - [x] 5.9.1: vila do Bosque em terreno plano à beira do lago, sem cobrir trilhas; o ponto mais
   baixo do terraço fica acima da água (corrigiu também a ponta alagada da rua das Montanhas).
+- [x] 5.10.0: grupo de até 3 (`js/engine/party.js`, tela `js/ui/party.js`, tecla L, menu Grupo); troca 1–3 com
+  efeito de luz e recarga de 1 s (`js/gfx/partyfx.js`); companheiros entram na luta como aliados locais
+  (comandos atacar/esquivar/poção ou automático; XP dividido entre o grupo; PV e poções voltam para cada
+  personagem; com o grupo de pé, quem estabiliza a 0 PV espera a luta acabar); demissão pela carteira
+  (`E.Work.confirmResign`); retratos ilustrados suaves (`js/gfx/portraits.js`) e fim das molduras de
+  `pixel-ui.css` (arquivo não é mais carregado). Teste: `tests/plan-party.json`.

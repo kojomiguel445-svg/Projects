@@ -76,31 +76,36 @@
     if (E.Net) HUD.online(E.Net.connected, E.Net.players.size + 1);
   };
   // ---------- grupo de personagens (lado direito) ----------
-  let bannerRegion = null, bannerTimer = 0, partyKey = '';
-  const faces = new Map();
-  const partyList = () => E.state.heroes.filter((h) => !h.dead && !h.deleted).slice(0, 4);
-  const face = (h) => {
-    const key = h.id + JSON.stringify(h.look) + (h.equip && h.equip.weapon || '');
-    if (!faces.has(key)) { try { faces.set(key, E.SP.hero(h, 'idle0', E.SP.heroWeaponType(h)).toDataURL()); } catch { faces.set(key, ''); } }
-    return faces.get(key);
-  };
-  HUD.party = () => {
+  let bannerRegion = null, bannerTimer = 0, partyKey = '', lastSwap = 0;
+  const SWAP_CD = 1000; // recarga da troca, como no Genshin
+  const partyList = () => E.Party ? E.Party.list() : E.state.heroes.filter((h) => !h.dead && !h.deleted).slice(0, 3);
+  const face = (h) => E.Portrait ? E.Portrait.url(h) : '';
+  HUD.party = (force) => {
     if (!el) return;
     const box = el.querySelector('.party'), active = E.Store.hero(), list = partyList();
-    const key = list.map((h) => `${h.id}:${h.hp}:${C.maxHp(h)}:${h.name}:${JSON.stringify(h.look)}`).join('|') + '#' + (active && active.id);
-    if (key === partyKey) return; partyKey = key;
-    box.innerHTML = list.map((h, i) => `<button class="pt ${active && h.id === active.id ? 'on' : ''}" data-hero="${h.id}" title="${U.esc(h.name)} · Nv. ${h.level}"><span class="pt-name">${U.esc(h.name)}<i class="pt-hp"><b style="width:${Math.max(0, Math.min(100, h.hp / C.maxHp(h) * 100))}%"></b></i></span><span class="pt-face" style="background-image:url(${face(h)})"></span><span class="pt-key">${i + 1}</span></button>`).join('');
+    const key = list.map((h) => `${h.id}:${h.hp}:${C.maxHp(h)}:${h.name}:${h.level}:${JSON.stringify(h.look)}`).join('|') + '#' + (active && active.id);
+    if (key === partyKey && !force) return; partyKey = key;
+    box.classList.toggle('solo', list.length < 2);
+    box.innerHTML = list.map((h, i) => `<button class="pt ${active && h.id === active.id ? 'on' : ''}" data-hero="${h.id}" title="${U.esc(h.name)} · Nv. ${h.level}" style="--el:${E.Portrait ? E.Portrait.element(h) : '#ece5d8'}"><span class="pt-name">${U.esc(h.name)}<i class="pt-hp"><b style="width:${Math.max(0, Math.min(100, h.hp / C.maxHp(h) * 100))}%"></b></i></span><span class="pt-face" style="background-image:url(${face(h)})"><i class="pt-cd"></i></span><span class="pt-key">${i + 1}</span></button>`).join('');
   };
+  U.on('party:changed', () => HUD.party(true));
   // Troca no próprio lugar: o mundo continua carregado; cada personagem mantém seus dados e empregos.
   HUD.switchHero = (id) => {
     const cur = E.Store.hero(), h = E.state.heroes.find((x) => x.id === id && !x.dead && !x.deleted), w = E.WG.world;
     if (!h || !cur || h.id === cur.id) return;
     if (E.WG.mode() !== 'world' || E.WG.locked || !w) return E.UI.toast('Troque de personagem enquanto explora o mundo.');
     if (E.Net && E.Net.connected && E.Net.party && E.Net.party.members.length > 1) return E.UI.toast('No cooperativo, troque de personagem pelo menu Heróis.');
+    if (h.hp <= 0) return E.UI.toast(`${h.name} está sem PV. Descanse ou use uma poção antes de trocar.`);
+    const now = performance.now(); if (now - lastSwap < SWAP_CD) return;
+    lastSwap = now;
+    if (E.Party && !E.Party.has(h.id)) { const ids = E.Party.ids().slice(); ids[Math.min(ids.length, E.Party.MAX - 1)] = h.id; E.state.party = ids; }
+    const oldCv = w.heroSprite && w.heroSprite.material.map && w.heroSprite.material.map.image;
     E.state.activeHero = h.id; E.Store.save(); w.refreshHeroFrames(); partyKey = ''; HUD.update();
-    const card = el.querySelector(`[data-hero="${h.id}"]`); if (card) { card.classList.add('swap'); setTimeout(() => card.classList.remove('swap'), 500); }
-    if (E.Audio && E.Audio.sfx) E.Audio.sfx('open');
-    E.UI.toast(`Agora você joga com ${h.name}.`);
+    if (E.PartyFX) E.PartyFX.swap(w, oldCv, E.Portrait && E.Portrait.element(h), E.Portrait && E.Portrait.element(cur));
+    const box = el.querySelector('.party'); box.classList.remove('cd'); void box.offsetWidth; box.classList.add('cd'); setTimeout(() => box.classList.remove('cd'), SWAP_CD);
+    const card = el.querySelector(`[data-hero="${h.id}"]`); if (card) { card.classList.add('swap'); setTimeout(() => card.classList.remove('swap'), 600); }
+    if (E.Audio && E.Audio.sfx) E.Audio.sfx('spell');
+    U.emit('party:switched', h.id);
   };
   HUD.banner = (title, sub) => {
     if (!el) return; const b = el.querySelector('.area-banner');
@@ -108,7 +113,7 @@
     b.classList.add('show'); clearTimeout(bannerTimer); bannerTimer = setTimeout(() => b.classList.remove('show'), 3800);
   };
   addEventListener('keydown', (event) => {
-    if (!el || event.repeat || !/^Digit[1-4]$/.test(event.code) || event.target && /INPUT|TEXTAREA|SELECT/.test(event.target.tagName)) return;
+    if (!el || event.repeat || !/^Digit[1-3]$/.test(event.code) || event.target && /INPUT|TEXTAREA|SELECT/.test(event.target.tagName)) return;
     if (E.WG.mode() !== 'world' || E.WG.locked || E.UI.anyOpen() || document.querySelector('.modal-bg') || (E.WorldServices && E.WorldServices.active)) return;
     const h = partyList()[+event.code.slice(5) - 1]; if (h) { event.preventDefault(); HUD.switchHero(h.id); }
   });

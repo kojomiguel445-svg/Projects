@@ -2,7 +2,7 @@
 (() => {
   const U = E.U, UI = E.UI;
   const T = {};
-  T.VERSION = '5.9.1';
+  T.VERSION = '5.10.0';
 
   T.show = () => {
     E.WG.showTitle();

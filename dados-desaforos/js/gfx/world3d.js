@@ -1805,8 +1805,10 @@
       const look = E.CH.normalize(a.look, a.cls, a.species);
       const wi = a.weapon || {};
       const draw = (f) => E.CH.draw({ look, species: a.species, frame: f, weaponType: wi.type, weaponColor: { c1: wi.c1 || '#dfe6ee', c2: wi.c2 || '#d4af37', shape: wi.shape || null }, weaponRarity: wi.rar || 1 });
-      const frames = [draw('idle0'), draw('idle1')];
-      const hh = 2.5 * 1.12 * WG.speciesScale(a.species) * ((look && look.height) || 1);
+      // companheiro do grupo local: usa o sprite completo do próprio herói (com a arte da arma)
+      const own = a.local && E.state.heroes.find((x) => x.id === a.heroId);
+      const frames = own ? [E.SP.hero(own, 'idle0', E.SP.heroWeaponType(own)), E.SP.hero(own, 'idle1', E.SP.heroWeaponType(own))] : [draw('idle0'), draw('idle1')];
+      const hh = own ? WG.heroHeight(own) * 1.12 : 2.5 * 1.12 * WG.speciesScale(a.species) * ((look && look.height) || 1);
       const sp = this.makeSprite(frames[0], hh);
       sp.scale.x *= -1;
       const spots = this.portrait ? [[3.4, 0.2], [-0.6, 3.6], [3.8, 3.4]] : [[5.0, -2.6], [5.2, 2.9], [6.6, 0.0]];
@@ -1814,7 +1816,7 @@
       const home = new THREE.Vector3(x, 0, z);
       sp.position.copy(home);
       this.scene.add(sp);
-      const ring = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.68, 32), new THREE.MeshBasicMaterial({ color: '#7fd8ff', transparent: true, opacity: 0.6, toneMapped: false, depthWrite: false }));
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.68, 32), new THREE.MeshBasicMaterial({ color: a.local && E.Portrait ? E.Portrait.element(a) : '#7fd8ff', transparent: true, opacity: 0.6, toneMapped: false, depthWrite: false }));
       ring.rotation.x = -Math.PI / 2; ring.position.set(x, 0.05, z); this.scene.add(ring);
       this.units[a.uid] = { sprite: sp, frames, home, h: hh, flip: -1, shadow: this.shadow(home, 0.6), allyRing: ring };
     }

@@ -3,6 +3,8 @@
   const U = E.U, UI = E.UI, C = E.C, R = E.R, S = E.S;
   const BU = {};
   let el, battle, arena, tab = 'acao', target = null, locked = true, waitingName = '';
+  // turno de um companheiro do grupo local: o jogador escolhe a ação (ou deixa no automático)
+  let allyTurn = null, allyResolve = null;
 
   const typeColor = (t) => (R.DAMAGE[t] ? R.DAMAGE[t].color : '#ffffff');
   const condChips = (cond, hero) => Object.keys(cond).filter((k) => R.CONDITIONS[k] || k === 'banido' || k === 'atormentado' || k === 'empurrado').map((k) => {
@@ -80,8 +82,13 @@
     async hit(uid, crit) { E.Audio.sfx('impact'); if (uid === 'hero') E.App.buzz(crit ? 160 : 50); else if (crit) E.App.buzz(70); if (arena) await arena.hit(uid, crit); },
     async death(uid) { if (arena) await arena.death(uid); render(); },
     async down() { if (arena) await arena.down(); },
-    activeAlly(a) { locked = true; waitingName = a.name; render(); },
-    allyAction(a) { return E.Coop.requestAction(a, battle); },
+    activeAlly(a) { locked = true; waitingName = a.name; allyTurn = a.local ? a : null; render(); },
+    allyAction(a) {
+      if (!a.local) return E.Coop.requestAction(a, battle);
+      const done = (act) => { allyTurn = null; allyResolve = null; return act; };
+      if (E.Party.auto()) return U.wait(380).then(() => done(E.Party.autoAction(a, battle, target)));
+      return new Promise((res) => { allyResolve = (act) => res(done(act)); renderCmd(); });
+    },
     async allyDown(a) { if (arena) await arena.downUnit(a.uid); },
     // tela de "entre a vida e a morte": o jogador precisa rolar o d20 com o botão (ou Espaço/Enter/R)
     awaitDeathRoll(o) {
@@ -125,7 +132,10 @@
     E.HUD.show(false);
     E.Audio.music('batalha');
     locked = true; waitingName = ''; tab = 'acao';
-    const allies = opts.allies || (E.Coop && !opts.noCoop ? await E.Coop.gather(keys, opts) : []);
+    let allies = opts.allies || (E.Coop && !opts.noCoop ? await E.Coop.gather(keys, opts) : []);
+    // o grupo (até 3 contando quem está em campo) entra junto; amigos online ocupam as vagas primeiro
+    if (E.Party && !opts.noParty) allies = allies.concat(E.Party.companions(E.Party.MAX - 1 - allies.length).map(E.Party.snapshot).filter(Boolean));
+    allyTurn = null; allyResolve = null;
     battle = new E.Battle({ hero: h, enemies: keys, region: E.WG.world.id, boss: opts.boss, noLair: !!(opts.ecoTrial || opts.summon), presenter: P, allies });
     BU.current = battle;
     BU.opts = opts;
@@ -182,7 +192,7 @@
     // ordem de iniciativa
     const cur = battle.order ? battle.order[battle.turnIdx] : null;
     el.querySelector('.order').innerHTML = `<span class="rnd">RODADA ${battle.round}</span>` + (battle.order || []).map((o) => {
-      if (o.side === 'hero') return `<span class="o hero ${cur === o ? 'cur' : ''}" title="${U.esc(h.name)} · ${o.init}"><img src="${UI.heroPortrait(h)}" alt=""></span>`;
+      if (o.side === 'hero') return `<span class="o hero ${cur === o ? 'cur' : ''}" title="${U.esc(h.name)} · ${o.init}"><img src="${E.Portrait ? E.Portrait.url(h) : UI.heroPortrait(h)}" alt=""></span>`;
       if (o.side === 'ally') { const a = battle.ally(o.uid); return `<span class="o hero ally ${cur === o ? 'cur' : ''} ${a.down ? 'dead' : ''}" title="${U.esc(a.name)} · ${o.init}"><img src="${E.Coop.portrait(a)}" alt=""></span>`; }
       const e = battle.enemy(o.uid);
       return `<span class="o enemy ${cur === o ? 'cur' : ''} ${e.dead ? 'dead' : ''}" title="${U.esc(e.name)} · ${o.init}"><img src="${E.SP.portrait(E.SP.monster(e.key), 2)}" alt=""></span>`;
@@ -207,7 +217,9 @@
     }
     // aliados
     const ac = el.querySelector('.acards');
-    ac.innerHTML = battle.allies.map((a) => `<div class="acard ${a.down ? 'down' : ''}"><img src="${E.Coop.portrait(a)}" alt=""><div><b>${U.esc(a.name)}</b><small>Nv. ${a.level} · CA ${a.ac}${a.dodge ? ' · Esquiva' : ''}</small><div class="bar"><i style="width:${Math.max(0, a.hp) / a.maxHp * 100}%"></i></div><small>${a.down ? 'Inconsciente' : `${a.hp}/${a.maxHp} PV`}</small></div></div>`).join('');
+    const autoBtn = battle.allies.some((a) => a.local) ? `<button class="ac-auto ${E.Party.auto() ? 'on' : ''}" data-auto>Companheiros: ${E.Party.auto() ? 'Automático' : 'Você escolhe'}</button>` : '';
+    ac.innerHTML = autoBtn + battle.allies.map((a) => `<div class="acard ${a.down ? 'down' : ''} ${allyTurn === a ? 'cur' : ''}"><img src="${E.Coop.portrait(a)}" alt=""><div><b>${U.esc(a.name)}</b><small>Nv. ${a.level} · CA ${a.ac}${a.dodge ? ' · Esquiva' : ''}</small><div class="bar"><i style="width:${Math.max(0, a.hp) / a.maxHp * 100}%"></i></div><small>${a.down ? 'Inconsciente' : `${a.hp}/${a.maxHp} PV`}</small></div></div>`).join('');
+    const ab = ac.querySelector('[data-auto]'); if (ab) ab.onclick = () => { E.Party.setAuto(!E.Party.auto()); E.Audio.sfx('click'); if (E.Party.auto() && allyResolve && allyTurn) { const r = allyResolve; r(E.Party.autoAction(allyTurn, battle, target)); } render(); };
     // herói
     const max = C.maxHp(h), t = battle.turn || {};
     const slots = C.slotsLeft(h), smax = C.slotsMax(h);
@@ -225,13 +237,33 @@
       <div class="econ"><span class="pip ${t.action > 0 ? '' : 'off'}"><i></i>Ação${t.attacksLeft > 0 ? ` (${t.attacksLeft} atq.)` : ''}</span><span class="pip ${t.bonus > 0 ? '' : 'off'}"><i class="b"></i>Bônus</span></div>
       ${smax.length ? `<div class="slots"><b>Espaços</b>${smax.map((n, i) => n ? `<span title="${i + 1}º círculo">${i + 1}º</span>${Array.from({ length: n }, (_, k) => `<span class="slot ${k < slots[i] ? 'on' : ''}"></span>`).join('')}` : '').join(' ')}</div>` : ''}
       <div class="stats">${Object.keys(res).filter((k) => resNames[k]).map((k) => `<span class="chip">${resNames[k]} ${C.res(h, k)}/${res[k]}</span>`).join('')}${hc.conc ? `<span class="chip gold">◎ ${S.SPELLS[hc.conc].name}</span>` : ''}${hc.raging ? '<span class="chip" style="color:#ff9a7a">🔥 Fúria</span>' : ''}${subChips}${condChips(hc.cond, true)}${h.heroic ? '<span class="chip gold" title="Inspiração Heroica: role de novo um dado">✦ Inspiração</span>' : ''}</div>`;
+    // os cartões dos aliados ficam sempre logo acima do cartão do herói, qualquer que seja a altura dele
+    const hcEl = el.querySelector('.hcard');
+    if (hcEl && hcEl.offsetHeight) {
+      if (hcEl.offsetTop > innerHeight / 2) Object.assign(ac.style, { bottom: `calc(${hcEl.offsetHeight + 24}px + var(--safe-b))`, top: '', left: '', right: '', width: '' });
+      else Object.assign(ac.style, { top: `${hcEl.offsetTop + hcEl.offsetHeight + 8}px`, bottom: 'auto', left: 'auto', right: getComputedStyle(hcEl).right, width: `${hcEl.offsetWidth}px` }); // celular em pé: o cartão do herói fica no alto
+    }
     renderCmd();
+  }
+
+  // comandos do companheiro: atacar o alvo marcado, esquivar, beber poção ou deixar no automático
+  function renderAllyCmd(cmd, a) {
+    const tgt = battle.enemy(target) && !battle.enemy(target).dead ? battle.enemy(target) : battle.alive()[0];
+    const pick = (act) => { if (!allyResolve) return; E.Audio.sfx('click'); const r = allyResolve; r(act); render(); };
+    cmd.innerHTML = `<div class="ally-cmd"><div class="ac-head"><img src="${E.Coop.portrait(a)}" alt=""><div><small>Companheiro</small><b>Turno de ${U.esc(a.name)}</b></div><span class="ac-hp">${Math.max(0, a.hp)}/${a.maxHp} PV</span></div><div class="cmd-list"></div></div>`;
+    const list = cmd.querySelector('.cmd-list');
+    const add = (o) => { const b = U.h(`<button class="act ${o.cls || ''}" ${o.disabled ? 'disabled' : ''}><span class="cost">${o.cost || ''}</span><div class="an">${o.icon} ${o.name}</div><div class="ad">${o.desc}</div></button>`); b.onclick = o.run; list.appendChild(b); };
+    add({ cls: 'main', icon: '⚔', name: `${U.esc(a.atkName)}${tgt ? ' → ' + U.esc(tgt.name) : ''}`, desc: `${UI.signed(a.toHit)} para acertar · ${a.dmg} ${R.DAMAGE[a.dtype] ? R.DAMAGE[a.dtype].name : ''}`, cost: '<i></i>', disabled: !tgt, run: () => pick({ kind: 'attack', target: tgt && tgt.uid }) });
+    add({ icon: '🛡', name: 'Esquivar', desc: 'Ataques contra este companheiro com Desvantagem', cost: '<i></i>', run: () => pick({ kind: 'dodge' }) });
+    add({ icon: '🧪', name: 'Poção de Cura', desc: a.potions > 0 ? `Cura 2d4+2 · restam ${a.potions}` : 'Sem poções na bolsa deste personagem', cost: '<i></i>', disabled: !(a.potions > 0) || a.hp >= a.maxHp, run: () => pick({ kind: 'potion' }) });
+    add({ cls: 'toggle', icon: '✦', name: 'Automático', desc: 'Os companheiros escolhem sozinhos nos próximos turnos', cost: 'grátis', run: () => { E.Party.setAuto(true); pick(E.Party.autoAction(a, battle, target)); } });
   }
 
   const resLabel = { canalizar: 'Canalizar', forma: 'Forma Selvagem', foco: 'Foco', feiticaria: 'P. Feitiçaria', inspiracao: 'Inspiração', zelo: 'dados', luz: 'dados', passo_feerico: 'usos', mapa: 'usos', golpe_terrivel: 'usos', incansavel: 'usos', intervencao: 'uso' };
   function renderCmd() {
     const cmd = el.querySelector('.cmd');
     const h = battle.h, hc = battle.hc, t = battle.turn || {};
+    if (allyTurn && allyResolve && !battle.over) return renderAllyCmd(cmd, allyTurn);
     if (locked || battle.over || battle.busy || h.hp <= 0) {
       cmd.innerHTML = `<div class="waiting">${battle.over ? 'Fim da batalha' : h.hp <= 0 ? 'Você está inconsciente' : waitingName ? `Turno de ${U.esc(waitingName)}` : 'Aguarde'}<span class="dots"></span></div>`;
       return;
@@ -356,6 +388,8 @@
         res.gold = Math.round(res.gold * E.Adv.goldMult()); res.gems = Math.round(res.gems * E.Adv.gemMult());
         res.adv = E.Adv.XP.win + res.kills.length * E.Adv.XP.enemy + (res.lair ? E.Adv.XP.lair : 0) + (res.boss ? E.Adv.XP.boss : 0);
       }
+      // XP dividido entre quem lutou no grupo (regra do D&D 2024); cada companheiro recebe a mesma parte
+      if (E.Party) { const sh = E.Party.share(res.xp, battle); res.party = sh.n; res.xpTotal = res.xp; res.xp = sh.each; }
       if (E.Life && E.Life.buff(h, 'sabedoria')) res.xp = Math.round(res.xp * 1.2);
       if (E.Life && E.Life.buff(h, 'fortuna')) res.gold = Math.round(res.gold * 1.25);
       levels = C.addXp(h, res.xp);
@@ -375,10 +409,15 @@
       if (E.Life) { E.Life.onKill(res.kills, E.WD.home(E.WG.world.id)); E.Life.ev('win'); E.Life.checkAch(h); }
       if (res.boss) E.Quests.storyReady();
     }
+    // o grupo venceu com quem estava em campo caído: ele acorda com 1 PV
+    let revived = false;
+    if (res.outcome === 'win' && h.hp <= 0) { h.hp = 1; revived = true; }
     if (h.hp > 0) h.deathSaves = { s: 0, f: 0 };
+    const mates = E.Party ? E.Party.apply(res, battle, res.outcome === 'win' ? (res.xpTotal ? Math.ceil(res.xpTotal / (res.party || 1)) : 0) : 0) : [];
     const title = { win: 'VITÓRIA', flee: 'FUGA', down: 'DERROTA', dead: 'MORTE' }[res.outcome];
     let sub = '';
     if (res.outcome === 'flee') sub = 'Você escapou do combate.';
+    if (revived) sub = `O grupo venceu e reanimou ${h.name} com 1 PV.`;
     if (res.outcome === 'down') { const lost = Math.floor(h.gold * 0.1); h.gold -= lost; h.hp = 1; sub = `Você acorda junto à Estátua de Teleporte com 1 PV. Perdeu ${lost} po.`; }
     let losses = null;
     if (res.outcome === 'dead') {
@@ -388,7 +427,7 @@
     }
     if (E.Sim) E.Sim.onBattle(h, res);
     E.Store.save();
-    const box = U.h(`<div class="result ${res.outcome === 'win' ? '' : 'lose'}"><div class="rbox"><div class="rt">${title}</div>${sub ? `<p class="muted">${sub}</p>` : ''}<div class="rewards"></div>${levels ? `<div class="levelup">✦ NÍVEL ${h.level}! ✦</div>` : ''}<div style="margin-top:22px"><button class="btn primary"><span class="ico">✓</span>Continuar</button></div></div></div>`);
+    const box = U.h(`<div class="result ${res.outcome === 'win' ? '' : 'lose'}"><div class="rbox"><div class="rt">${title}</div>${sub ? `<p class="muted">${sub}</p>` : ''}<div class="rewards"></div>${levels ? `<div class="levelup">✦ NÍVEL ${h.level}! ✦</div>` : ''}${mates.length ? `<div class="party-result">${res.party > 1 && res.outcome === 'win' ? `<small>XP do encontro (${res.xpTotal}) dividido entre ${res.party} personagens</small>` : ''}${mates.map((m) => `<span class="pr-m ${m.down ? 'down' : ''}"><b>${U.esc(m.name)}</b>${m.levels ? ` · Nível ${m.level}!` : ''} · ${m.down ? 'acordou com ' : ''}${m.hp}/${m.max} PV</span>`).join('')}</div>` : ''}<div style="margin-top:22px"><button class="btn primary"><span class="ico">✓</span>Continuar</button></div></div></div>`);
     const rw = box.querySelector('.rewards');
     if (losses) {
       const it = [['💀', losses.levelLost ? `Nível ${losses.from} → ${losses.to}` : `${losses.xp} XP`, losses.levelLost ? 'Nível perdido' : 'Experiência perdida'], ['🪙', `−${losses.gold}`, 'Ouro'], ...losses.items.slice(0, 4).map((x) => ['🎒', `−${x.n}`, x.name])];
