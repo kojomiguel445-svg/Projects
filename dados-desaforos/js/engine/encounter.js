@@ -7,7 +7,12 @@
   // rng opcional para composições determinísticas por acampamento
   EN.build = (regionId, level, diff = 'baixa', rng = U.rand) => {
     const budget = R.ENCOUNTER_BUDGET[Math.max(1, Math.min(10, level))][DIFF[diff]];
-    const pool = (M.BY_REGION[regionId] || M.BY_REGION.bosque).map((k) => ({ k, xp: R.CR_XP[M.MONSTERS[k].cr] }));
+    // Também protege domínios, grutas e pools acrescentados depois de carregar o bestiário.
+    const ordinary = (keys) => (keys || []).filter((k) => M.MONSTERS[k] && !M.isTrueDragon(k) && !M.MONSTERS[k].lairOnly && !M.MONSTERS[k].summonOnly);
+    let keys = ordinary(M.BY_REGION[regionId] || M.BY_REGION.bosque);
+    if (!keys.length) keys = ordinary(M.BY_REGION.bosque);
+    if (!keys.length) keys = ['lobo']; // fallback conhecido: jamais selecionar um dragão por falta de opções
+    const pool = keys.map((k) => ({ k, xp: R.CR_XP[M.MONSTERS[k].cr] }));
     const fits = pool.filter((p) => p.xp <= budget);
     const out = [];
     let spent = 0;

@@ -300,26 +300,39 @@
         if (e.defaultPrevented) return;
         if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
         this.keys[e.code] = true;
+        if (/^(Key[WASD]|Arrow(Up|Down|Left|Right)|Space)$/.test(e.code) && E.ClickMove) E.ClickMove.cancel();
         if (mode === 'world' && !e.repeat && (e.code === 'KeyF' || e.code === 'KeyE')) U.emit('world:interact');
         if (e.code === 'Space' && mode === 'world') { if (!e.repeat && WG.world) WG.world.jump('keyboard'); e.preventDefault(); }
       });
       addEventListener('keyup', (e) => { this.keys[e.code] = false; if (e.code === 'Space' && WG.world && WG.world.hero.glideControl === 'keyboard') WG.world.closeGlider(); });
-      addEventListener('blur', () => { this.keys = {}; this.sprint = false; if (WG.world) WG.world.closeGlider(); });
-      // arrastar para girar a câmera
-      let drag = null;
-      canvas.addEventListener('pointerdown', (e) => { if (mode === 'idle') return; drag = { id: e.pointerId, x: e.clientX, y: e.clientY, sx:e.clientX, sy:e.clientY }; });
-      addEventListener('pointermove', (e) => { if (!drag || drag.id !== e.pointerId) return; this.yawDelta += (e.clientX - drag.x) * 0.006; this.pitchDelta += (e.clientY - drag.y) * 0.004; drag.x = e.clientX; drag.y = e.clientY; });
-      addEventListener('pointerup', (e) => {
-        if (!drag || drag.id !== e.pointerId) return;
-        const click=Math.hypot(e.clientX-drag.sx,e.clientY-drag.sy)<6;drag=null;
-        if(!click||e.target!==canvas||mode!=='world'||WG.locked||!WG.world||!E.Interact||E.UI.anyOpen())return;
-        const w=WG.world,p=w.hero,targets=(w.interactables||[]).filter(it=>['venue','citizen','customer'].includes(it.kind)&&Math.hypot(p.x-it.x,p.z-it.z)<(it.r||2)+.7).map(it=>({it,obj:it.group||(it.citizen&&it.citizen.sp)||it.sprite||(it.customer&&it.customer.sprite)})).filter(x=>x.obj&&x.obj.isObject3D);
-        if(!targets.length)return;
-        const bounds=canvas.getBoundingClientRect(),ray=new THREE.Raycaster();
-        ray.setFromCamera(new THREE.Vector2((e.clientX-bounds.left)/bounds.width*2-1,-(e.clientY-bounds.top)/bounds.height*2+1),w.camera);
-        const hits=ray.intersectObjects(targets.map(t=>t.obj),true);
-        for(const hit of hits){let o=hit.object;while(o){const target=targets.find(t=>t.obj===o);if(target){E.Interact.run(target.it);return;}o=o.parent;}}
+      addEventListener('blur', () => { this.keys = {}; this.sprint = false; drag = press = null; if (E.ClickMove) E.ClickMove.cancel(); if (WG.world) WG.world.closeGlider(); });
+      // Mouse: left chooses a destination; hold right to orbit. Touch keeps its
+      // existing drag/pinch camera gestures and never starts mouse navigation.
+      let drag = null, press = null;
+      const worldCanvas = () => mode === 'world' && !WG.locked && !(E.UI && E.UI.anyOpen());
+      canvas.addEventListener('pointerdown', (e) => {
+        if (mode === 'idle') return;
+        const touch = e.pointerType === 'touch';
+        if (!touch && e.button === 0 && (worldCanvas() || mode === 'interior')) { press = {id:e.pointerId,x:e.clientX,y:e.clientY}; return; }
+        if (touch || (e.button === 2 && worldCanvas())) {
+          drag = {id:e.pointerId,x:e.clientX,y:e.clientY,touch};
+          if (!touch) { if (E.ClickMove) E.ClickMove.cancel(); e.preventDefault(); }
+        }
       });
+      addEventListener('pointermove', (e) => {
+        if (!drag || drag.id !== e.pointerId) return;
+        if (!drag.touch && (!(e.buttons & 2) || !worldCanvas())) { drag = null; return; }
+        this.yawDelta += (e.clientX-drag.x)*.006; this.pitchDelta += (e.clientY-drag.y)*.004;
+        drag.x=e.clientX; drag.y=e.clientY;
+      });
+      addEventListener('pointerup', (e) => {
+        if (drag && drag.id === e.pointerId) drag = null;
+        if (!press || press.id !== e.pointerId) return;
+        const click=Math.hypot(e.clientX-press.x,e.clientY-press.y)<6; press=null;
+        if (click && e.target===canvas && E.ClickMove) E.ClickMove.click(e,canvas);
+      });
+      addEventListener('pointercancel', (e) => { if(drag&&drag.id===e.pointerId)drag=null;if(press&&press.id===e.pointerId)press=null; });
+      canvas.addEventListener('contextmenu', (e) => { if(worldCanvas())e.preventDefault(); });
       canvas.addEventListener('wheel', (e) => { this.zoomDelta += Math.sign(e.deltaY) * 1.2; e.preventDefault(); }, { passive: false });
       // pinça
       const touches = new Map();
@@ -396,6 +409,7 @@
       this.build();
     }
     height(x, z) {
+      if (this.reg.dragonLair && E.DragonLairs) return E.DragonLairs.height(this, x, z);
       if (this.reg.metro) return E.Metro.height(this, x, z);
       if (this.cave) return this.caveHeight(x, z);
       const n = this.noise, B = this.B, dc = Math.hypot(x, z);
@@ -504,14 +518,14 @@
       this.scatterProps();
       if (!this.cave) this.scatterGrass();
       this.buildPOIs();
-      if (this.cave) E.WX.caveInterior(this);
+      if (this.cave) { if (this.reg.dragonLair && E.DragonLairs) E.DragonLairs.interior(this); else E.WX.caveInterior(this); }
       else if (this.reg.metro) E.Metro.build(this);
       else { E.WX.plaza(this); E.WX.landmark(this, this.landmarkPos); E.WX.outposts(this, this.outpostPos); }
-      if (!this.cave && E.M.LAIR[this.id]) { E.WX.lairBase(this, this.lairPos); this.refreshLair(); }
+      if (!this.cave && E.M.LAIR[this.id] && !(E.DragonLairs && E.DragonLairs.relocated(this.id))) { E.WX.lairBase(this, this.lairPos); this.refreshLair(); }
       if (!this.reg.metro && !this.cave) E.WX.tradePost(this);
-      E.WX.fishSpots(this, this.cave ? 2 : this.reg.metro ? 3 : 7);
+      if (!this.reg.dragonLair) E.WX.fishSpots(this, this.cave ? 2 : this.reg.metro ? 3 : 7);
       // minério só nas grutas (com picareta)
-      if (this.cave) E.WX.oreNodes(this, 13, this.reg.ores);
+      if (this.cave && !this.reg.dragonLair) E.WX.oreNodes(this, 13, this.reg.ores);
       if (!this.cave) E.WX.wildlife(this);
       // novidades de cada região: entrada da gruta, Lumes, Corrida das Lanternas e Domínio
       if (!this.cave && !this.reg.metro) E.WX.regionExtras(this);
@@ -521,6 +535,7 @@
       if (!this.cave && E.EX3) E.EX3.build(this);
       if (!this.cave && E.Villages && E.Villages.build) E.Villages.build(this);
       if (!this.cave && E.Shopfronts && E.Shopfronts.batchTown) E.Shopfronts.batchTown(this);
+      if (!this.cave && E.DragonLairs) E.DragonLairs.exterior(this);
       this.buildColliderGrid();
       this.buildHero();
       this.buildParticles();
@@ -530,12 +545,15 @@
       if (!this.cave && E.Crowds) E.Crowds.build(this);
       if (!this.cave && E.StallLife) E.StallLife.build(this);
       if (!this.cave && E.CasinoLife) E.CasinoLife.build(this);
+      if (!this.cave && E.LandmarkFacades) E.LandmarkFacades.build(this);
+      if (!this.cave && E.LandmarkDoors) E.LandmarkDoors.build(this);
       this.buildColliderGrid();
       this.hero.y = this.groundAt(this.hero.x, this.hero.z);
     }
 
     // posições das coisas importantes
     layout() {
+      if (E.DragonLairs && E.DragonLairs.layout(this)) return;
       const rng = this.rng;
       const findSpot = (minR, maxR, tries = 80) => {
         for (let i = 0; i < tries; i++) {
@@ -627,6 +645,7 @@
     }
 
     scatterProps() {
+      if (this.reg.dragonLair) return;
       const B = this.B, rng = this.rng, q = E.state.settings.quality;
       const K = this.K, total = Math.round((q === 'baixo' ? 380 : q === 'medio' ? 650 : 950) * B.density * (K > 1 ? 3 : 1));
       const groups = {};
@@ -1089,6 +1108,7 @@
     }
     // chefe do covil: aparece se não foi derrotado nos últimos 20 minutos
     refreshLair() {
+      if (E.DragonLairs && E.DragonLairs.relocated(this.id)) return;
       const key = E.M.LAIR[this.id]; if (!key) return;
       const killed = ((E.state.world.bossKilled || {})[this.id]) || 0;
       const alive = Date.now() - killed > 20 * 60 * 1000;
@@ -1189,7 +1209,7 @@
       const h = E.Store.hero() || { cls: 'guerreiro', species: 'humano', look: { skin: '#e3b892', hair: '#3a2a20', hairStyle: 0, outfit: '#e08a3c' }, equip: {} };
       const wt = E.SP.heroWeaponType(h);
       const F = (f) => E.SP.hero(h, f, wt);
-      this.heroFrames = { idle: [F('idle0'), F('idle1')], walk: Array.from({ length: 12 }, (_, i) => F('w' + i)), crouch: F('jump0'), up: F('jump1'), fall: F('jump2'), land: F('land'), swim: Array.from({ length: 8 }, (_, i) => F('swim' + i)), fish: null };
+      this.heroFrames = { idle: [F('idle0'), F('idle1')], sit: [F('sit0'), F('sit1')], walk: Array.from({ length: 12 }, (_, i) => F('w' + i)), crouch: F('jump0'), up: F('jump1'), fall: F('jump2'), land: F('land'), swim: Array.from({ length: 8 }, (_, i) => F('swim' + i)), swimFast: Array.from({ length: 8 }, (_, i) => F('swimfast' + i)), fish: null };
       this.fishFrames(h);
       if (this.heroSprite) this.heroSprite.userData.h = WG.heroHeight(h);
       if (E.Net && E.Net.connected) E.Net.hello();
@@ -1391,7 +1411,11 @@
       cam.yaw -= inp.yawDelta; inp.yawDelta = 0;
       cam.pitch = U.clamp(cam.pitch + inp.pitchDelta, 0.18, 1.2); inp.pitchDelta = 0;
       cam.dist = U.clamp(cam.dist + inp.zoomDelta, 5, 22); inp.zoomDelta = 0;
-      const mv = WG.locked ? { x: 0, y: 0 } : inp.move();
+      const rawMove = inp.move();
+      const routedMove = E.ClickMove ? E.ClickMove.motion({mode:'world',world:this,dt,blocked:WG.locked},rawMove) : rawMove;
+      const mv = WG.locked ? { x: 0, y: 0 } : routedMove;
+      const traveler = E.Store.hero(), body = E.Sim && E.Sim.bodyModifiers ? E.Sim.bodyModifiers(traveler) : { run: 1, jump: 1, glideDescent: 1 };
+      const swimming = E.Sim && E.Sim.BALANCE ? E.Sim.BALANCE.swim : { normalSpeed: 3.1, fastSpeed: 5.2, staminaPerSecond: 14 };
       // v4.5: movimento estilo Genshin — vigor, corrida, escalada, nado, queda livre e planador
       if (hr.st === undefined) hr.st = WG.STAMINA;
       const wasAir = hr.jump > 0.02, gNow = this.groundAt(hr.x, hr.z);
@@ -1399,8 +1423,10 @@
       if (hr.glideControl === 'keyboard' && !inp.keys.Space) this.closeGlider();
       if (inp.keys.Space && wasAir && !WG.locked) this.openGlider('keyboard');
       hr.moving = Math.abs(mv.x) + Math.abs(mv.y) > .05;
-      const canSprint = !hr.boat && !!mv.sprint && !hr.exhaust && hr.st > 0 && (!E.Sim || E.Sim.canSprint(E.Store.hero())) && !hr.swim && !wasAir;
-      let speed = hr.boat ? 6.2 : hr.glide ? 7.4 : hr.swim ? 3.1 : canSprint ? 8.5 : 5.2;
+      const canBoost = !hr.boat && !!mv.sprint && !hr.exhaust && hr.st > 0 && (!E.Sim || E.Sim.canSprint(traveler));
+      const canSprint = canBoost && !hr.swim && !wasAir;
+      hr.fastSwimming = canBoost && !!hr.swim && hr.moving && !wasAir;
+      let speed = hr.boat ? 6.2 : hr.glide ? 7.4 : hr.swim ? (hr.fastSwimming ? swimming.fastSpeed : swimming.normalSpeed) : canSprint ? 8.5 * body.run : 5.2;
       let drain = 0;
       hr.climb = false;
       let moved = 0;
@@ -1428,11 +1454,11 @@
         if (Math.abs(sx) > 0.001) hr.dir = sx > 0 ? 1 : -1;
       }
       // pulo, correntes de vento, planador e queda
-      if (hr.preJump > 0) { hr.preJump -= dt; if (hr.preJump <= 0) { hr.preJump = 0; if (!hr.swim) { hr.vy = 7.2; hr.jump = 0.01; } } }
+      if (hr.preJump > 0) { hr.preJump -= dt; if (hr.preJump <= 0) { hr.preJump = 0; if (!hr.swim) { hr.vy = 7.2 * Math.sqrt(body.jump); hr.jump = 0.01; } } }
       const up = (this.updrafts || []).find((u) => Math.hypot(u.x - hr.x, u.z - hr.z) < u.r && hr.y + hr.jump < u.y + u.h);
       if (up && hr.jump > 0.005) { hr.vy = Math.max(4, Math.min(11, hr.vy + 40 * dt)); }
       hr.vy -= 18 * dt;
-      if (hr.glide && !up) hr.vy = Math.max(hr.vy, -2.1);
+      if (hr.glide && !up) hr.vy = Math.max(hr.vy, -2.1 * body.glideDescent);
       if (hr.jump > 0 || hr.vy > 0) hr.jump += hr.vy * dt;
       const heroH = this.heroSprite.userData.h || 2.5, swimFrame = this.heroFrames.swim && this.heroFrames.swim[0];
       const g0 = this.groundAt(hr.x, hr.z), deep = !hr.boat && !this.cave && this.waterLevel - g0 > Math.min(.75, heroH * .35);
@@ -1451,19 +1477,20 @@
       hr.swim = deep && !air;
       if (hr.swim || !air) this.closeGlider();
       hr.sprinting = canSprint && hr.moving && !hr.climb && !hr.swim && !air && moved > .001;
-      drain = hr.sprinting ? 14 : 0;
+      hr.fastSwimming = hr.fastSwimming && hr.swim && !air && moved > .001;
+      drain = hr.sprinting ? 14 : hr.fastSwimming ? swimming.staminaPerSecond : 0;
       if (!air && hr.wasAir && !hr.swim) { hr.landT = 0.13; if (E.Audio.sfx) E.Audio.sfx('step'); }
       hr.wasAir = air;
-      // A corrida é a única ação que gasta vigor.
+      // Só a corrida e a aceleração na água gastam vigor; nadar normalmente regenera.
       const draining = drain > 0;
       if (draining) { hr.st = Math.max(0, hr.st - drain * dt); hr.stT = 0.7; if (hr.st === 0) hr.exhaust = true; }
       else { hr.stT = (hr.stT || 0) - dt; if (hr.stT <= 0) hr.st = Math.min(WG.STAMINA, hr.st + 26 * dt); }
       if (hr.exhaust && hr.st > 25) hr.exhaust = false;
       if (!hr.boat && !air && !deep && !hr.climb) hr.safe = { x: hr.x, z: hr.z };
       if (this.swimRipple) {
-        const ripple = this.swimRipple, pulse = (this.t * (hr.moving ? 1.35 : .65)) % 1;
+        const ripple = this.swimRipple, pulse = (this.t * (hr.fastSwimming ? 2.8 : hr.moving ? 1.35 : .65)) % 1;
         ripple.visible = hr.swim;
-        if (hr.swim) { ripple.position.set(hr.x, this.waterLevel + .035, hr.z); ripple.scale.setScalar(.9 + pulse * 1.4); ripple.material.opacity = (1 - pulse) * .28; }
+        if (hr.swim) { ripple.position.set(hr.x, this.waterLevel + .035, hr.z); ripple.scale.setScalar(.9 + pulse * (hr.fastSwimming ? 2.1 : 1.4)); ripple.material.opacity = (1 - pulse) * (hr.fastSwimming ? .48 : .28); }
       }
       if (this.glider) { this.glider.visible = !!hr.glide; if (hr.glide) { const gh = this.heroSprite.userData.h || 2.5; this.glider.position.set(hr.x, hr.y + hr.jump + gh * 1.02, hr.z); } }
       // animação do sprite: caminhada de 12 quadros sincronizada com a passada, pulo com esticar/amassar
@@ -1475,9 +1502,10 @@
       if (this.rise) { const R = this.rise, u = Math.min(1, (R.t += dt) / 0.45); hr.x = R.x0 + (R.x1 - R.x0) * u; hr.z = R.z0 + (R.z1 - R.z0) * u; cv = R.t < .18 ? HF.crouch : HF.walk[Math.floor(R.t * 14) % 12]; if (u >= 1) this.rise = null; }
       else if (this.fish && (this.fish.cv || this.fish.frame)) cv = this.fish.cv || HF.fish[this.fish.key || this.fish.frame];
       else if (hr.boat) cv = HF.idle[Math.floor(this.t*1.7)%2];
+      else if (hr.casinoSeat && HF.sit) cv = HF.sit[Math.floor(this.t * 1.5) % 2];
       else if (hr.preJump > 0) { cv = HF.crouch; sx = 1.05; sy = 0.93; }
       else if (air) { if (hr.glide) cv = HF.up; else if (hr.vy > 1.2) { cv = HF.up; sx = 0.94; sy = 1.07; } else if (hr.vy > -1.5) cv = HF.up; else { cv = HF.fall; sx = 0.97; sy = 1.03; } }
-      else if (hr.swim && HF.swim && HF.swim.length) { hr.swimPhase = (hr.swimPhase || 0) + dt * (hr.moving ? 10 : 4); cv = HF.swim[Math.floor(hr.swimPhase) % HF.swim.length]; }
+      else if (hr.swim && HF.swim && HF.swim.length) { const frames = hr.fastSwimming && HF.swimFast ? HF.swimFast : HF.swim; hr.swimPhase = (hr.swimPhase || 0) + dt * (hr.fastSwimming ? 17 : hr.moving ? 10 : 4); cv = frames[Math.floor(hr.swimPhase) % frames.length]; }
       else if (hr.landT > 0) { hr.landT -= dt; cv = HF.land; const k = hr.landT / 0.13; sx = 1 + 0.08 * k; sy = 1 - 0.09 * k; }
       else {
         if (hr.moving) cv = HF.walk[Math.floor(hr.stride / 3.3 * 12) % 12];
@@ -1572,11 +1600,14 @@
       if (E.StallLife) E.StallLife.update(this, dt);
       if (E.Maritime) E.Maritime.update(this, dt);
       if (E.CasinoLife) E.CasinoLife.update(this, dt);
+      if (E.LandmarkFacades) E.LandmarkFacades.update(this, this.t, dt);
+      if (E.LandmarkDoors) E.LandmarkDoors.update(this, dt);
       if (E.Online) E.Online.tick(this, dt);
       for (const hb of this.herbs) { E.WX.animHerb(hb.group, this.t + hb.i); if (hb.beacon) hb.beacon.material.opacity = 0.16 + Math.sin(this.t * 2 + hb.i) * 0.06; }
       E.WX.animFishSpots(this, this.t);
       this.updateFishing(dt);
       E.WX.updateExtras(this, dt);
+      if (E.DragonLairs) E.DragonLairs.update(this, dt);
       if (E.WN3) E.WN3.update(this, dt);
       if (E.EX3) E.EX3.update(this, dt);
       if (this.lairBoss) { this.lairBoss.beam.material.opacity = 0.12 + Math.sin(this.t * 1.7) * 0.05; this.lairBoss.sprite.material.map = tex(this.lairBoss.frames[Math.floor(this.t * 1.3) % 2]); }
@@ -1668,6 +1699,7 @@
       if (E.Crowds && E.Crowds.dispose) E.Crowds.dispose(this);
       if (E.StallLife && E.StallLife.dispose) E.StallLife.dispose(this);
       if (E.Maritime && E.Maritime.dispose) E.Maritime.dispose(this);
+      if (E.LandmarkFacades) E.LandmarkFacades.dispose(this);
       if (E.CasinoLife && E.CasinoLife.dispose) E.CasinoLife.dispose(this);
       disposeScene([this.scene, ...(this.retiredObjects || [])]);
       this.retiredObjects = [];
@@ -2111,7 +2143,7 @@
     else if (mode === 'interior' && E.Interior && E.Interior.current) { E.Interior.update(dt); if (E.Interior.current && !diceActive) renderer.render(E.Interior.current.scene, E.Interior.current.camera); }
     if (['world', 'arena', 'interior'].includes(mode)) {
       const actor = mode === 'interior' && E.Interior && E.Interior.current ? E.Interior.current : WG.world && WG.world.hero;
-      if (E.Sim && E.Sim.tick) E.Sim.tick(Math.min(1, Math.max(0, elapsed / 1000)), { mode, moving: !!(actor && actor.moving), sprinting: !!(actor && actor.sprinting), world: WG.world });
+      if (E.Sim && E.Sim.tick) E.Sim.tick(Math.min(1, Math.max(0, elapsed / 1000)), { mode, frameToken: now, moving: !!(actor && actor.moving), sprinting: !!(actor && (actor.sprinting || actor.fastSwimming)), world: WG.world });
       if (mode !== 'arena' && E.Vendor && E.Vendor.tick) E.Vendor.tick(Math.min(1, Math.max(0, elapsed / 1000)));
       if (mode !== 'arena' && E.Business && E.Business.tick) E.Business.tick(Math.min(1, Math.max(0, elapsed / 1000)));
       if (mode !== 'arena' && E.CasinoBusiness && E.CasinoBusiness.tick) E.CasinoBusiness.tick(Math.min(1, Math.max(0, elapsed / 1000)));
@@ -2122,7 +2154,7 @@
     else if (mode === 'title' && WG.title) { WG.title.update(dt); renderer.render(WG.title.w.scene, WG.title.camera); }
   }
   WG.start = () => { if (!raf) { lastTick = lastFrame = performance.now(); frameBudget = 0; clock.getDelta(); loop(); } };
-  WG.setMode = (m) => { mode = m; lastTick = lastFrame = performance.now(); frameBudget = 0; clock.getDelta(); WG.start(); };
+  WG.setMode = (m) => { if (E.ClickMove) E.ClickMove.modeChanged(m); mode = m; lastTick = lastFrame = performance.now(); frameBudget = 0; clock.getDelta(); WG.start(); };
   WG.renderer = () => renderer;
   WG.mode = () => mode;
   WG.performanceInfo = () => ({ pixelRatio: renderer.getPixelRatio(), maxPixelRatio, calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, textures: renderer.info.memory.textures });

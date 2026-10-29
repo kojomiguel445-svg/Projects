@@ -7,7 +7,7 @@
 
   // ---------------- catálogos de aparência ----------------
   CH.HAIR_STYLES = ['Curto', 'Longo', 'Rabo de cavalo', 'Espetado', 'Coque', 'Tranças', 'Chanel', 'Cacheado', 'Raspado', 'Moicano', 'Maria-chiquinha', 'Black power', 'Coque samurai', 'Ondulado longo', 'Franja de lado'];
-  CH.BUILDS = { magro: 'Magro', medio: 'Médio', forte: 'Forte' };
+  CH.BUILDS = { magro: 'Magro', medio: 'Médio', forte: 'Musculoso', gordo: 'Gordo' };
   CH.EYES = ['#3a2a20', '#2f6fb3', '#3f8a4a', '#8a5a2a', '#9b6bff', '#d4a017', '#c0392b', '#5a6b7d'];
   CH.HAIR = ['#2a1f1a', '#5a3a22', '#8a5a32', '#c8873a', '#e8c46a', '#f2ead0', '#c84b3a', '#e86a9a', '#3a62c8', '#4a9a6a', '#8a5ad8', '#9aa3ad'];
   CH.CLOTH = ['#e08a3c', '#c0392b', '#3a62c8', '#2c3e50', '#5f8a4a', '#7b5cff', '#f0c75e', '#a8325a', '#3ec7b3', '#f2ead0', '#4a4f5a', '#8a5a32'];
@@ -70,13 +70,22 @@
     return { skin: sp.look.skin[0], hair: '#5a3a22', hairStyle: 0, eyes: '#3a2a20', outfit: d.outfit, c1: d.c1, c2: d.c2, acc: d.acc, build: 'medio', height: 1, beard: species === 'anao' };
   };
   // completa aparências criadas na versão anterior
-  CH.normalize = (look, cls, species) => {
+  CH.normalize = (look, cls, species, ancestry) => {
     const base = CH.defaultLook(cls, species);
     const l = Object.assign({}, base, look || {});
     if (!CH.OUTFITS[l.outfit]) { if (typeof l.outfit === 'string' && l.outfit.startsWith('#')) l.c1 = l.outfit; l.outfit = base.outfit; }
     if (l.hairStyle == null || l.hairStyle >= CH.HAIR_STYLES.length) l.hairStyle = 0;
     if (!CH.ACCESSORIES[l.acc]) l.acc = base.acc;
     if (!CH.CAPES[l.cape]) l.cape = 'auto';
+    if (!['neutra', 'masculina', 'feminina'].includes(l.presentation)) l.presentation = 'neutra';
+    for (const [key, kind] of [['hairPreset', 'hair'], ['eyeShape', 'eyes'], ['mouthShape', 'mouths']]) {
+      if (!E.Skins || !E.Skins.has(kind, l[key])) l[key] = null;
+    }
+    for (const [key, options] of [['dragonHorns', E.Skins?.horns], ['dragonSnout', E.Skins?.snouts], ['dragonCrest', E.Skins?.crests], ['scalePattern', E.Skins?.patterns]]) {
+      if (!options || !Object.prototype.hasOwnProperty.call(options, l[key])) l[key] = 'auto';
+    }
+    // Read the existing ancestry only to colour the visual copy; never mutate the hero or rules.
+    if (species === 'draconato' && E.Skins?.ancestryColor(ancestry)) l.skin = E.Skins.ancestryColor(ancestry);
     return l;
   };
 
@@ -227,6 +236,7 @@
     const seated = /^s(f(cast0|cast1|hold|bite|reel0|reel1|catch)|it[01])$/.test(f);
     if (seated) f = f.startsWith('sit') ? 'idle' + f[3] : f.slice(1);
     const L = o.look, sp = o.species || 'humano';
+    const customHair = E.Skins && E.Skins.has('hair', L.hairPreset);
     const skin = L.skin, hair = L.hair, c1 = L.c1, c2 = L.c2;
     const atk = f === 'atk';
     // ---- pose: ciclo de caminhada de 12 quadros (w0…w11), pulo (jump0 agachar, jump1 subir, jump2 cair, land pousar)
@@ -234,9 +244,11 @@
     let bob = f === 'idle1' ? 1 : 0, lL = 0, rL = 0, aL = 0, aR = 0, arms = 'swing', spread = 0, crouch = 0, sway = 0;
     let rArm = atk ? 'atk' : 'swing';
     const fishPose = /^f(cast0|cast1|hold|bite|reel0|reel1|catch)$/.test(f);
-    const swim = /^swim([0-7])$/.exec(f), swimPhase = swim ? Number(swim[1]) / 8 * Math.PI * 2 : 0;
+    const fastSwim = f.startsWith('swimfast');
+    const swim = /^swim(?:fast)?([0-7])$/.exec(f), swimPhase = swim ? Number(swim[1]) / 8 * Math.PI * 2 : 0;
     const twoHands = !!o.twoHands && !fishPose && !swim;
-    if (swim) { bob = Math.round(Math.sin(swimPhase * 2)); arms = rArm = 'swim'; }
+    if (swim) { bob = Math.round(Math.sin(swimPhase * 2) * (fastSwim ? 1.5 : 1)); arms = rArm = 'swim'; }
+    if (fastSwim && swim) { lL = Math.round(Math.sin(swimPhase) * 5); rL = -lL; }
 
     const wm = /^w(\d+)$/.exec(f) || /^walk(\d)$/.exec(f);
     if (wm) {
@@ -260,17 +272,24 @@
     if (twoHands) arms = rArm = 'grip';
     if (seated) { lL = rL = 0; sway = Math.max(-1, Math.min(1, sway)); crouch = 0; bob = (f === 'freel1' || f === 'idle1' ? 1 : 0) + 8; }
     bob += crouch;
-    const bw = ({ magro: 0, medio: 1, forte: 3 }[L.build] ?? 1) + (sp === 'anao' ? 2 : sp === 'golias' ? 2 : sp === 'orc' ? 1 : 0);
-    const shoulder = 9 + bw, waist = 7 + bw, legW = 5 + Math.round(bw / 2);
+    // Medidas nativas de cada porte: músculo afunila na cintura; volume arredonda o abdômen.
+    // Médio e magro conservam as medidas antigas; espécie soma apenas a sua estrutura visual.
+    const build = L.build === 'forte' || L.build === 'gordo' || L.build === 'magro' ? L.build : 'medio';
+    const muscular = build === 'forte', stout = build === 'gordo';
+    const speciesWidth = sp === 'anao' || sp === 'golias' ? 2 : sp === 'orc' ? 1 : 0;
+    const measures = { magro: [9, 7, 5], medio: [10, 8, 6], forte: [13, 8, 8], gordo: [11, 14, 8] }[build];
+    const shoulder = measures[0] + speciesWidth, waist = measures[1] + speciesWidth;
+    const legW = muscular || stout ? measures[2] + Math.round(speciesWidth / 2) : 5 + Math.round(((build === 'magro' ? 0 : 1) + speciesWidth) / 2);
+    const belly = stout ? waist + 3 : waist;
     const outfit = L.outfit;
     const XS = XO[outfit] || null;
     const dark = sh(c1, -0.3), light = sh(c1, 0.22);
     const boots = XS && XS.boots ? XS.boots(c1, c2) : outfit === 'cavaleiro' || outfit === 'aurora' ? sh(c1, -0.35) : '#4a3022';
     const pants = XS && XS.pants ? XS.pants(c1, c2, skin) : { manto: sh(c1, -0.2), oriental: sh(c1, -0.35), sacerdote: '#e8e2d0', nobre: '#2a2a34', vestido: sh(c1, -0.2), tribal: '#6b4a2a', estelar: '#1a1d3a', aurora: '#e6e9ef', apostador: '#1a1a22' }[outfit] || sh(c2, -0.25);
     const ty = 33 + bob; // topo do tronco
-    const hy = 21 + bob; // centro da cabeça
+    const hy = 21 + bob + (fastSwim && swim ? 2 : 0); // aceleração: cabeça baixa na água
     const longRobe = ['manto', 'sacerdote', 'vestido', 'oriental', 'estelar'].includes(outfit);
-    const k = { p, CX, ty, hy, bob, shoulder, waist, c1, c2, skin, hair, legW, lL, rL, aL, aR, arms, rArm };
+    const k = { p, CX, ty, hy, bob, shoulder, waist, c1, c2, skin, hair, legW, lL, rL, aL, aR, arms, rArm, build, belly };
 
     // ===== camadas de trás =====
     const hasCape = ['aventureiro', 'cavaleiro', 'nobre', 'estelar', 'aurora'].includes(outfit);
@@ -281,21 +300,53 @@
     if (cape === 'esfarrapada') { const ec = sh(cc, -0.1); p.poly([[CX - shoulder + 1, ty + 1], [CX + shoulder - 1, ty + 1], [CX + shoulder + 4, 66], [CX - shoulder - 4, 66]], ec); for (let x = -shoulder - 4, i = 0; x < shoulder + 4; x += 4, i++) p.poly([[CX + x, 66], [CX + x + 4, 66], [CX + x + 2, 70 + (i % 2) * 3]], ec); }
     if (cape === 'pele') p.poly([[CX - shoulder, ty], [CX + shoulder, ty], [CX + shoulder + 3, 55], [CX - shoulder - 3, 55]], '#6b4a2e');
     if (XS && XS.back) XS.back(k);
+    if (customHair) { if (L.acc !== 'capuz') E.Skins.hairPart(p, L, CX, hy, 'back'); }
+    else {
     if (L.hairStyle === 10) for (const s of [-1, 1]) { p.poly([[CX + s * 14, hy - 1], [CX + s * 19, hy + 2], [CX + s * 18, hy + 17], [CX + s * 14, hy + 13]], sh(hair, -0.08)); p.ell(CX + s * 15, hy - 3, 3.5, 3.5, hair); p.rect(CX + s * 15 - 1, hy, 3, 2, c2); }
     if (L.hairStyle === 11) p.ell(CX, hy - 6, 18, 15, sh(hair, -0.12));
     if (L.hairStyle === 13) { p.poly([[CX - 13, hy - 6], [CX + 13, hy - 6], [CX + 15, 54], [CX - 15, 54]], sh(hair, -0.18)); for (let y = hy; y < 54; y += 5) { p.ell(CX - 15, y, 2, 2.5, sh(hair, -0.18)); p.ell(CX + 15, y + 2, 2, 2.5, sh(hair, -0.18)); } }
     if (L.hairStyle === 1) p.poly([[CX - 13, hy - 6], [CX + 13, hy - 6], [CX + 14, 50], [CX - 14, 50]], sh(hair, -0.18));
     if (L.hairStyle === 2) { p.ell(CX + 12, hy - 4, 4, 4, hair); p.poly([[CX + 11, hy - 2], [CX + 17, hy + 2], [CX + 19, hy + 22], [CX + 14, hy + 26], [CX + 13, hy + 8]], sh(hair, -0.08)); }
+    }
     if (sp === 'tiferino') { p.line(CX + 5, 58, CX + 14, 62, skin, false, 3); p.line(CX + 14, 62, CX + 17, 54, skin, false, 3); p.poly([[CX + 15, 49], [CX + 20, 53], [CX + 16, 55]], sh(skin, -0.25)); }
     if (L.acc === 'capuz' || (outfit === 'ladrao' && L.acc === 'classe')) p.poly([[CX - 14, hy], [CX + 14, hy], [CX + 12, ty + 6], [CX - 12, ty + 6]], sh(c1, -0.25));
+
+    // Batidas alternadas: pés rompem a superfície atrás dos flancos no nado acelerado.
+    if (fastSwim && swim) for (const side of [-1, 1]) {
+      const kick = Math.sin(swimPhase + (side < 0 ? Math.PI : 0));
+      const hipX = CX + side * (waist - 2), kneeX = CX + side * (waist + 4 + Math.max(0, kick) * 2);
+      const kneeY = 51 + kick * 2, footX = kneeX + side * (2 + Math.max(0, kick) * 2);
+      p.line(hipX, 52 + bob, kneeX, kneeY, pants, false, legW);
+      p.line(kneeX, kneeY, footX, 49 - Math.max(0, kick) * 4, boots, false, Math.max(3, legW - 2));
+      p.line(footX, 49 - Math.max(0, kick) * 4, footX + side * 2, 48 - Math.max(0, kick) * 4, sh(boots, .2), false, 3);
+    }
 
     // ===== pernas =====
     const legTop = 52 + bob;
     const lx = CX - 1 - legW - spread + sway, rx = CX + 1 + spread + sway;
     Object.assign(k, { legTop, lx, rx });
-    p.rect(lx, legTop, legW, 72 - legTop + lL, pants);
-    p.rect(rx, legTop, legW, 72 - legTop + rL, pants);
-    p.rect(lx, legTop, 1, 72 - legTop + lL, sh(pants, 0.15));
+    // Sentado mantém as pernas dobradas; o contorno em pé usa joelhos em alturas fixas.
+    if ((muscular || stout) && !seated) {
+      for (const [x, d] of [[lx, lL], [rx, rL]]) {
+        if (muscular) {
+          // Coxa cheia, joelho estreito e panturrilha própria; a animação mantém os mesmos pés.
+          p.poly([[x, legTop], [x + legW, legTop], [x + legW, 58 + d], [x + legW - 1, 61 + d], [x + legW, 65 + d], [x + legW - 1, 71 + d], [x + 2, 71 + d], [x + 1, 66 + d], [x, 64 + d], [x + 1, 60 + d]], pants);
+          p.line(x + 1, legTop + 2, x + 2, 58 + d, sh(pants, 0.22), false, 2);
+          p.line(x + legW - 2, legTop + 3, x + legW - 2, 58 + d, sh(pants, -0.2));
+          p.line(x + 2, 63 + d, x + 2, 67 + d, sh(pants, 0.16));
+          p.line(x + legW - 2, 64 + d, x + legW - 3, 69 + d, sh(pants, -0.24));
+          p.rect(x + 2, 60 + d, legW - 3, 1, sh(pants, -0.14));
+        } else {
+          p.poly([[x, legTop], [x + legW, legTop], [x + legW, 62 + d], [x + legW - 1, 69 + d], [x + legW - 1, 72 + d], [x + 1, 72 + d], [x, 67 + d]], pants);
+          p.line(x + 1, legTop + 2, x + 1, 66 + d, sh(pants, 0.13));
+          p.line(x + legW - 1, 57 + d, x + legW - 2, 69 + d, sh(pants, -0.13));
+        }
+      }
+    } else {
+      p.rect(lx, legTop, legW, 72 - legTop + lL, pants);
+      p.rect(rx, legTop, legW, 72 - legTop + rL, pants);
+      p.rect(lx, legTop, 1, 72 - legTop + lL, sh(pants, 0.15));
+    }
     if (seated) { // coxas voltadas para a frente (topo claro) e joelhos marcados
       p.rect(lx - 1, legTop, legW + 1, 4, sh(pants, 0.12)); p.rect(rx, legTop, legW + 1, 4, sh(pants, 0.12));
       p.rect(lx - 1, legTop, legW + 1, 1, sh(pants, 0.3)); p.rect(rx, legTop, legW + 1, 1, sh(pants, 0.3));
@@ -334,9 +385,30 @@
 
     // ===== tronco =====
     const torso = XS && XS.torso ? XS.torso(c1, c2, skin) : outfit === 'tribal' ? skin : outfit === 'estelar' ? '#232a5e' : outfit === 'aurora' ? '#f2f2f6' : outfit === 'apostador' ? '#1e1e26' : c1;
-    p.poly([[CX - shoulder, ty + 1], [CX + shoulder, ty + 1], [CX + waist, 50 + bob], [CX - waist, 50 + bob]], torso);
-    p.rect(CX - shoulder, ty, shoulder * 2, 3, torso);
-    if (outfit === 'tribal') { p.poly([[CX - shoulder - 2, ty - 1], [CX + shoulder + 2, ty - 1], [CX + shoulder - 2, ty + 6], [CX - shoulder + 2, ty + 6]], c1); p.rect(CX - 3, ty + 9, 6, 1, sh(skin, -0.18)); p.rect(CX - 4, ty + 12, 3, 1, sh(skin, -0.15)); p.rect(CX + 1, ty + 12, 3, 1, sh(skin, -0.15)); }
+    if (muscular) {
+      p.poly([[CX - shoulder + 2, ty], [CX + shoulder - 2, ty], [CX + shoulder, ty + 3], [CX + shoulder - 1, ty + 8], [CX + waist, 50 + bob], [CX - waist, 50 + bob], [CX - shoulder + 1, ty + 8], [CX - shoulder, ty + 3]], torso);
+      const bare = torso === skin, contour = sh(torso, bare ? -0.25 : -0.13), sheen = sh(torso, bare ? 0.18 : 0.1);
+      // Peitorais e laterais em grupos de pixels, sem desenhar abdominais sobre armadura.
+      p.poly([[CX - shoulder + 2, ty + 3], [CX - 2, ty + 3], [CX - 2, ty + 8], [CX - shoulder + 4, ty + 8]], sheen);
+      p.line(CX - shoulder + 3, ty + 8, CX - 3, ty + 9, contour);
+      p.line(CX + 2, ty + 9, CX + shoulder - 3, ty + 8, contour);
+      p.line(CX - shoulder + 3, ty + 10, CX - waist + 1, ty + 15, contour);
+      p.line(CX + shoulder - 3, ty + 10, CX + waist - 1, ty + 15, contour);
+      if (bare) {
+        p.line(CX, ty + 4, CX, ty + 10, contour);
+        for (const y of [ty + 11, ty + 14]) { p.rect(CX - 4, y, 3, 1, contour); p.rect(CX + 1, y, 3, 1, contour); p.rect(CX - 3, y - 1, 2, 1, sheen); }
+      }
+    } else if (stout) {
+      p.poly([[CX - shoulder + 1, ty], [CX + shoulder - 1, ty], [CX + shoulder + 1, ty + 4], [CX + belly - 1, ty + 8], [CX + belly, ty + 12], [CX + belly - 1, ty + 15], [CX + waist, 50 + bob], [CX - waist, 50 + bob], [CX - belly + 1, ty + 15], [CX - belly, ty + 12], [CX - belly + 1, ty + 8], [CX - shoulder - 1, ty + 4]], torso);
+      p.poly([[CX - shoulder + 2, ty + 4], [CX - 3, ty + 5], [CX - 4, ty + 14], [CX - belly + 3, ty + 13], [CX - belly + 2, ty + 9]], sh(torso, 0.11));
+      p.line(CX + belly - 2, ty + 8, CX + belly - 2, ty + 13, sh(torso, -0.19));
+      p.line(CX - waist + 3, ty + 16, CX + waist - 3, ty + 16, sh(torso, -0.14));
+      if (torso === skin) { p.rect(CX, ty + 12, 2, 1, sh(skin, -0.24)); p.set(CX + 1, ty + 13, sh(skin, 0.14)); }
+    } else {
+      p.poly([[CX - shoulder, ty + 1], [CX + shoulder, ty + 1], [CX + waist, 50 + bob], [CX - waist, 50 + bob]], torso);
+      p.rect(CX - shoulder, ty, shoulder * 2, 3, torso);
+    }
+    if (outfit === 'tribal') { p.poly([[CX - shoulder - 2, ty - 1], [CX + shoulder + 2, ty - 1], [CX + shoulder - 2, ty + 6], [CX - shoulder + 2, ty + 6]], c1); if (!muscular && !stout) { p.rect(CX - 3, ty + 9, 6, 1, sh(skin, -0.18)); p.rect(CX - 4, ty + 12, 3, 1, sh(skin, -0.15)); p.rect(CX + 1, ty + 12, 3, 1, sh(skin, -0.15)); } }
     if (outfit === 'cavaleiro' || outfit === 'aurora') {
       const metal = outfit === 'aurora' ? '#f6f2e4' : c1, trim = outfit === 'aurora' ? '#ffd36b' : sh(c1, 0.35);
       p.rect(CX - shoulder - 3, ty - 1, 6, 6, metal); p.rect(CX + shoulder - 3, ty - 1, 6, 6, metal);
@@ -366,14 +438,42 @@
     const armL = CX - shoulder - 4, armR = CX + shoulder;
     Object.assign(k, { armL, armR });
     const gl = XS && XS.glove ? XS.glove(c1, c2) : skin; // mãos (luvas em algumas roupas)
+    const armMass = muscular ? 2 : stout ? 1 : 0;
+    const limbBar = (x, y, w, h, col) => {
+      if (!armMass) { p.rect(x, y, w, h, col); return; }
+      if (h > w) {
+        if (muscular) {
+          p.poly([[x - 1, y], [x + 5, y], [x + 6, y + 3], [x + 6, y + 6], [x + 4, y + 9], [x + 5, y + 11], [x + 4, y + h], [x, y + h], [x - 1, y + 11], [x, y + 9], [x - 2, y + 6], [x - 2, y + 3]], col);
+          p.line(x - 1, y + 3, x - 1, y + 6, sh(col, 0.23));
+          p.line(x + 4, y + 4, x + 4, y + 7, sh(col, -0.24));
+          p.rect(x + 1, y + 8, 3, 1, sh(col, -0.2));
+          p.line(x, y + 10, x, y + 12, sh(col, 0.16));
+        } else {
+          p.poly([[x, y], [x + 4, y], [x + 5, y + 3], [x + 5, y + 9], [x + 4, y + h], [x, y + h], [x - 1, y + 9], [x - 1, y + 3]], col);
+          p.line(x, y + 3, x, y + h - 3, sh(col, 0.12));
+          p.line(x + 4, y + 4, x + 4, y + h - 3, sh(col, -0.13));
+        }
+      } else {
+        p.poly([[x, y - 1], [x + 3, y - armMass], [x + w - 3, y - armMass], [x + w, y], [x + w, y + 4], [x + w - 3, y + 4 + armMass], [x + 3, y + 4 + armMass], [x, y + 5]], col);
+        p.line(x + 2, y - 1, x + w - 3, y - 1, sh(col, muscular ? 0.22 : 0.11));
+        p.line(x + 3, y + 4, x + w - 3, y + 4, sh(col, muscular ? -0.23 : -0.12));
+      }
+    };
+    const limbLine = (x0, y0, x1, y1, col, width) => {
+      p.line(x0, y0, x1, y1, col, false, width + (armMass ? muscular ? 2 : 1 : 0));
+      if (armMass) p.line(x0 - 1, y0 - 1, x1 - 1, y1 - 1, sh(col, muscular ? 0.17 : 0.1));
+    };
     let weaponPalm = [armR + 2, ty + 15 + aR], secondPalm = null;
     if (swim) {
       const stroke = (side, phase) => {
         const shoulderX = CX + side * shoulder, elbowX = CX + side * (shoulder + 5 + Math.cos(phase) * 3);
-        const elbowY = ty + 7 + Math.sin(phase) * 4, palmX = CX + side * (shoulder + 8 + Math.cos(phase + .6) * 5);
-        const palmY = ty + 9 + Math.sin(phase + .6) * 5;
-        p.line(shoulderX, ty + 3, elbowX, elbowY, sleeve, false, 4);
-        p.line(elbowX, elbowY, palmX, palmY, skin, false, 3);
+        // Normal: remada aberta. Acelerado: recuperação alta e puxada alternada de crawl.
+        const elbowY = ty + (fastSwim ? -1 + Math.sin(phase) * 10 : 7 + Math.sin(phase) * 4);
+        const palmX = CX + side * (fastSwim ? shoulder + 2 + Math.cos(phase + .6) * 5 : shoulder + 8 + Math.cos(phase + .6) * 5);
+        const palmY = ty + (fastSwim ? -6 + Math.sin(phase + .6) * 13 : 9 + Math.sin(phase + .6) * 5);
+        limbLine(shoulderX, ty + 3, elbowX, elbowY, sleeve, 4);
+        limbLine(elbowX, elbowY, palmX, palmY, skin, 3);
+        if (armMass) p.ell(shoulderX, ty + 3, muscular ? 4 : 3, 3, sleeve);
         p.ell(palmX, palmY, 2.3, 1.8, skin);
       };
       stroke(-1, swimPhase); stroke(1, swimPhase + Math.PI);
@@ -381,35 +481,36 @@
       weaponPalm = [CX + (atk ? 14 : 10), ty + (atk ? 7 : 14)];
       secondPalm = [weaponPalm[0] - 4, weaponPalm[1] + 4];
       // Both forearms meet the same handle; the left hand is lower on the grip.
-      p.line(armL + 2, ty + 3, CX - 1, ty + 14, sleeve, false, 4);
-      p.line(CX - 1, ty + 14, secondPalm[0], secondPalm[1], sleeve, false, 4);
-      p.line(armR + 1, ty + 3, weaponPalm[0] + 1, weaponPalm[1] - 4, sleeve, false, 4);
+      limbLine(armL + 2, ty + 3, CX - 1, ty + 14, sleeve, 4);
+      limbLine(CX - 1, ty + 14, secondPalm[0], secondPalm[1], sleeve, 4);
+      limbLine(armR + 1, ty + 3, weaponPalm[0] + 1, weaponPalm[1] - 4, sleeve, 4);
+      if (armMass) { p.ell(armL + 2, ty + 3, muscular ? 4 : 3, 3, sleeve); p.ell(armR + 1, ty + 3, muscular ? 4 : 3, 3, sleeve); }
       p.ell(secondPalm[0], secondPalm[1], 2.7, 2.2, gl);
       p.ell(weaponPalm[0], weaponPalm[1], 2.7, 2.2, gl);
-    } else if (arms === 'up') { p.rect(armL, ty - 11, 4, 13, sleeve); p.rect(armL, ty - 14, 4, 4, gl); }
-    else if (arms === 'out') { p.rect(armL - 9, ty + 1, 13, 4, sleeve); p.rect(armL - 12, ty + 1, 4, 4, gl); }
+    } else if (arms === 'up') { limbBar(armL, ty - 11, 4, 13, sleeve); p.rect(armL, ty - 14, 4, 4, gl); }
+    else if (arms === 'out') { limbBar(armL - 9, ty + 1, 13, 4, sleeve); p.rect(armL - 12, ty + 1, 4, 4, gl); }
     else {
-      if (wide) p.poly([[armL, ty + 1], [armL + 4, ty + 1], [armL + 5, 46 + aL], [armL - 2, 46 + aL]], sleeve);
-      else p.rect(armL, ty + 1 + aL, 4, 13, sleeve);
+      if (wide) p.poly([[armL - armMass, ty + 1], [armL + 4 + armMass, ty + 1], [armL + 5 + armMass, 46 + aL], [armL - 2 - armMass, 46 + aL]], sleeve);
+      else limbBar(armL, ty + 1 + aL, 4, 13, sleeve);
       p.rect(armL, ty + 13 + aL, 4, 4, gl);
     }
     let hand = null;
     if (swim || twoHands) { /* arms already posed above */ }
-    else if (rArm === 'atk') { p.rect(armR, ty + 3, 10, 4, sleeve); p.rect(armR + 9, ty + 3, 4, 4, gl); weaponPalm = [armR + 11, ty + 5]; }
-    else if (rArm === 'up') { p.rect(armR, ty - 11, 4, 13, sleeve); p.rect(armR, ty - 14, 4, 4, gl); hand = [armR + 2, ty - 12]; }
-    else if (rArm === 'fwdHi') { p.rect(armR, ty - 1, 10, 4, sleeve); p.rect(armR + 9, ty - 2, 4, 4, gl); hand = [armR + 11, ty]; }
-    else if (rArm === 'fwd') { p.rect(armR, ty + 3, 9, 4, sleeve); p.rect(armR + 8, ty + 3, 4, 4, gl); hand = [armR + 10, ty + 5]; }
-    else if (rArm === 'fwdLo') { p.rect(armR, ty + 6, 8, 4, sleeve); p.rect(armR + 7, ty + 6, 4, 4, gl); hand = [armR + 9, ty + 8]; }
+    else if (rArm === 'atk') { limbBar(armR, ty + 3, 10, 4, sleeve); p.rect(armR + 9, ty + 3, 4, 4, gl); weaponPalm = [armR + 11, ty + 5]; }
+    else if (rArm === 'up') { limbBar(armR, ty - 11, 4, 13, sleeve); p.rect(armR, ty - 14, 4, 4, gl); hand = [armR + 2, ty - 12]; }
+    else if (rArm === 'fwdHi') { limbBar(armR, ty - 1, 10, 4, sleeve); p.rect(armR + 9, ty - 2, 4, 4, gl); hand = [armR + 11, ty]; }
+    else if (rArm === 'fwd') { limbBar(armR, ty + 3, 9, 4, sleeve); p.rect(armR + 8, ty + 3, 4, 4, gl); hand = [armR + 10, ty + 5]; }
+    else if (rArm === 'fwdLo') { limbBar(armR, ty + 6, 8, 4, sleeve); p.rect(armR + 7, ty + 6, 4, 4, gl); hand = [armR + 9, ty + 8]; }
     else {
-      if (wide) p.poly([[armR, ty + 1], [armR + 4, ty + 1], [armR + 6, 46 + aR], [armR - 1, 46 + aR]], sleeve);
-      else p.rect(armR, ty + 1 + aR, 4, 13, sleeve);
+      if (wide) p.poly([[armR - armMass, ty + 1], [armR + 4 + armMass, ty + 1], [armR + 6 + armMass, 46 + aR], [armR - 1 - armMass, 46 + aR]], sleeve);
+      else limbBar(armR, ty + 1 + aR, 4, 13, sleeve);
       p.rect(armR, ty + 13 + aR, 4, 4, gl);
     }
-    if ((outfit === 'ladrao' || outfit === 'cavaleiro') && arms === 'swing') { p.rect(armL, ty + 10 + aL, 4, 3, outfit === 'ladrao' ? '#5a3a22' : sh(c1, -0.2)); if (!atk) p.rect(armR, ty + 10 + aR, 4, 3, outfit === 'ladrao' ? '#5a3a22' : sh(c1, -0.2)); }
+    if ((outfit === 'ladrao' || outfit === 'cavaleiro') && arms === 'swing') { p.rect(armL - (armMass ? 1 : 0), ty + 10 + aL, 4 + (armMass ? 2 : 0), 3, outfit === 'ladrao' ? '#5a3a22' : sh(c1, -0.2)); if (!atk) p.rect(armR - (armMass ? 1 : 0), ty + 10 + aR, 4 + (armMass ? 2 : 0), 3, outfit === 'ladrao' ? '#5a3a22' : sh(c1, -0.2)); }
     // golias: marcas de pedra (litodermas) nos braços
     if (sp === 'golias') { const mk = sh(skin, -0.42); for (const ax of [armR, arms === 'swing' ? armL : null]) if (ax !== null) { p.line(ax, ty + 4, ax + 3, ty + 7, mk); p.line(ax + 3, ty + 7, ax + 1, ty + 10, mk); p.set(ax + 2, ty + 3, mk); } }
 
-    if (XS && XS.arms) XS.arms(k);
+    if (XS && XS.arms && !fastSwim) XS.arms(k);
     if (cape === 'pele') { p.ell(CX, ty + 1, shoulder + 4, 3.5, '#e8e0d0'); for (let x = -shoulder - 3; x <= shoulder + 3; x += 2) p.set(CX + x, ty + 3 + (x % 4 ? 1 : 0), '#c8bca8'); }
 
     // ===== feições de cada espécie (Livro do Jogador 2024) =====
@@ -425,6 +526,9 @@
       aasimar: { ears: 'round' },
     }[sp] || {});
 
+    if (L.presentation === 'feminina') HS.jaw = Math.max(3, HS.jaw - 1);
+    if (L.presentation === 'masculina') HS.jaw = Math.min(10, HS.jaw + 1);
+
     // ===== pescoço e cabeça =====
     const drac = sp === 'draconato';
     const eyeC = sp === 'tiferino' ? '#ffcf5a' : sp === 'aasimar' ? '#9fe3ff' : drac ? (L.eyes === '#3a2a20' ? '#ffcf5a' : L.eyes) : L.eyes;
@@ -432,37 +536,46 @@
     const dragonHead = (hooded) => {
       const belly = E.SP.mix(skin, '#f4e8c8', 0.5), dk = sh(skin, -0.32), dk2 = sh(skin, -0.55), hl = sh(skin, 0.24);
       const hornC = E.SP.mix(skin, '#efe4cc', 0.7), hornD = sh(hornC, -0.3);
-      if (!hooded) for (const s of [-1, 1]) {
+      if (E.Skins) { E.Skins.dragonHorns(p, L, CX, hy, hooded); if (!hooded) E.Skins.dragonCrest(p, L, CX, hy); }
+      if (!hooded && (!L.dragonHorns || L.dragonHorns === 'auto')) for (const s of [-1, 1]) {
         p.line(CX + s * 6, hy - 7, CX + s * 12, hy - 14, hornD, false, 4);
         p.line(CX + s * 12, hy - 14, CX + s * 15, hy - 21, hornC, false, 3);
         p.line(CX + s * 15, hy - 21, CX + s * 14, hy - 26, hornC, false, 2);
         p.line(CX + s * 7, hy - 9, CX + s * 12, hy - 16, sh(hornC, 0.25));
         p.line(CX + s * 9, hy - 5, CX + s * 15, hy - 9, hornD, false, 2); // chifre menor de trás
       }
-      for (const s of [-1, 1]) { // babados das bochechas
+      if (!L.dragonCrest || ['auto', 'frill'].includes(L.dragonCrest)) for (const s of [-1, 1]) { // babados das bochechas
         p.poly([[CX + s * 9, hy - 3], [CX + s * 18, hy - 6], [CX + s * 15, hy - 2], [CX + s * 11, hy + 1]], dk);
         p.poly([[CX + s * 9, hy + 1], [CX + s * 17, hy + 2], [CX + s * 11, hy + 6]], sh(skin, -0.18));
       }
       p.ell(CX, hy - 2, 11, 10, skin);
       p.poly([[CX - 8, hy + 1], [CX + 8, hy + 1], [CX + 7, hy + 9], [CX + 4, hy + 14], [CX - 4, hy + 14], [CX - 7, hy + 9]], skin);
+      if (!L.dragonSnout || L.dragonSnout === 'auto') {
       p.poly([[CX - 6, hy + 10], [CX + 6, hy + 10], [CX + 4, hy + 14], [CX - 4, hy + 14]], belly);
       p.rect(CX - 4, hy + 12, 8, 1, sh(belly, -0.18));
+      if (!E.Skins?.has('mouths', L.mouthShape)) {
       p.line(CX - 6, hy + 10, CX + 6, hy + 10, dk2); p.set(CX - 7, hy + 9, dk2); p.set(CX + 7, hy + 9, dk2);
       p.set(CX - 5, hy + 11, '#f6f0e0'); p.set(CX + 5, hy + 11, '#f6f0e0'); p.set(CX - 3, hy + 11, '#f6f0e0'); p.set(CX + 3, hy + 11, '#f6f0e0');
+      }
       p.rect(CX - 4, hy + 6, 2, 1, dk2); p.rect(CX + 3, hy + 6, 2, 1, dk2); // narinas
       p.line(CX - 7, hy + 2, CX - 5, hy + 9, sh(skin, -0.14)); p.line(CX + 7, hy + 2, CX + 5, hy + 9, sh(skin, -0.2)); // laterais do focinho
       p.rect(CX - 1, hy - 1, 2, 7, hl); p.set(CX - 2, hy + 5, hl); p.set(CX + 1, hy + 5, hl); // ponte do focinho
-      for (let k = 0; k < 3; k++) p.poly([[CX - 2, hy - 9 + k * 3], [CX, hy - 14 + k * 3], [CX + 2, hy - 9 + k * 3]], k ? dk : sh(dk, 0.1)); // crista
+      } else if (E.Skins) E.Skins.dragonSnout(p, L, CX, hy);
+      if (!L.dragonCrest || L.dragonCrest === 'auto') for (let k = 0; k < 3; k++) p.poly([[CX - 2, hy - 9 + k * 3], [CX, hy - 14 + k * 3], [CX + 2, hy - 9 + k * 3]], k ? dk : sh(dk, 0.1)); // crista
+      if (!L.scalePattern || L.scalePattern === 'auto') {
       for (const [x, y] of [[-7, -7], [-4, -9], [4, -9], [7, -7], [-9, -2], [9, -2], [-6, 4], [6, 4], [-2, -6], [2, -6]]) p.set(CX + x, hy + y, hl);
       for (const [x, y] of [[-8, -5], [8, -5], [-6, 7], [6, 7], [-10, 1], [10, 1]]) p.set(CX + x, hy + y, dk);
-      for (const ex of [CX - 9, CX + 4]) { // olhos de réptil com pupila em fenda
+      } else if (E.Skins) E.Skins.dragonPattern(p, L, CX, hy);
+      const customDragonEyes = E.Skins && E.Skins.drawEyes(p, L, CX, hy, true);
+      if (!customDragonEyes) for (const ex of [CX - 9, CX + 4]) { // olhos de réptil com pupila em fenda
         p.rect(ex, hy - 2, 5, 4, '#fff6dc');
         p.rect(ex + 1, hy - 2, 4, 4, eyeC, true);
         p.rect(ex + 1, hy, 4, 2, sh(eyeC, 0.25), true);
         p.rect(ex + 2, hy - 2, 1, 4, '#1a0a08');
         p.set(ex + 4, hy - 2, '#ffffff', true);
       }
-      p.line(CX - 10, hy - 5, CX - 4, hy - 3, dk, false, 2); p.line(CX + 3, hy - 3, CX + 9, hy - 5, dk, false, 2); // sobrancelhas ósseas
+      if (!customDragonEyes) { p.line(CX - 10, hy - 5, CX - 4, hy - 3, dk, false, 2); p.line(CX + 3, hy - 3, CX + 9, hy - 5, dk, false, 2); // sobrancelhas ósseas
+      }
     };
     if (drac) {
       p.rect(CX - 4, hy + 9, 8, 6, sh(skin, -0.1));
@@ -504,10 +617,11 @@
       }
     };
     if (!drac) {
-      drawEyes(lash);
+      const customEyes = E.Skins && E.Skins.drawEyes(p, L, CX, hy);
+      if (!customEyes) drawEyes(lash);
       // sobrancelhas: grossas e baixas em anões, orcs e golias
-      if (HS.brow) { const bc = sp === 'anao' ? hair : sh(skin, -0.38); p.rect(CX - 10, e0 - 3, 7, 2, bc); p.rect(CX + 3, e0 - 3, 7, 2, bc); }
-      else { p.rect(CX - 9, ey - 3, 5, 1, sh(hair, -0.25)); p.rect(CX + 4, ey - 3, 5, 1, sh(hair, -0.25)); }
+      if (!customEyes && HS.brow) { const bc = sp === 'anao' ? hair : sh(skin, -0.38); p.rect(CX - 10, e0 - 3, 7, 2, bc); p.rect(CX + 3, e0 - 3, 7, 2, bc); }
+      else if (!customEyes) { p.rect(CX - 9, ey - 3, 5, 1, sh(hair, -0.25)); p.rect(CX + 4, ey - 3, 5, 1, sh(hair, -0.25)); }
       // nariz
       const nd = sh(skin, -0.2);
       if (HS.nose === 'big') { p.ell(CX, hy + 6, 2.6, 2.4, sh(skin, -0.05)); p.set(CX - 1, hy + 5, sh(skin, 0.2)); p.set(CX - 2, hy + 8, nd); p.set(CX + 2, hy + 8, nd); }
@@ -516,7 +630,7 @@
       else if (HS.nose === 'button') p.rect(CX, hy + 6, 2, 1, nd);
       else if (HS.nose === 'thin') { p.set(CX, hy + 5, nd); p.set(CX, hy + 7, nd); }
       else p.set(CX, hy + 7, sh(skin, -0.16));
-      p.rect(CX - 1, hy + 9, 3, 1, E.SP.mix(sh(skin, -0.35), '#c0505a', 0.35));
+      if (!E.Skins?.has('mouths', L.mouthShape)) p.rect(CX - 1, hy + 9, 3, 1, E.SP.mix(sh(skin, -0.35), '#c0505a', 0.35));
       const blush = sp === 'pequenino' || sp === 'gnomo' ? 0.45 : 0.3;
       p.rect(CX - 10, hy + 8, 3, sp === 'pequenino' ? 2 : 1, E.SP.mix(skin, '#ff7a8a', blush)); p.rect(CX + 7, hy + 8, 3, sp === 'pequenino' ? 2 : 1, E.SP.mix(skin, '#ff7a8a', blush));
     }
@@ -529,9 +643,11 @@
     if ((L.beard && !drac) || sp === 'anao') { p.poly([[CX - 9, hy + 4], [CX + 9, hy + 4], [CX + 7, hy + 14], [CX, hy + 18], [CX - 7, hy + 14]], hair); p.rect(CX - 3, hy + 8, 6, 1, sh(skin, -0.3)); p.rect(CX - 4, hy + 4, 8, 2, hair); }
 
     // ===== cabelo (frente) =====
+    if (E.Skins) E.Skins.drawMouth(p, L, CX, hy, drac);
     const hiH = sh(hair, 0.32), loH = sh(hair, -0.2);
     const hood = L.acc === 'capuz';
-    if (!hood && sp !== 'draconato' && L.hairStyle !== 8 && L.hairStyle !== 9) {
+    if (customHair && !hood) E.Skins.hairPart(p, L, CX, hy, 'front');
+    if (!customHair && !hood && sp !== 'draconato' && L.hairStyle !== 8 && L.hairStyle !== 9) {
       const vol = L.hairStyle === 7 ? 2 : L.hairStyle === 11 ? 3 : 0;
       p.ell(CX, hy - 7, 13 + vol, 7 + vol, hair);
       p.rect(CX - 12 - vol, hy - 7, 24 + vol * 2, 4, hair);
@@ -555,8 +671,9 @@
       p.rect(CX - 7, hy - 11, 3, 1, hiH); p.rect(CX - 4, hy - 12, 4, 1, hiH); p.rect(CX + 1, hy - 12, 2, 1, hiH); p.set(CX - 8, hy - 10, hiH);
       p.set(CX - 12, hy - 2, loH); p.set(CX + 11, hy - 2, loH);
     }
-    if (L.hairStyle === 8 && !hood && sp !== 'draconato') { p.ell(CX, hy - 7, 11, 5, sh(hair, -0.1)); p.rect(CX - 2, hy - 13, 4, 8, hair); }
-    if (L.hairStyle === 9 && !hood && sp !== 'draconato') { p.ell(CX, hy - 7, 11, 5, sh(skin, -0.12)); for (let i = 0; i < 5; i++) p.poly([[CX - 3, hy - 9 - i * 3], [CX + 3, hy - 9 - i * 3], [CX + 1 + i, hy - 16 - i * 3]], i % 2 ? sh(hair, -0.1) : hair); p.rect(CX - 3, hy - 12, 6, 6, hair); }
+    if (!customHair && L.hairStyle === 8 && !hood && sp !== 'draconato') { p.ell(CX, hy - 7, 11, 5, sh(hair, -0.1)); p.rect(CX - 2, hy - 13, 4, 8, hair); }
+    if (!customHair && L.hairStyle === 9 && !hood && sp !== 'draconato') { p.ell(CX, hy - 7, 11, 5, sh(skin, -0.12)); for (let i = 0; i < 5; i++) p.poly([[CX - 3, hy - 9 - i * 3], [CX + 3, hy - 9 - i * 3], [CX + 1 + i, hy - 16 - i * 3]], i % 2 ? sh(hair, -0.1) : hair); p.rect(CX - 3, hy - 12, 6, 6, hair); }
+    if (drac && customHair && !hood && E.Skins) { E.Skins.dragonHorns(p, L, CX, hy); E.Skins.dragonCrest(p, L, CX, hy); }
     if (sp === 'tiferino') { p.line(CX - 7, hy - 9, CX - 12, hy - 18, '#3a2a3a', false, 3); p.line(CX - 12, hy - 18, CX - 9, hy - 21, '#3a2a3a', false, 2); p.line(CX + 6, hy - 9, CX + 11, hy - 18, '#3a2a3a', false, 3); p.line(CX + 11, hy - 18, CX + 8, hy - 21, '#3a2a3a', false, 2); }
 
     // ===== acessórios =====

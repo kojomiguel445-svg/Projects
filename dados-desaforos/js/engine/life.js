@@ -189,27 +189,56 @@
   // ------------------------------------------------------------ pesca
   LF.isNight = () => { if (E.Sim) return E.Sim.clock().night; const hr = new Date().getHours(); return hr >= 19 || hr < 6; };
   LF.timeOk = (f) => !f.when || (f.when === 'noite' ? LF.isNight() : !LF.isNight());
-  LF.activeBait=(h,biome)=>{const d=LF.data(h);return biome==='sea'&&d.sbait>0?{key:'sbait',bonus:.65,name:'Isca de Corrente Profunda'}:d.pbait>0?{key:'pbait',bonus:.35,name:'Isca Luminescente'}:d.bait>0?{key:'bait',bonus:.20,name:'Isca de Minhoca'}:null;};
-  LF.spendBait=(h,key)=>{const d=LF.data(h);if(!['bait','pbait','sbait'].includes(key)||!(d[key]>0))return false;d[key]--;E.Store.save();return true;};
+  // Each rod keeps a bait slot; quantities stay in the original Life inventory.
+  LF.baitTypes = () => Object.entries(L().BAITS).map(([id,b]) => Object.assign({},b,{id,key:b.key||(id==='isca_lendaria'?'lbait':null),waitMult:id==='isca_marinha'?.70:id==='isca_brilhante'?.78:.88})).filter(b=>b.key);
+  const baitCount=(d,key)=>Number.isSafeInteger(d[key])&&d[key]>0?d[key]:0;
+  LF.rodBait = (h,tier=LF.data(h).rod) => {
+    const d=LF.data(h);
+    if(!Number.isSafeInteger(tier)||tier<0||tier>d.rod||!L().RODS[tier])return null;
+    if(!d.rodBaits||typeof d.rodBaits!=='object'||Array.isArray(d.rodBaits))d.rodBaits={};
+    if(!Object.prototype.hasOwnProperty.call(d.rodBaits,tier)) {
+      // Existing saves retain one initial choice; later purchases never replace it automatically.
+      d.rodBaits[tier]=['pbait','bait','sbait','lbait'].find(key=>baitCount(d,key))||null;
+    }
+    return LF.baitTypes().find(b=>b.key===d.rodBaits[tier])||null;
+  };
+  LF.equipRodBait = (h,key,tier=LF.data(h).rod) => {
+    const d=LF.data(h);
+    if(E.Fishing&&E.Fishing.isActive&&E.Fishing.isActive())return {ok:false,message:'Recolha a linha antes de trocar a isca.'};
+    if(!Number.isSafeInteger(tier)||tier<0||tier>d.rod||!L().RODS[tier])return {ok:false,message:'Vara indisponível.'};
+    const bait=LF.baitTypes().find(b=>b.key===key);
+    if(key!==null&&(!bait||!baitCount(d,key)))return {ok:false,message:'Você não tem essa isca.'};
+    LF.rodBait(h,tier);d.rodBaits[tier]=key;E.Store.save();
+    return {ok:true,message:bait?`${bait.name} equipada.`:'Isca removida da vara.'};
+  };
+  LF.activeBait=(h,biome)=>{const d=LF.data(h),b=LF.rodBait(h);return b&&baitCount(d,b.key)&&(b.key!=='sbait'||biome==='sea')?b:null;};
+  LF.spendBait=(h,key)=>{const d=LF.data(h);if(!LF.baitTypes().some(b=>b.key===key)||!baitCount(d,key))return false;d[key]--;E.Store.save();return true;};
+  // A receipt binds the consumed unit to this cast, including cancellation and the last unit.
+  const fishingCasts=new WeakMap();
+  LF.beginFishingCast=(h,biome)=>{const bait=LF.activeBait(h,biome),receipt={};if(bait&&!LF.spendBait(h,bait.key))return null;fishingCasts.set(receipt,{h,bait,biome,result:null,landed:false});return receipt;};
   const fishingPrice=(r,n)=>E.Settlements&&E.Settlements.price?E.Settlements.price(r,n):Math.ceil(n*((E.WD&&E.WD.REGIONS[r]||{}).metro?1.65:1));
   LF.rodPrice=(tier,r)=>{const def=L().RODS[tier];return def&&def.retail?fishingPrice(r,def.retail):0;};
   LF.buyRod=(h,tier,r)=>{const d=LF.data(h),def=L().RODS[tier],price=LF.rodPrice(tier,r);if(!Number.isSafeInteger(tier)||tier!==d.rod+1||!def||!price)return {ok:false,message:'Compre a próxima vara; a vara de Dendê continua exclusiva da missão.'};if(!Number.isFinite(h.gold)||h.gold<price)return {ok:false,message:`A vara custa ${price} po.`};h.gold-=price;d.rod=tier;E.Store.save();return {ok:true,message:`${def.name} comprada e equipada.`,cost:price};};
   LF.buyBait=(h,id,packs=1,r)=>{const def=L().BAITS[id],d=LF.data(h);if(!def||!def.price||!Number.isSafeInteger(packs)||packs<1||packs>100)return {ok:false,message:'Escolha lotes inteiros de iscas disponíveis.'};const cost=fishingPrice(r,def.price)*packs,n=(def.pack||5)*packs;if(!Number.isFinite(h.gold)||h.gold<cost)return {ok:false,message:`As iscas custam ${cost} po.`};h.gold-=cost;d[def.key]=(d[def.key]||0)+n;E.Store.save();return {ok:true,message:`${def.name} ×${n} guardada(s).`,cost,quantity:n};};
   LF.baitPrice=(id,r)=>{const def=L().BAITS[id];return def&&def.price?fishingPrice(r,def.price):0;};
-  LF.rollCatch = (h, biome, region) => {
-    const d = LF.data(h), bait=LF.activeBait(h,biome), finish=res=>Object.assign(res,{baitKey:bait&&bait.key});
+  LF.rollCatch = (h, biome, region, receipt) => {
+    const cast=receipt&&fishingCasts.get(receipt);
+    if(receipt&&(!cast||cast.h!==h||cast.biome!==biome))return null;
+    if(cast&&cast.result)return cast.result;
+    const d = LF.data(h), bait=cast?cast.bait:LF.activeBait(h,biome), legendaryBait=!!(bait&&bait.key==='lbait');
+    const finish=res=>{Object.assign(res,{baitKey:bait&&bait.key,baitSpent:!!cast});if(cast){res.cast=receipt;cast.result=res;}return res;};
     const list = (L().FISH_BY_BIOME[biome] || L().FISH_BY_BIOME.forest).filter((f) => LF.timeOk(f)&&(!f.minRod||d.rod>=f.minRod));
     // peixes que só existem nesta região: o raro (★4) e o lendário (precisa da hora certa e de vara melhor ou Isca Lendária)
     const reg = region && L().FISH_REGION[region];
     if (reg) {
       const legend = reg.find((f) => f.legend), rare = reg.find((f) => !f.legend);
       const cm = (f) => Math.round(f.min + Math.pow(U.rand(), 1.4) * (f.max - f.min));
-      if (legend && LF.timeOk(legend) && (d.rod >= 1 || d.lbait > 0)) {
+      if (legend && LF.timeOk(legend) && (d.rod >= 1 || legendaryBait)) {
         let ch = 0.012 * (1 + d.rod * 0.6 + LF.level(h, 'pesca') * 0.08) + (LF.buff(h, 'pescador') ? 0.01 : 0);
-        if (d.lbait > 0) ch = Math.max(ch, 0.3);
-        if (U.rand() < ch) return finish({ fish: legend, cm: cm(legend), usedLB: d.lbait > 0 });
+        if (legendaryBait) ch = Math.max(ch, 0.3);
+        if (U.rand() < ch) return finish({ fish: legend, cm: cm(legend), usedLB: legendaryBait });
       }
-      if (rare && LF.timeOk(rare) && U.rand() < 0.05 * (1 + d.rod * 0.25 + (d.bait > 0 ? 0.3 : 0))) return finish({ fish: rare, cm: cm(rare) });
+      if (rare && LF.timeOk(rare) && U.rand() < 0.05 * (1 + d.rod * 0.25 + (bait ? 0.3 : 0))) return finish({ fish: rare, cm: cm(rare) });
     }
     if (U.rand() < 0.07) { // lixo / tesouro
       const tot = L().JUNK.reduce((a, j) => a + j.w, 0); let r = U.rand() * tot;
@@ -226,8 +255,11 @@
   };
   LF.landCatch = (h, res) => {
     const d = LF.data(h);
-    if(!res||res.landed)return false;res.landed=true;
-    if(Object.prototype.hasOwnProperty.call(res,'baitKey')){if(res.baitKey&&d[res.baitKey]>0)d[res.baitKey]--;}else if(d.bait>0)d.bait--;
+    if(!res||res.landed)return false;
+    const cast=res.cast&&fishingCasts.get(res.cast);
+    if(res.cast&&(!cast||cast.h!==h||cast.result!==res||cast.landed))return false;
+    if(cast)cast.landed=true;res.landed=true;
+    if(!res.baitSpent){if(Object.prototype.hasOwnProperty.call(res,'baitKey')){if(res.baitKey&&d[res.baitKey]>0)d[res.baitKey]--;}else if(d.bait>0)d.bait--;}
     if (res.junk) {
       const j = res.junk;
       if (j.gems) { E.state.gems += j.gems; E.UI.loot('💎', `${j.gems} Gemas (da garrafa)`); }
@@ -237,7 +269,7 @@
       return;
     }
     const f = res.fish;
-    if (res.usedLB && d.lbait > 0) d.lbait--;
+    if (res.usedLB && !res.baitSpent && res.baitKey!=='lbait' && d.lbait > 0) d.lbait--;
     if (f.legend && !d.legends[f.id]) { d.legends[f.id] = Date.now(); d.stats.legend++; E.UI.toast(`✦ PEIXE LENDÁRIO: ${f.name}!`, 'gold big'); }
     // Bênção das Águas: todo ★5 pescado concede Faro de Pescador por 20 minutos
     if (f.r >= 5) { d.buffs.pescador = Math.max(Date.now(), d.buffs.pescador || 0) + 20 * 60e3; res.blessing = true; }

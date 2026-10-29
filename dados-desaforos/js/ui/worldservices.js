@@ -148,7 +148,7 @@
       f('blackjack',null,'Sentar na mesa de Vinte-e-Um','cards-table',-x,front);
       f('slots',null,'Usar a máquina do Dragão','slots',x,front);
     }else if(v.service==='arena'){
-      f('arena',null,'Falar com o mestre da arena','counter',-x,back);
+      f('arena-enter',null,'Abrir os portões do Coliseu','noticeboard',0,front,{r:2.05});
       f('contracts',null,'Ler os desafios da guilda','noticeboard',x,back);
     }
     // A visible vacancy plaque belongs to the operating establishment itself.
@@ -249,9 +249,9 @@
     if(!it||!hero())return;source=it;
     if(it.service==='player-casino')return E.CasinoOwner&&E.CasinoOwner.use(it);
     if(E.Harbor&&['pier','fish','boat'].includes(it.action))return E.Harbor.open(it,it.action==='fish'?'sell':it.action==='boat'?'boat':'tools');
-    const handlers={supply:i=>E.Workshift?E.Workshift.supplier(i):fish(i),glider,food,potion,pick,weapon:weapons,upgrade,furniture,home:i=>property(i,'home'),contract:i=>property(i,'shop'),inn,cook:i=>meal(i,true),eat:i=>meal(i,false),jobs,work,professions,wholesale,contracts,trade,cart,pier:fishingTools,fish,alchemy:i=>craft(i,'alquimia'),smelt:i=>craft(i,'forja'),arena,cashier,roulette:i=>casino(i,'roulette'),dice:i=>casino(i,'dice'),blackjack:i=>E.Casino.open({game:'bj',atTable:true,anchor:i}),slots:i=>E.Casino.open({game:'slots',atTable:true,anchor:i})};
+    const handlers={'casino-enter':i=>E.LandmarkDoors&&E.LandmarkDoors.enter(E.WG.world,i.venue),'arena-enter':i=>E.ArenaLife&&E.ArenaLife.enter(i.region),supply:i=>E.Workshift?E.Workshift.supplier(i):fish(i),glider,food,potion,pick,weapon:weapons,upgrade,furniture,home:i=>property(i,'home'),contract:i=>property(i,'shop'),inn,cook:i=>meal(i,true),eat:i=>meal(i,false),jobs,work,professions,wholesale,contracts,trade,cart,pier:fishingTools,fish,alchemy:i=>craft(i,'alquimia'),smelt:i=>craft(i,'forja'),arena,cashier,roulette:i=>casino(i,'roulette'),dice:i=>casino(i,'dice'),blackjack:i=>E.Casino.open({game:'bj',atTable:true,anchor:i}),slots:i=>E.Casino.open({game:'slots',atTable:true,anchor:i})};
     if(it.service==='player-shop'&&it.action!=='contract')return E.StallLife&&E.StallLife.counter(it.region,it.action||'register');
-    return (handlers[it.action]||handlers[{general:'glider',food:'food',smith:'weapon',furniture:'furniture',guild:'jobs',inn:'inn',home:'home',market:'trade',alchemy:'alchemy',pier:'pier',arena:'arena',casino:'roulette'}[it.service]]||(()=>W.open({title:'Estabelecimento',text:'Aproxime-se de uma bancada, produto ou morador para interagir.',actions:[]})))(it);
+    return (handlers[it.action]||handlers[{general:'glider',food:'food',smith:'weapon',furniture:'furniture',guild:'jobs',inn:'inn',home:'home',market:'trade',alchemy:'alchemy',pier:'pier',arena:'arena-enter',casino:'roulette'}[it.service]]||(()=>W.open({title:'Estabelecimento',text:'Aproxime-se de uma bancada, produto ou morador para interagir.',actions:[]})))(it);
   };
   W.foodBag=(page=0)=>{
     const h=hero();if(!h)return;source={interior:!!(E.Interior&&E.Interior.current)};
@@ -273,7 +273,7 @@
   };
   W.service=(kind,region)=>{
     const w=E.WG&&E.WG.world,p=actor(),inside=E.Interior&&E.Interior.current,r=region||S().region();
-    const primary={general:'glider',food:'cook',smith:'upgrade',furniture:'furniture',guild:'jobs',inn:'inn',home:'home',market:'trade',alchemy:'alchemy',pier:'pier',arena:'arena',casino:'roulette','player-shop':'register','player-casino':'casino-license'}[kind];
+    const primary={general:'glider',food:'cook',smith:'upgrade',furniture:'furniture',guild:'jobs',inn:'inn',home:'home',market:'trade',alchemy:'alchemy',pier:'pier',arena:'arena-enter',casino:'roulette','player-shop':'register','player-casino':'casino-license'}[kind];
     if(inside){
       if(inside.kind!==kind)return E.UI.toast('Saia para a rua e procure o estabelecimento indicado.');
       return W.use({service:kind,action:primary,product:kind==='furniture'?'bed':undefined,region:r,interior:true});

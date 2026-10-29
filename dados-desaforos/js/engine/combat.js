@@ -109,7 +109,7 @@
       await this.P.rollD20({ who: 'hero', label: 'Iniciativa', rolls: hr.rolls, nat: hr.nat, bonus: C.initiative(h) + foco, total: hInit, adv, kind: 'init' });
       this.order = [{ side: 'hero', init: hInit, dex: C.score(h, 'des') }];
       for (const e of this.enemies) {
-        const ei = U.die(20) + U.mod(e.def.ab.des);
+        const ei = U.die(20) + (e.def.initiative ?? U.mod(e.def.ab.des));
         e.init = ei;
         this.order.push({ side: 'enemy', uid: e.uid, init: ei, dex: e.def.ab.des });
       }
@@ -161,6 +161,11 @@
       hc.dodge = false;
       hc.reckless = false;
       hc.shieldSpell = false;
+      if (hc.conc && INCAP.some((c) => hc.cond[c])) this.endConc();
+      if (hc.raging && INCAP.some((c) => hc.cond[c])) hc.raging = false;
+      if (hc.conc && hc.concRounds !== null && hc.concRounds !== undefined && --hc.concRounds <= 0) this.endConc();
+      for (const e of this.enemies) for (const [c, cd] of Object.entries(e.cond)) { if (cd.heroRounds && --cd.heroRounds <= 0) this.dropCond(e, c); }
+      for (const e of this.enemies) if (e.smiteEffects) e.smiteEffects = e.smiteEffects.filter((effect) => --effect.heroRounds > 0);
       this.reactionUsed = false;
       // encerra efeitos que duram "até o início do seu próximo turno"
       for (const e of this.enemies) {
@@ -176,7 +181,7 @@
       // Força Vital (Árvore do Mundo): PV temporários para um aliado enquanto em Fúria
       if (hc.raging && C.hasFx(h, 'lifeGiving')) { const a = this.allies.find((x) => !x.down); if (a) { const x = rollDice(`${C.rageDamage(h)}d6`); a.temp = Math.max(a.temp || 0, x.total); this.say(`Força Vital: ${a.name} ganha ${x.total} PV temporários.`, 'good'); } }
       if (h.hp > 0) await this.startOfTurnSubFx();
-      if (hc.sb.heroism && h.hp > 0) this.giveTemp(Math.max(1, C.mod(h, C.castAb(h))), 'Heroísmo');
+      if (hc.sb.heroism && h.hp > 0) this.giveTemp(Math.max(1, C.mod(h, hc.heroismAb || C.castAb(h, S.SPELLS.heroismo))), 'Heroísmo');
       if (hc.sb.haste && h.hp > 0) this.turn.attacksLeft = 1;
       for (const k of Object.keys(hc.sb)) { if (k === 'advNext' || k === 'advD20') continue; if (--hc.sb[k] <= 0) { delete hc.sb[k]; if (k === 'dup') this.say('O duplo ilusório se desfaz.', 'sys'); } }
       if (hc.raging) { hc.rageRounds++; if (hc.rageRounds > 100) { hc.raging = false; this.say('A Fúria se esgota.', 'sys'); } }
@@ -251,7 +256,7 @@
       const hc = this.hc;
       for (const c of ['amedrontado', 'contido', 'paralisado', 'adormecido', 'envenenado', 'agarrado', 'cego']) {
         const cd = hc.cond[c];
-        if (!cd || !cd.save) continue;
+        if (!cd || (!cd.save && !cd.expireOnly)) continue;
         if (cd.turns !== undefined && --cd.turns <= 0) { delete hc.cond[c]; this.say(`${R.CONDITIONS[c].name} termina.`, 'good'); continue; }
         const ok = await this.heroSave(cd.save, cd.dc, `Encerrar ${R.CONDITIONS[c].name}`);
         if (ok) { delete hc.cond[c]; this.say(`${this.h.name} se livra: ${R.CONDITIONS[c].name}.`, 'good'); }
@@ -261,6 +266,10 @@
     // ------------------------------------------------------------ testes do herói
     async heroSave(ab, dc, label, opts = {}) {
       const h = this.h, hc = this.hc;
+      if (['for', 'des'].includes(ab) && (hc.cond.paralisado || hc.cond.atordoado || hc.cond.adormecido)) {
+        this.say(`${h.name} falha automaticamente no TR de ${R.AB[ab].name}.`, 'bad');
+        return false;
+      }
       let adv = false, dis = false;
       if (ab === 'des' && (hc.dodge || C.has(h, 'sentido_perigo'))) adv = true;
       if (['int', 'sab', 'car'].includes(ab) && C.species(h).hooks.advMentalSaves) adv = true;
@@ -282,6 +291,11 @@
       if ((r.nat === 1 && !(ab === 'con' && opts.death))) { /* falha natural não é automática em TR (apenas testes de morte) */ }
       let ok = total >= dc;
       await this.P.rollD20({ who: 'hero', label: `TR de ${R.AB[ab].name}${label ? ' · ' + label : ''}`, rolls: r.rolls, nat: r.nat, bonus: bonus + blessDie, total, dc, adv: r.mode === 'adv', dis: r.mode === 'dis', outcome: ok ? 'success' : 'fail', kind: 'save' });
+      // Contraencanto (2024): reação após uma falha contra Enfeitiçado/Amedrontado.
+      if (!ok && (opts.fear || opts.charm) && C.hasFx(h, 'countercharm') && !this.reactionUsed && !INCAP.some((c) => hc.cond[c])) {
+        const ch = await this.P.ask({ title: 'Contraencanto', text: 'Usar sua reação para repetir a resistência com Vantagem?', options: [{ id: 'yes', label: 'Repetir com Vantagem' }, { id: 'no', label: 'Guardar reação' }] });
+        if (ch === 'yes') { this.reactionUsed = true; const retry = this.d20(true, dis, true); total = retry.nat + bonus + blessDie; ok = total >= dc; await this.P.rollD20({ who: 'hero', label: 'Contraencanto', rolls: retry.rolls, nat: retry.nat, bonus: bonus + blessDie, total, dc, adv: retry.mode === 'adv', dis: retry.mode === 'dis', outcome: ok ? 'success' : 'fail', kind: 'save' }); }
+      }
       // Presságio (Adivinho): troca o d20 por um número visto no início do combate
       if (!ok && hc.portent.length) {
         const hi = Math.max(...hc.portent);
@@ -348,7 +362,7 @@
       if (tc.adormecido) adv.push('alvo Incapacitado');
       if (tc.cego) adv.push('alvo Cego');
       if (tc.iluminado) adv.push('Raio Guia');
-      if (tc.iluminado_conc) adv.push('Fogo das Fadas');
+      if (tc.iluminado_conc) adv.push(tc.iluminado_conc.name || 'Fogo das Fadas');
       if (tc.atormentado) adv.push('Atormentar');
       if (hc.hidden) adv.push('escondido');
       if (hc.reckless && !isSpell && !prof.ranged && prof.ability === 'for' && !hc.brutalNext) adv.push('Ataque Descuidado');
@@ -365,6 +379,7 @@
         if (w && w.def.passive && (w.def.passive.kind === 'firstAdv' || w.def.passive.adv)) adv.push(w.def.passive.name);
       }
       if (this.useLuck) adv.push('Sorte');
+      if (hc.cond.caido) dis.push('Caído');
       if (hc.cond.envenenado) dis.push('Envenenado');
       if (hc.cond.amedrontado) dis.push('Amedrontado');
       if (hc.cond.contido) dis.push('Contido');
@@ -373,7 +388,6 @@
         const need = prof.ranged ? C.score(h, 'des') : C.score(h, 'for');
         if (need < 13) dis.push('arma Pesada (atributo < 13)');
       }
-      if (h.species === 'pequenino' || h.species === 'gnomo') { if (!isSpell && prof.heavy && !dis.includes('arma Pesada (atributo < 13)')) dis.push('arma Pesada para criatura Pequena'); }
       return { adv, dis };
     }
 
@@ -403,13 +417,15 @@
       let prof = C.attackProfile(h, { unarmed: opts.unarmed });
       if (opts.override) prof = Object.assign({}, prof, { dice: opts.override.dice, type: opts.override.type || prof.type, name: opts.override.name || prof.name, mastery: null });
       // Bordão Místico e Golpe Certeiro usam o atributo de conjuração
+      if (opts.trueStrike && (prof.base === 'desarmado' || !C.proficientWith(h, prof.base))) { this.say('Golpe Certeiro exige uma arma com a qual você tenha proficiência.', 'bad'); return; }
       const shill = hc.sb.shillelagh && ['bordao', 'clava'].includes(prof.base);
       if (shill || opts.castAb) {
-        const cm = C.mod(h, C.castAb(h));
-        if (cm > prof.abMod) prof = Object.assign({}, prof, { toHit: prof.toHit - prof.abMod + cm + (prof.proficient ? 0 : C.pb(h)), dmgMod: prof.dmgMod - prof.abMod + cm, abMod: cm });
-        if (shill) prof = Object.assign({}, prof, { dice: h.level >= 5 ? '1d10' : '1d8', name: prof.name + ' (Bordão Místico)' });
+        const castAb = !opts.trueStrike && hc.shillelaghAb ? hc.shillelaghAb : C.castAb(h, opts.trueStrike ? S.SPELLS.golpe_certeiro : S.SPELLS.bordao_mistico, opts.spellSource);
+        const cm = C.mod(h, castAb);
+        if (opts.trueStrike || cm > prof.abMod) prof = Object.assign({}, prof, { toHit: prof.toHit - prof.abMod + cm, dmgMod: prof.dmgMod - prof.abMod + cm, abMod: cm, ability: castAb });
+        if (shill) prof = Object.assign({}, prof, { dice: h.level >= 17 ? '2d6' : h.level >= 11 ? '1d12' : h.level >= 5 ? '1d10' : '1d8', name: prof.name + ' (Bordão Místico)' });
       }
-      if (hc.sb.magicWeapon || hc.sb.elemWeapon) prof = Object.assign({}, prof, { toHit: prof.toHit + 1 });
+      if (hc.sb.magicWeapon || hc.sb.elemWeapon) prof = Object.assign({}, prof, { toHit: prof.toHit + (hc.sb.magicWeapon ? hc.magicWeaponBonus || 1 : 1) });
       if (opts.reckless && C.has(h, 'ataque_descuidado') && !t.attacked) hc.reckless = true;
       const { adv, dis } = this.heroAttackMods(target, prof, false);
       if (opts.sig && opts.sig.adv) adv.push(opts.sig.name);
@@ -435,7 +451,7 @@
       delete hc.sb.advNext; delete hc.sb.advD20;
       if (target.cond.iluminado) delete target.cond.iluminado;
       if (target.cond.atormentado) delete target.cond.atormentado;
-      await this.P.rollD20({ who: 'hero', label: `${prof.name} → ${target.name}`, rolls: r.rolls, nat: r.nat, bonus: bonus + blessDie, total, ac, adv: r.mode === 'adv', dis: r.mode === 'dis', advWhy: adv, disWhy: dis, outcome: crit && hit ? 'crit' : hit ? 'hit' : 'miss', kind: 'attack' });
+      await this.P.rollD20({ who: 'hero', label: `${prof.name} → ${target.name}`, rolls: r.rolls, nat: r.nat, bonus: bonus + blessDie, breakdown: { ability: prof.abMod, proficiency: prof.proficient ? C.pb(h) : 0, other: bonus - prof.abMod - (prof.proficient ? C.pb(h) : 0), bless: blessDie }, total, ac, adv: r.mode === 'adv', dis: r.mode === 'dis', advWhy: adv, disWhy: dis, outcome: crit && hit ? 'crit' : hit ? 'hit' : 'miss', kind: 'attack' });
       // Inspiração Heroica: rolar de novo após errar
       if (!hit && h.heroic) {
         const ch = await this.P.ask({ title: 'Inspiração Heroica', text: `Você errou (${total} vs CA ${ac}). Gastar sua Inspiração Heroica para rolar o d20 de novo?`, options: [{ id: 'yes', label: 'Rolar de novo ✦' }, { id: 'no', label: 'Aceitar' }] });
@@ -495,14 +511,16 @@
       }
       let mod = cleave || (ctx.offhand && !C.hasFx(h, 'twf')) ? Math.min(0, prof.dmgMod) : prof.dmgMod;
       if (hc.raging && prof.ability === 'for' && !prof.ranged) mod += C.rageDamage(h);
-      if (hc.sb.magicWeapon) mod += 1;
+      if (hc.sb.magicWeapon) mod += hc.magicWeaponBonus || 1;
       const ua = prof.base === 'desarmado' || (h.cls === 'monge' && C.isMonkWeapon(h, prof.base));
       let mainType = prof.type;
+      if (ctx.trueStrike) mainType = this.bestType(target, mainType, ['radiante']);
+      if (hc.sb.shillelagh && ['bordao', 'clava'].includes(prof.base)) mainType = this.bestType(target, mainType, ['energia']);
       if (hc.wild && C.hasFx(h, 'moonRadiant')) mainType = this.bestType(target, mainType, ['radiante']);
       if (ua && hc.sb.elem && C.hasFx(h, 'elemAttune')) mainType = this.bestType(target, mainType, ['acido', 'frio', 'fogo', 'eletrico', 'trovejante']);
       if (ua && C.hasFx(h, 'empoweredStrikes')) mainType = this.bestType(target, mainType, ['energia']);
       if (mainType !== prof.type) this.say(`Dano ${dmgName(mainType)} em vez de ${dmgName(prof.type)}.`, 'info');
-      parts.push({ amount: Math.max(1, main.total + mod), type: mainType, dice: main, label: prof.name, mod });
+      parts.push({ amount: Math.max(0, main.total + mod), type: mainType, dice: main, label: prof.name, mod });
       const extraRolls = [];
       const addExtra = (dice, type, label) => {
         const x = rollDice(dice, crit);
@@ -536,7 +554,7 @@
       if (hc.sb.shroud) addExtra('1d8', 'radiante', 'Mortalha Espiritual');
       if (hc.sb.elemWeapon) addExtra('1d4', 'fogo', 'Arma Elemental');
       if (hc.sb.enlarge) addExtra('1d4', prof.type, 'Aumentar');
-      if (ctx.trueStrike && h.level >= 5) addExtra(h.level >= 11 ? '2d6' : '1d6', 'radiante', 'Golpe Certeiro');
+      if (ctx.trueStrike && h.level >= 5) addExtra(h.level >= 17 ? '3d6' : h.level >= 11 ? '2d6' : '1d6', 'radiante', 'Golpe Certeiro');
       // talentos: Mestre de Armas Grandes, Perfurador
       if (prof.heavy && !cleave && C.hasFx(h, 'heavyPb') && !t.once.gwm) { parts.push({ amount: C.pb(h), type: prof.type, label: 'Mestre de Armas Grandes' }); t.once.gwm = true; }
       if (crit && prof.type === 'perfurante' && C.hasFx(h, 'piercer')) { const x = rollDice(`1d${U.parseDice(prof.dice).s}`); parts.push({ amount: x.total, type: prof.type, dice: x, label: 'Perfurador' }); }
@@ -591,22 +609,29 @@
       const tech = await this.hitTechnique(target, prof, unarmedLike);
       if (tech) { if (tech.dice) addExtra(tech.dice, tech.type || prof.type, tech.label); if (tech.after) target.pendingTech = tech.after; }
       // Golpe Divino (Paladino) — perguntar
-      if (!prof.ranged && this.turn.bonus > 0) {
-        const smites = this.smiteOptions();
+      if (!hc.raging && this.turn.bonus > 0) {
+        const smites = this.smiteOptions(prof);
         if (smites.length) {
           const ch = await this.P.ask({ title: 'Golpe Divino', text: `Você acertou ${target.name}! Gastar a Ação Bônus para canalizar um Golpe?`, options: smites.concat([{ id: 'no', label: 'Não usar' }]) });
-          if (ch && ch !== 'no') {
+          if (ch && ch !== 'no' && smites.some((o) => o.id === ch)) {
             const [spellId, lvlStr] = ch.split('@');
             const lvl = Number(lvlStr);
             const sp = S.SPELLS[spellId];
-            if (lvl === 0) C.spend(h, 'golpe_gratis'); else this.useSlot(lvl);
+            if (lvl === 0) C.spend(h, 'golpe_gratis'); else { this.useSlot(lvl); this.turn.once.slotSpell = true; }
+            if (sp.conc) this.startConc(spellId, lvl || sp.level);
             this.turn.bonus--;
             let dice = U.parseDice(sp.dmg);
-            let n = dice.n + (sp.up ? Math.max(0, (lvl || sp.level) - sp.level) : 0);
+            let n = dice.n + (sp.up ? Math.max(0, (lvl || sp.level) - sp.level) * U.parseDice(sp.up).n : 0);
             if (spellId === 'golpe_divino' && ['morto-vivo', 'corruptor'].includes(target.def.type)) n += 1;
-            addExtra(`${n}d${dice.s}`, sp.type, sp.name);
-            if (sp.cond && sp.condSave) target.pendingCond = { cond: sp.cond, save: sp.condSave, dc: C.spellDC(h, sp) };
-            else if (sp.cond) target.cond[sp.cond] = { src: 'hero' };
+            const scaledDice = `${n}d${dice.s}`, dc = C.spellDC(h, sp);
+            if (sp.smiteEffect === 'ensnaring') target.pendingEnsnaring = { dice: scaledDice, dc, name: sp.name };
+            else addExtra(scaledDice, sp.type, sp.name);
+            if (sp.smiteEffect === 'searing') {
+              target.smiteEffects = target.smiteEffects || [];
+              target.smiteEffects.push({ id: spellId, dice: scaledDice, dc, name: sp.name, type: sp.type, heroRounds: sp.durationRounds });
+            }
+            if (sp.cond && sp.condSave) target.pendingCond = { cond: sp.cond, save: sp.condSave, dc };
+            else if (sp.cond) target.cond[sp.cond] = { src: 'hero', conc: !!sp.conc, name: sp.name };
             if (sp.later) target.later = { dice: sp.later, type: sp.type, name: sp.name };
             if (C.hasFx(h, 'smiteTemp') && spellId === 'golpe_divino' && C.res(h, 'canalizar') > 0) {
               const gi = await this.P.ask({ title: 'Golpe Inspirador', text: 'Gastar Canalizar Divindade para ganhar 2d8 + nível PV temporários?', options: [{ id: 'yes', label: 'Inspirar (Canalizar Divindade)' }, { id: 'no', label: 'Não' }] });
@@ -624,6 +649,19 @@
       const total = parts.reduce((a, p) => a + p.amount, 0);
       await this.P.rollDamage({ who: 'hero', label: crit ? 'CRÍTICO! Dano dobrado' : 'Dano', parts, total, crit });
       const killed = await this.damageEnemy(target, parts, { crit, weapon: true });
+      if (target.pendingEnsnaring) {
+        const effect = target.pendingEnsnaring; delete target.pendingEnsnaring;
+        if (!killed) {
+          const large = ['Grande', 'Enorme', 'Imenso'].includes(target.def.size);
+          const ok = this.enemySave(target, 'for', effect.dc, true, { adv: large });
+          await this.showEnemySave(target, 'for', ok, effect.dc, effect.name);
+          if (ok.ok) this.endConc();
+          else if (!(target.def.condImm || []).includes('contido')) {
+            target.cond.contido = { src: 'hero', conc: true, spell: 'golpe_constritor', ...effect };
+            this.say(`${effect.name}: ${target.name} fica Contido; pode gastar sua ação para escapar com Atletismo.`, 'good');
+          }
+        }
+      }
       // efeitos de maestria
       if (!killed && prof.mastery) await this.applyMastery(prof, target, cleave);
       else if (killed && prof.mastery === 'trespassar' && !cleave && !t.once.cleave) await this.applyMastery(prof, target, cleave);
@@ -713,15 +751,15 @@
       return null;
     }
 
-    smiteOptions() {
+    smiteOptions(prof = {}) {
       const h = this.h, out = [];
       if (h.cls !== 'paladino' && h.cls !== 'patrulheiro') return out;
-      const known = C.knownSpells(h).filter((id) => S.SPELLS[id] && S.SPELLS[id].time === 'smite');
+      const known = C.knownSpells(h).filter((id) => S.SPELLS[id] && S.SPELLS[id].time === 'smite' && (!prof.ranged || S.SPELLS[id].rangedSmite) && (!S.SPELLS[id].weaponOnly || prof.base !== 'desarmado'));
       const slots = C.slotsLeft(h);
       for (const id of known) {
         const sp = S.SPELLS[id];
         if (id === 'golpe_divino' && C.res(h, 'golpe_gratis') > 0) out.push({ id: `${id}@0`, label: `${sp.name} (grátis)` });
-        slots.forEach((n, i) => { if (n > 0 && i + 1 >= sp.level) out.push({ id: `${id}@${i + 1}`, label: `${sp.name} · ${i + 1}º círculo` }); });
+        slots.forEach((n, i) => { if (!this.turn.once.slotSpell && n > 0 && i + 1 >= sp.level) out.push({ id: `${id}@${i + 1}`, label: `${sp.name} · ${i + 1}º círculo` }); });
       }
       return out.slice(0, 6);
     }
@@ -1186,6 +1224,7 @@
       const h = this.h, hc = this.hc, t = this.turn;
       let sp = S.SPELLS[spellId];
       if (hc.raging) return;
+      if (sp.weaponCast) { const wp = C.attackProfile(h); if (wp.base === 'desarmado' || !C.proficientWith(h, wp.base)) { this.say('Golpe Certeiro exige uma arma com a qual você tenha proficiência.', 'bad'); return; } }
       const mm = meta ? this.metamagicOptions(spellId).find((m) => m.id === meta) : null;
       const isBonus = sp.time === 'bonus' || (mm && mm.id === 'quickened');
       // Magia de Guerra (Cavaleiro Arcano, 2024): um truque pode substituir um dos ataques da ação Atacar
@@ -1201,7 +1240,7 @@
         if (slot === 'free') {
           if (spellId === 'marca_cacador') C.spend(h, 'marca_gratis'); else C.spend(h, 'mi_spell');
         } else if (slot > 0) { this.useSlot(slot); lvl = slot; t.once.slotSpell = true; }
-        if (sp.conc) this.startConc(spellId);
+        if (sp.conc) this.startConc(spellId, slot === 'free' ? sp.level : slot || sp.level);
         const target = this.enemy(targetUid) || this.alive()[0];
         if (mm) { C.spend(h, 'feiticaria', mm.cost); this.say(`Metamagia ${mm.label.split(' (')[0]}!`, 'spell'); }
         // Feitiços Psíquicos (Grande Antigo): dano de magia de Bruxo pode virar Psíquico
@@ -1211,7 +1250,7 @@
         // Grimório das Mãos Vazias
         const f = C.equipped(h, 'focus');
         if (f && f.def.passive && f.def.passive.spellTemp && lvl > 0) this.giveTemp(f.def.passive.spellTemp[f.refine - 1], f.def.passive.name);
-        this.castCtx = { sp, hiddenDis: !!hc.hidden && C.hasFx(h, 'hiddenSpellDis'), modDone: false, empowered: mm && mm.id === 'empowered', seeking: mm && mm.id === 'seeking', heightened: mm && mm.id === 'heightened' };
+        this.castCtx = { sp, source: slot === 'free' && h.mi && h.mi.spell === spellId && spellId !== 'marca_cacador' ? 'mi' : undefined, hiddenDis: !!hc.hidden && C.hasFx(h, 'hiddenSpellDis'), modDone: false, empowered: mm && mm.id === 'empowered', seeking: mm && mm.id === 'seeking', heightened: mm && mm.id === 'heightened' };
         await this.resolveSpell(sp, spellId, lvl, target);
         this.castCtx = null;
         // subclasses: Proteção Arcana (criada e recarregada por Abjurações); Surto de Magia Selvagem; Magia Sedutora
@@ -1250,7 +1289,7 @@
       const h = this.h, sp = S.SPELLS[spellId];
       if (!sp) return;
       const lvl = o.lvl || sp.level;
-      if (sp.conc && !o.noConc) this.startConc(spellId);
+      if (sp.conc && !o.noConc) this.startConc(spellId, lvl);
       const tgt = target && !target.dead ? target : this.alive()[0];
       this.say(`${h.name} conjura ${sp.name} sem gastar espaço${o.noConc && sp.conc ? ' (sem Concentração)' : ''}.`, 'spell');
       await this.P.anim({ actor: 'hero', target: tgt && tgt.uid, kind: sp.heal ? 'heal' : sp.buff ? 'buff' : 'spell', type: sp.type || 'energia', aoe: !!sp.aoe });
@@ -1302,8 +1341,10 @@
 
     async resolveSpell(sp, id, lvl, target) {
       const h = this.h, hc = this.hc, t = this.turn;
-      const dc = C.spellDC(h, sp) + (hc.innate > 0 ? 1 : 0);
-      const castMod = C.mod(h, C.castAb(h));
+      const spellSource = this.castCtx && this.castCtx.source;
+      const castAb = C.castAb(h, id, spellSource);
+      const dc = C.spellDC(h, id, spellSource) + (hc.innate > 0 ? 1 : 0);
+      const castMod = C.mod(h, castAb);
       const upN = (expr) => {
         const d = U.parseDice(expr);
         const up = sp.up ? U.parseDice(sp.up) : null;
@@ -1337,6 +1378,9 @@
       if (sp.mirror) { hc.mirror = sp.mirror; this.say(`${sp.mirror} duplicatas ilusórias surgem ao seu redor!`, 'good'); this.P.update(); return; }
       if (sp.sb) {
         hc.sb[sp.sb] = sp.conc ? 999 : sp.rounds || 10;
+        if (sp.sb === 'shillelagh') hc.shillelaghAb = castAb;
+        if (sp.sb === 'heroism') hc.heroismAb = castAb;
+        if (sp.sb === 'magicWeapon') hc.magicWeaponBonus = lvl >= 6 ? 3 : lvl >= 3 ? 2 : 1;
         if (sp.conc) hc.concSb = sp.sb;
         if (sp.sb === 'invis' || sp.sb === 'ginvis') hc.hidden = 99;
         if (sp.sb === 'heroism') { delete hc.cond.amedrontado; this.giveTemp(Math.max(1, castMod), sp.name); }
@@ -1345,7 +1389,7 @@
         this.P.update();
         return;
       }
-      if (sp.weaponCast) { if (target) await this.weaponAttack(target, { castAb: true, trueStrike: true }); return; }
+      if (sp.weaponCast) { if (target) await this.weaponAttack(target, { castAb: true, trueStrike: true, spellSource }); return; }
       if (sp.autoDmg) {
         const x = rollDice(upN(sp.dmg));
         const parts = [{ amount: x.total, type: sp.type, dice: x, label: sp.name }, ...this.spellExtraDamage(sp.type)];
@@ -1361,13 +1405,13 @@
         if (sp.buff === 'escudo_fe') { hc.shieldOfFaith = true; this.say('Escudo da Fé: +2 na CA.', 'good'); }
         if (sp.buff === 'marca' || sp.buff === 'maldicao') { hc.mark = { uid: target.uid, type: sp.type, name: sp.name }; this.say(`${sp.name} em ${target.name}: +1d6 de ${dmgName(sp.type)} em cada acerto.`, 'good'); }
         if (sp.buff === 'armadura_arcana') { h.buffs.armadura_arcana = true; this.say(`Armadura Arcana: CA ${C.ac(h)}.`, 'good'); }
-        if (sp.buff === 'auxilio') { h.buffs.auxilio = true; h.hp += 5; this.say('Auxílio: +5 PV máximos e atuais.', 'good'); }
+        if (sp.buff === 'auxilio') { const aid = C.applyAid(h, lvl); this.say(`Auxílio: +${aid.bonus} PV máximos (${aid.increase > 0 ? '+' + aid.increase : 'sem aumento adicional'} PV atuais).`, 'good'); }
         this.P.update();
         return;
       }
       if (sp.escape) { this.say('Você se teleporta para longe do combate!', 'good'); return this.finish('flee'); }
       // ---- invocação (Arma Espiritual)
-      if (sp.summon) { hc.weaponSpirit = { dice: upN(sp.dmg), type: sp.type }; }
+      if (sp.summon) { hc.weaponSpirit = { dice: upN(sp.dmg), type: sp.type, spell: id, ab: castAb }; }
       // ---- mísseis mágicos
       if (sp.auto) {
         const darts = sp.darts + (lvl - sp.level);
@@ -1390,12 +1434,12 @@
         for (let s = 0; s < shots; s++) {
           const tgt = spread ? (spread[s].dead ? null : spread[s]) : target.dead ? this.alive()[0] : target;
           if (!tgt) break;
-          const prof = { ranged: sp.attack === 'dist', ability: C.castAb(h) };
+          const prof = { ranged: sp.attack === 'dist', ability: castAb };
           const { adv, dis } = this.heroAttackMods(tgt, prof, true);
           const r = this.d20(adv.length > 0, dis.length > 0, true);
           if (this.useLuck) { C.spend(h, 'sorte'); this.useLuck = false; }
           const blessDie = hc.blessed ? U.die(4) : 0;
-          const bonus = C.spellAttack(h) + blessDie;
+          const bonus = C.spellAttack(h, id, spellSource) + blessDie;
           let total = r.nat + bonus;
           let crit = r.nat === 20 || ((tgt.cond.paralisado || tgt.cond.adormecido) && sp.attack === 'cac');
           let hit = r.nat !== 1 && (r.nat === 20 || total >= tgt.ac);
@@ -1409,10 +1453,14 @@
           if (hc.hidden && !hc.sb.ginvis) hc.hidden = 0;
           if (tgt.cond.iluminado) delete tgt.cond.iluminado;
           await this.P.rollD20({ who: 'hero', label: `${sp.name}${shots > 1 ? ` (${s + 1}/${shots})` : ''} → ${tgt.name}`, rolls: r.rolls, nat: r.nat, bonus, total, ac: tgt.ac, adv: r.mode === 'adv', dis: r.mode === 'dis', advWhy: adv, disWhy: dis, outcome: crit && hit ? 'crit' : hit ? 'hit' : 'miss', kind: 'attack' });
-          if (!hit) { this.P.float(tgt.uid, 'Errou', 'miss'); this.say(`${sp.name} erra ${tgt.name}.`, 'miss'); if (sp.burst && sp.burst.all) await this.spellBurst(sp, lvl, tgt, dc); continue; }
+          if (!hit) {
+            this.P.float(tgt.uid, 'Errou', 'miss'); this.say(`${sp.name} erra ${tgt.name}.`, 'miss');
+            if (sp.level === 0 && C.has(h, 'truque_potente')) { const missRoll = rollDice(C.cantripDice(h, sp)); const half = Math.floor(missRoll.total / 2); await this.P.rollDamage({ who: 'hero', label: `${sp.name} · Truque Potente`, parts: [{ amount: half, type: sp.type, dice: missRoll }], total: half }); if (await this.damageEnemy(tgt, [{ amount: half, type: sp.type }], { spell: true })) this.onKill(tgt); }
+            if (sp.burst && sp.burst.all) await this.spellBurst(sp, lvl, tgt, dc); continue;
+          }
           const dice = sp.level === 0 ? C.cantripDice(h, sp) : upN(sp.dmg);
           const x = this.empower(rollDice(dice, crit));
-          const parts = [{ amount: x.total, type: sp.type, dice: x, label: sp.name }];
+          const parts = [{ amount: x.total + (sp.summon === 'arma_espiritual' ? castMod : 0), type: sp.type, dice: x, label: sp.name }];
           if (id === 'rajada_mistica' && h.cls === 'bruxo' && h.level >= 2) parts.push({ amount: C.mod(h, 'car'), type: sp.type, label: 'Rajada Agonizante' });
           if (C.has(h, 'golpes_abencoados') && sp.level === 0 && !t.once.blessed) { const b = rollDice('1d8', crit); parts.push({ amount: b.total, type: 'radiante', dice: b, label: 'Golpes Abençoados' }); t.once.blessed = true; }
           if (hc.mark && hc.mark.uid === tgt.uid && id !== 'rajada_mistica') { /* marca só com ataques que acertam — magias também contam */ }
@@ -1454,6 +1502,7 @@
           await this.P.rollDamage({ who: 'hero', label: `${sp.name} · TR de ${R.AB[sp.save].name} CD ${dc}`, parts, total });
         }
         for (const e of targets) {
+          if (id === 'sono' && (e.def.noSleep || (e.def.condImm || []).includes('exaustao'))) { this.say(`${e.name} é imune ao sono desta magia.`, 'info'); continue; }
           const ok = this.enemySave(e, sp.save, dc, true);
           await this.showEnemySave(e, sp.save, ok, dc, sp.name);
           if (roll) {
@@ -1465,9 +1514,11 @@
             const cond = sp.cond === 'iluminado_conc' ? 'iluminado_conc' : sp.cond;
             if (e.def.condImm && e.def.condImm.includes(cond)) { this.say(`${e.name} é imune a ${R.CONDITIONS[cond]?.name || cond}.`, 'info'); continue; }
             if (cond === 'lentificado' && !e.cond.lentificado) e.ac -= 2;
-            e.cond[cond] = { src: 'hero', save: sp.save, dc, conc: !!sp.conc };
+            if (id === 'sono') e.cond.incapacitado = { src: 'hero', save: sp.save, dc, conc: true, sleepStage: 1 };
+            else e.cond[cond] = { src: 'hero', save: cond === 'enfeiticado' ? undefined : sp.save, dc, conc: !!sp.conc, heroRounds: !sp.conc ? sp.durationRounds : undefined };
+            if (id === 'sono') this.say(`${e.name}: Incapacitado; repetirá a resistência no fim do próximo turno.`, 'good');
             if (cond === 'banido') this.say(`${e.name} desaparece para outro plano!`, 'good');
-            else this.say(`${e.name}: ${R.CONDITIONS[cond]?.name || cond}!`, 'good');
+            else this.say(`${e.name}: ${R.CONDITIONS[id === 'sono' ? 'incapacitado' : cond]?.name || cond}!`, 'good');
           }
         }
         if (sp.dot) hc.dots = [{ id, lvl, targets: sp.aoe ? 'all' : target.uid }];
@@ -1490,7 +1541,7 @@
       this.busy = true;
       try {
         const r = this.d20(false, false, true);
-        const bonus = C.spellAttack(h);
+        const bonus = C.spellAttack(h, S.SPELLS[hc.weaponSpirit.spell || 'arma_espiritual']);
         const total = r.nat + bonus;
         const crit = r.nat === 20;
         const hit = r.nat !== 1 && (crit || total >= tgt.ac);
@@ -1498,7 +1549,7 @@
         await this.P.rollD20({ who: 'hero', label: `Arma Espiritual → ${tgt.name}`, rolls: r.rolls, nat: r.nat, bonus, total, ac: tgt.ac, outcome: crit && hit ? 'crit' : hit ? 'hit' : 'miss', kind: 'attack' });
         if (hit) {
           const x = rollDice(hc.weaponSpirit.dice, crit);
-          const parts = [{ amount: x.total + C.mod(h, C.castAb(h)), type: 'energia', dice: x, label: 'Arma Espiritual' }];
+          const parts = [{ amount: x.total + C.mod(h, hc.weaponSpirit.ab || C.castAb(h, S.SPELLS.arma_espiritual)), type: 'energia', dice: x, label: 'Arma Espiritual' }];
           await this.P.rollDamage({ who: 'hero', label: 'Arma Espiritual', parts, total: parts[0].amount, crit });
           if (await this.damageEnemy(tgt, parts, { spell: true })) this.onKill(tgt);
         } else this.P.float(tgt.uid, 'Errou', 'miss');
@@ -1544,16 +1595,19 @@
       delete e.cond[c];
     }
 
-    startConc(id) {
+    startConc(id, lvl = S.SPELLS[id].level) {
       if (this.hc.conc) this.endConc();
       this.hc.conc = id;
+      const sp = S.SPELLS[id];
+      this.hc.concRounds = sp.durationRounds || null;
+      if (id === 'maldicao') this.hc.concRounds = lvl >= 5 ? 14400 : lvl >= 3 ? 4800 : lvl === 2 ? 2400 : 600;
       this.say(`Concentrando em ${S.SPELLS[id].name}.`, 'sys');
     }
     endConc(silent) {
       const hc = this.hc;
       if (!hc.conc) return;
       const name = S.SPELLS[hc.conc].name;
-      hc.conc = null; hc.blessed = false; hc.shieldOfFaith = false; hc.mark = null; hc.weaponSpirit = false; hc.dots = [];
+      hc.conc = null; hc.concRounds = null; hc.blessed = false; hc.shieldOfFaith = false; hc.mark = null; hc.weaponSpirit = false; hc.dots = [];
       if (hc.concSb) { if ((hc.concSb === 'invis' || hc.concSb === 'ginvis') && hc.hidden === 99) hc.hidden = 0; delete hc.sb[hc.concSb]; hc.concSb = null; }
       for (const e of this.enemies) for (const [k, v] of Object.entries(e.cond)) if (v.conc) this.dropCond(e, k);
       if (!silent) this.say(`A concentração em ${name} se desfaz.`, 'bad');
@@ -1830,6 +1884,8 @@
       if (total <= 0) return false;
       e.hp -= total;
       delete e.cond.adormecido;
+      delete e.cond.enfeiticado;
+      if (e.cond.incapacitado && e.cond.incapacitado.sleepStage) delete e.cond.incapacitado;
       if (!opts.sear && e.cond.incapacitado && e.cond.incapacitado.turned) { delete e.cond.incapacitado; delete e.cond.amedrontado; }
       this.say(`${e.name} sofre ${total} de dano.`, 'dmg');
       await this.P.hit(e.uid, opts.crit);
@@ -2002,8 +2058,8 @@
     }
 
     // ------------------------------------------------------------ inimigos
-    enemySave(e, ab, dc, isSpell) {
-      let adv = false, dis = false;
+    enemySave(e, ab, dc, isSpell, opts = {}) {
+      let adv = !!opts.adv, dis = !!opts.dis;
       if (isSpell && e.def.traits && e.def.traits.some((t) => t[0] === 'resistencia_magica')) adv = true;
       if (isSpell && this.castCtx && this.castCtx.hiddenDis) dis = true;
       if (isSpell && e.cond.mistico) { dis = true; delete e.cond.mistico; }
@@ -2011,7 +2067,7 @@
       if (isSpell && this.castCtx && this.castCtx.sp && this.castCtx.sp.foeAdv) adv = true;
       if (ab === 'sab' && this.hc.mark && this.hc.mark.uid === e.uid && this.hc.mark.name === 'Maldição' && C.hasFx(this.h, 'eldritchHex')) dis = true;
       if (ab === 'des' && e.cond.contido) dis = true;
-      if (['for', 'des'].includes(ab) && (e.cond.paralisado || e.cond.atordoado)) return { ok: false, nat: 0, total: 0, auto: true };
+      if (['for', 'des'].includes(ab) && (e.cond.paralisado || e.cond.atordoado || e.cond.adormecido)) return { ok: false, nat: 0, total: 0, auto: true };
       const r = this.d20(adv, dis);
       let bonus = e.def.saves && e.def.saves[ab] !== undefined ? e.def.saves[ab] : U.mod(e.def.ab[ab]);
       if (e.cond.perdicao) bonus -= U.die(4);
@@ -2019,12 +2075,46 @@
       let ok = total >= dc;
       let legendary = false;
       if (!ok && e.lr > 0) { e.lr--; ok = true; legendary = true; }
-      return { ok, nat: r.nat, rolls: r.rolls, total, bonus, legendary };
+      return { ok, nat: r.nat, rolls: r.rolls, total, bonus, legendary, mode: r.mode };
     }
     async showEnemySave(e, ab, res, dc, label) {
       if (res.auto) { this.say(`${e.name} falha automaticamente no TR de ${R.AB[ab].name}.`, 'good'); return; }
-      await this.P.rollD20({ who: 'enemy', label: `${e.name}: TR de ${R.AB[ab].name} · ${label}`, rolls: res.rolls, nat: res.nat, bonus: res.bonus, total: res.total, dc, outcome: res.ok ? 'success' : 'fail', kind: 'esave', quick: true });
+      await this.P.rollD20({ who: 'enemy', label: `${e.name}: TR de ${R.AB[ab].name} · ${label}`, rolls: res.rolls, nat: res.nat, bonus: res.bonus, total: res.total, dc, adv: res.mode === 'adv', dis: res.mode === 'dis', outcome: res.ok ? 'success' : 'fail', kind: 'esave', quick: true });
       if (res.legendary) this.say(`${e.name} usa Resistência Lendária e transforma a falha em sucesso!`, 'boss');
+    }
+
+    // SRD 5.2.1 pp128,160: these effects trigger at the target's turn start.
+    async tickSmiteEffects(e) {
+      const searing = (e.smiteEffects || []).filter((effect) => effect.id === 'golpe_ardente' && effect.heroRounds > 0)
+        .reduce((best, effect) => !best || U.avgDice(effect.dice) > U.avgDice(best.dice) ? effect : best, null);
+      const ensnaring = e.cond.contido && e.cond.contido.spell === 'golpe_constritor' && this.hc.conc === 'golpe_constritor' ? e.cond.contido : null;
+      for (const effect of [searing, ensnaring].filter(Boolean)) {
+        const type = effect === ensnaring ? 'perfurante' : 'fogo';
+        const x = rollDice(effect.dice), parts = [{ amount: x.total, type, dice: x, label: effect.name }];
+        this.say(`${effect.name}: dano no início do turno de ${e.name}.`, 'spell');
+        await this.P.rollDamage({ who: 'hero', label: `${effect.name} (contínuo)`, parts, total: x.total });
+        if (await this.damageEnemy(e, parts, { spell: true })) { this.onKill(e); return true; }
+        if (effect === searing) {
+          const ok = this.enemySave(e, 'con', effect.dc, true);
+          await this.showEnemySave(e, 'con', ok, effect.dc, effect.name);
+          if (ok.ok) { e.smiteEffects = e.smiteEffects.filter((active) => active !== effect); this.say(`${e.name} apaga as chamas de ${effect.name}.`, 'info'); }
+        }
+      }
+      return false;
+    }
+
+    // Ensnaring Strike escape is an action and an Athletics check, never an end-turn save.
+    async enemyEscapeEnsnaring(e) {
+      const effect = e.cond.contido;
+      if (!effect || effect.spell !== 'golpe_constritor' || this.hc.conc !== 'golpe_constritor' || e.dead || INCAP.some((c) => e.cond[c])) return false;
+      const r = this.d20(false, !!(e.cond.envenenado || e.cond.amedrontado));
+      const listed = e.def.skills && e.def.skills.atletismo;
+      const bonus = typeof listed === 'number' ? listed : U.mod(e.def.ab.for);
+      const total = r.nat + bonus, ok = total >= effect.dc;
+      await this.P.rollD20({ who: 'enemy', label: `${e.name}: Atletismo · escapar de ${effect.name}`, rolls: r.rolls, nat: r.nat, bonus, total, dc: effect.dc, dis: r.mode === 'dis', outcome: ok ? 'success' : 'fail', kind: 'check', quick: true });
+      this.say(`${e.name} gasta sua ação para escapar das vinhas${ok ? ' e se liberta' : ', mas não consegue'}.`, 'info');
+      if (ok) this.endConc();
+      return true;
     }
 
     async enemyTurn(e) {
@@ -2033,10 +2123,13 @@
       this.turnFlags = {};
       this.P.activeEnemy(e.uid);
       e.acted = true;
+      e.turnCount = (e.turnCount || 0) + 1;
+      for (const [cond, cd] of Object.entries(hc.cond)) { if (cd.expiresAtStartOf === e.uid && e.turnCount >= cd.sourceTurn) delete hc.cond[cond]; }
       // início do turno
       if (e.cond.caido) { delete e.cond.caido; this.say(`${e.name} se levanta.`, 'sys'); }
       if (e.def.regen && !e.tookFireAcid && e.hp > 0 && e.hp < e.maxHp) { const amt = Math.min(e.def.regen, e.maxHp - e.hp); e.hp += amt; this.P.float(e.uid, '+' + amt, 'heal'); this.say(`${e.name} se regenera (${amt} PV).`, 'bad'); }
       e.tookFireAcid = false;
+      if (await this.tickSmiteEffects(e)) return;
       if (e.later) { const x = rollDice(e.later.dice); const l = e.later; delete e.later; this.say(`${l.name} continua corroendo ${e.name}.`, 'spell'); if (await this.damageEnemy(e, [{ amount: x.total, type: l.type }], {})) { this.onKill(e); return; } }
       if (e.def.special && !e.ready) { const rr = U.die(6); if (rr >= e.def.special.recharge) e.ready = true; }
       if (INCAP.some((c) => e.cond[c])) {
@@ -2045,13 +2138,18 @@
         await this.enemyEndSaves(e);
         return;
       }
+      if (await this.enemyEscapeEnsnaring(e)) { await this.enemyEndSaves(e); return; }
       // com aliados no grupo, o inimigo escolhe quem atacar
       const standing = this.allies.filter((a) => !a.down);
-      if (standing.length && (h.hp <= 0 || U.rand() < standing.length / (standing.length + 1))) {
+      const charmedByHero = e.cond.enfeiticado && e.cond.enfeiticado.src === 'hero';
+      if (charmedByHero && !standing.length) { this.say(`${e.name} está Enfeitiçado e não pode atacar você.`, 'info'); await this.enemyEndSaves(e); return; }
+      if (standing.length && (charmedByHero || h.hp <= 0 || U.rand() < standing.length / (standing.length + 1))) {
         const a = U.pick(standing);
         const melee2 = e.def.attacks.filter((x) => x.r !== 'dist');
-        const list2 = melee2.length ? melee2 : e.def.attacks;
-        for (let i = 0; i < (e.def.multi || 1) && !a.down && !this.over; i++) await this.enemyAttackAlly(e, list2[i % list2.length], a);
+        const named2 = e.def.multiattacks && e.def.multiattacks.map((name) => e.def.attacks.find((atk) => atk.n === name)).filter(Boolean);
+        const list2 = named2 && named2.length ? named2 : melee2.length ? melee2 : e.def.attacks;
+        const count2 = named2 && named2.length ? named2.length : e.def.multi || 1;
+        for (let i = 0; i < count2 && !a.down && !this.over; i++) await this.enemyAttackAlly(e, list2[i % list2.length], a);
         await this.enemyEndSaves(e);
         return;
       }
@@ -2063,6 +2161,16 @@
       }
       // ações de invocação do bloco de estatísticas (Ente, Aparição)
       if (await this.enemySummonAction(e)) { await this.enemyEndSaves(e); if (e.averse) e.averse--; return; }
+      // Rotina declarada do bloco: nomes de ataques e, opcionalmente, da ação especial.
+      if (e.def.multiattacks) {
+        for (const name of e.def.multiattacks) {
+          if (this.over || h.hp <= 0 || e.dead) break;
+          const atk = e.def.attacks.find((a) => a.n === name);
+          if (atk) await this.enemyAttack(e, atk);
+          else if (e.def.special && e.def.special.n === name && (!e.def.special.targetCond || hc.cond[e.def.special.targetCond]) && (!e.def.special.recharge || e.ready)) { if (e.def.special.recharge) e.ready = false; await this.enemySpecial(e); }
+        }
+        await this.enemyEndSaves(e); return;
+      }
       // habilidade especial
       if (e.def.special && e.ready && (e.def.boss || U.rand() < 0.65)) {
         e.ready = false;
@@ -2103,7 +2211,7 @@
       } else {
         const tgt = act && this.enemy(act.target) && !this.enemy(act.target).dead ? this.enemy(act.target) : this.alive()[0];
         if (!tgt) return;
-        const r = this.d20(a.advT > 0, false);
+        const r = this.d20(a.advT > 0 || !!tgt.cond.iluminado_conc, false);
         if (a.advT) a.advT = 0;
         const total = r.nat + a.toHit, crit = r.nat === 20, hit = r.nat !== 1 && (crit || total >= tgt.ac);
         await this.P.rollD20({ who: 'ally', label: `${a.name}: ${a.atkName}`, rolls: r.rolls, nat: r.nat, bonus: a.toHit, total, ac: tgt.ac, outcome: crit && hit ? 'crit' : hit ? 'hit' : 'miss', kind: 'attack', quick: true });
@@ -2139,10 +2247,18 @@
     }
 
     async enemyEndSaves(e) {
+      for (const [cond, cd] of Object.entries(this.hc.cond)) { if (cd.expiresAtEndOf === e.uid && (e.turnCount || 0) >= cd.sourceTurn) delete this.hc.cond[cond]; }
       for (const c of ['contido', 'paralisado', 'adormecido', 'amedrontado', 'cego', 'envenenado', 'incapacitado', 'lentificado']) {
         const cd = e.cond[c];
         if (!cd || !cd.save) continue;
+        if (cd.sleepStage === 2) continue;
         const res = this.enemySave(e, cd.save, cd.dc, true);
+        if (cd.sleepStage === 1) {
+          delete e.cond[c];
+          if (!res.ok) { e.cond.adormecido = { src: cd.src, conc: true, sleepStage: 2 }; this.say(`${e.name} adormece após a segunda falha.`, 'good'); }
+          else this.say(`${e.name} resiste ao sono.`, 'info');
+          continue;
+        }
         if (res.ok && !res.legendary) { this.dropCond(e, c); this.say(`${e.name} se livra: ${R.CONDITIONS[c].name}.`, 'info'); }
         else if (res.legendary) { this.dropCond(e, c); this.say(`${e.name} usa Resistência Lendária para se libertar!`, 'boss'); }
       }
@@ -2153,6 +2269,7 @@
       const hc = this.hc;
       const adv = [], dis = [];
       const melee = atk.r !== 'dist';
+      if (atk.firstRoundAdv && this.round === 1) adv.push('Ataque da primeira rodada');
       if (e.def.traits && e.def.traits.some((t) => t[0] === 'tatica_bando') && this.alive().filter((x) => !INCAP.some((c) => x.cond[c])).length >= 2) adv.push('Táticas de Bando');
       if (hc.cond.caido) (melee ? adv : dis).push('você está Caído');
       if (hc.cond.contido || hc.cond.paralisado || hc.cond.adormecido || (hc.cond.cego && !C.hasFx(this.h, 'blindFight'))) adv.push('você está vulnerável');
@@ -2203,7 +2320,7 @@
       let hit = r.nat !== 1 && (r.nat === 20 || total >= ac);
       if (hit && (hc.cond.paralisado || hc.cond.adormecido) && atk.r !== 'dist') crit = true;
       // Escudo Arcano (reação): +5 na CA se isso transformar o acerto em erro
-      if (hit && !crit && !this.reactionUsed && C.knownSpells(h).includes('escudo_arcano') && total < ac + 5 && C.slotsLeft(h).some((n) => n > 0) && h.hp > 0) {
+      if (hit && !crit && !hc.raging && !this.reactionUsed && C.knownSpells(h).includes('escudo_arcano') && total < ac + 5 && C.slotsLeft(h).some((n) => n > 0) && h.hp > 0) {
         const ch = await this.P.ask({ title: 'Escudo Arcano', text: `${e.name} acertaria (${total} vs CA ${ac}). Gastar um espaço de 1º círculo e sua reação para +5 na CA?`, options: [{ id: 'yes', label: 'Conjurar Escudo Arcano (+5 CA)' }, { id: 'no', label: 'Não' }] });
         if (ch === 'yes') {
           const lvl = C.slotsLeft(h).findIndex((n) => n > 0) + 1;
@@ -2302,6 +2419,10 @@
           if (fx.cond === 'caido' && h.species === 'golias' && !fx.save) resisted = false;
           if (!resisted) {
             hc.cond[fx.cond] = fx.cond === 'paralisado' ? { turns: 1, save: 'con', dc: fx.dc || 10 } : fx.cond === 'agarrado' ? { save: 'for', dc: 13 } : {};
+            if (fx.duration === 'untilStartOfSourceNextTurn') hc.cond[fx.cond] = { expiresAtStartOf: e.uid, sourceTurn: (e.turnCount || 0) + 1 };
+            if (fx.duration === 'untilEndOfSourceNextTurn') hc.cond[fx.cond] = { expiresAtEndOf: e.uid, sourceTurn: (e.turnCount || 0) + 1 };
+            if (fx.duration === 'untilEndOfTargetNextTurn') hc.cond[fx.cond] = { turns: 1, expireOnly: true };
+            if (INCAP.includes(fx.cond)) { if (hc.conc) this.endConc(); hc.raging = false; }
             this.say(`Você fica ${R.CONDITIONS[fx.cond].name}!`, 'bad');
           }
         }
@@ -2316,7 +2437,7 @@
       const sp = e.def.special, h = this.h;
       this.say(`${e.name} usa ${sp.n}!`, 'boss');
       await this.P.anim({ actor: e.uid, target: 'hero', kind: 'especial', type: sp.type || 'psiquico', name: sp.n });
-      const ok = await this.heroSave(sp.save, sp.dc, sp.n, { poison: sp.type === 'veneno', fear: sp.cond === 'amedrontado', charm: sp.cond === 'adormecido' });
+      const ok = await this.heroSave(sp.save, sp.dc, sp.n, { poison: sp.type === 'veneno', fear: sp.cond === 'amedrontado', charm: sp.cond === 'enfeiticado' });
       if (sp.dmg) {
         const x = rollDice(sp.dmg);
         let amt = ok ? (sp.half ? Math.floor(x.total / 2) : 0) : x.total;
@@ -2331,6 +2452,10 @@
       if (!ok && sp.cond && h.hp > 0 && this.heroImmune(sp.cond)) this.say(`Você é imune: ${R.CONDITIONS[sp.cond].name}.`, 'good');
       else if (!ok && sp.cond && h.hp > 0) {
         this.hc.cond[sp.cond] = { save: sp.save, dc: sp.dc };
+        if (sp.duration === 'untilStartOfSourceNextTurn') this.hc.cond[sp.cond] = { expiresAtStartOf: e.uid, sourceTurn: (e.turnCount || 0) + 1 };
+        if (sp.duration === 'untilEndOfSourceNextTurn') this.hc.cond[sp.cond] = { expiresAtEndOf: e.uid, sourceTurn: (e.turnCount || 0) + 1 };
+        if (sp.duration === 'untilEndOfTargetNextTurn') this.hc.cond[sp.cond] = { turns: 1, expireOnly: true };
+        if (INCAP.includes(sp.cond)) { if (this.hc.conc) this.endConc(); this.hc.raging = false; }
         this.say(`Você fica ${R.CONDITIONS[sp.cond].name}!`, 'bad');
       }
       this.P.update();

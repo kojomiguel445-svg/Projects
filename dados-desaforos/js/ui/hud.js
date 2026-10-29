@@ -4,7 +4,13 @@
   const HUD = {};
   let el, mm, mmx, near = [], lastMini = -Infinity, lastLabels = -Infinity, lastTracker = -Infinity;
   let labelsEl, onlineLabelsEl, trackerMarkup = null, lastWorld = null, refs = {}, hudVisible = true;
-  let miniVignette = null, miniViewCone = null, lastCoopMarkup = null, lastLife = -Infinity;
+  let miniVignette = null, miniViewCone = null, lastCoopMarkup = null, lastLife = -Infinity, lastWayfinding = -Infinity;
+  let xpHeroId = null, xpLevel = null, xpFeedbackTimer = 0;
+  const xpNumber = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 });
+  const cityLandmarks = [
+    { service: 'casino', label: 'CASSINO', icon: 'casino', color: '#dcb963' },
+    { service: 'arena', label: 'COLISEU', icon: 'shield', color: '#ce8372' },
+  ];
   const npcLabels = new Map(), onlineLabels = [], promptButtons = [];
   const writeText = (node, value) => { if (node._text !== value) { node.textContent = value; node._text = value; } };
   const writeHtml = (node, value) => { if (node._html !== value) { node.innerHTML = value; node._html = value; } };
@@ -13,15 +19,16 @@
   HUD.mount = () => {
     if (el) el.remove();
     refs = {}; near = []; promptButtons.length = 0; npcLabels.clear(); onlineLabels.length = 0;
-    lastMini = lastLabels = lastTracker = lastLife = -Infinity; lastWorld = null; hudVisible = true;
+    lastMini = lastLabels = lastTracker = lastLife = lastWayfinding = -Infinity; lastWorld = null; hudVisible = true;
     miniVignette = miniViewCone = null; lastCoopMarkup = null; stEl = null;
+    xpHeroId = xpLevel = null; clearTimeout(xpFeedbackTimer);
     el = U.h(`<div id="hud" class="layer noevents">
       <div class="labels"></div>
       <div class="hud-tl">
         <button class="paimon" data-a="menu" data-key="Esc" title="Menu do viajante" aria-label="Menu do viajante">${E.Icons ? E.Icons.html('compass', { decorative: true }) : UI.ICONS.menu}</button>
         <div class="minimap" title="Abrir mapa"><canvas width="256" height="256"></canvas><span class="compass">N</span></div>
         <div class="region-name"></div>
-        <div class="survival-hud"><span class="survival-time" aria-label="Calendário"></span><button class="survival-food" data-a="food" title="Comida e saciedade">${E.Icons ? E.Icons.html('cooking', { decorative: true }) : ''}<span></span><i><b></b></i></button></div>
+        <div class="survival-hud"><span class="survival-time" aria-label="Calendário"></span></div>
         <div class="tracker"></div>
       </div>
       <div class="hud-tr">
@@ -32,11 +39,12 @@
         <button class="icon-btn" data-a="map" data-key="M" title="Mapa">${UI.ICONS.map}</button>
       </div>
       <div class="coop-bar"></div>
+      <div class="landmark-wayfinding" role="group" aria-label="Destinos de Aurenna. As setas acompanham a câmera." hidden>${cityLandmarks.map((landmark) => `<div class="landmark-cue" data-landmark="${landmark.service}" style="--landmark-color:${landmark.color}">${E.Icons ? E.Icons.html(landmark.icon, { decorative: true }) : ''}<b>${landmark.label}</b><small></small><i class="landmark-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 21V4M5 11l7-7 7 7"/></svg></i></div>`).join('')}</div>
       <div class="party" aria-label="Personagens"></div>
       <div class="area-banner" aria-hidden="true"><b></b><small></small></div>
       <div class="uid"></div>
       <div class="prompts"></div>
-      <div class="hud-bottom"><div class="hp-name"><span class="lv"></span><span class="nm"></span><span class="hp-num"></span></div><div class="bar hpbar"><i class="hp"></i><i class="temp"></i></div><div class="bar xp"><i></i></div></div>
+      <div class="hud-bottom"><div class="hp-name"><span class="lv"></span><span class="nm"></span><span class="hp-num"></span></div><div class="bar hpbar"><i class="hp"></i><i class="temp"></i></div><button class="survival-food hunger-bar" data-a="food" title="Fome e alimentação">${E.Icons ? E.Icons.html('cooking', { decorative: true }) : ''}<i role="progressbar" aria-label="Saciedade" aria-valuemin="0" aria-valuemax="100"><b></b></i><span></span></button><div class="xp-hud"><div class="xp-meta"><span class="xp-caption"><span class="xp-level"></span>XP</span><span class="xp-feedback" role="status" aria-live="polite" aria-atomic="true"></span><span class="xp-total"></span></div><div class="bar xp" role="progressbar" aria-label="Experiência até o próximo nível" aria-valuemin="0" aria-valuemax="100"><i></i></div></div></div>
       <div class="ia-mark" aria-hidden="true"><i></i></div>
       <div class="joy" aria-hidden="true"><i></i></div>
       <div class="mobile-actions"><button class="icon-btn" data-a="jump" aria-label="Pular">${UI.ICONS.jump}</button><button class="icon-btn act" data-a="act" aria-label="Interagir">${UI.ICONS.hand}</button></div>
@@ -49,6 +57,9 @@
     onlineLabelsEl.style.cssText = 'position:absolute;inset:0;pointer-events:none';
     labelsEl.appendChild(onlineLabelsEl);
     for (const [key, selector] of Object.entries({ region: '.region-name', name: '.nm', level: '.lv', hpNum: '.hp-num', iaMark: '.ia-mark', hp: '.hp', temp: '.temp', hpbar: '.hpbar', xp: '.xp i', tracker: '.tracker', prompts: '.prompts', act: '[data-a=act]', sprint: '[data-a=sprint]', jump: '[data-a=jump]', lifeTime: '.survival-time', food: '[data-a=food]', foodLabel: '[data-a=food] > span', foodFill: '[data-a=food] b' })) refs[key] = el.querySelector(selector);
+    refs.wayfinding = el.querySelector('.landmark-wayfinding');
+    for (const [key, selector] of Object.entries({ xpHud: '.xp-hud', xpBar: '.bar.xp', xpLevel: '.xp-level', xpTotal: '.xp-total', xpFeedback: '.xp-feedback' })) refs[key] = el.querySelector(selector);
+    refs.landmarks = cityLandmarks.map((landmark) => { const node = refs.wayfinding.querySelector(`[data-landmark="${landmark.service}"]`); return { ...landmark, node, metric: node.querySelector('small'), arrow: node.querySelector('.landmark-arrow') }; });
     el.querySelector('.minimap').onclick = () => E.Wonders.regionMap();
     el.querySelector('.tracker').onclick = () => E.Journal.quests();
     el.querySelector('[data-a=wish]').onclick = () => E.Wish.open();
@@ -129,7 +140,52 @@
     if (html !== lastCoopMarkup) { bar.innerHTML = html; lastCoopMarkup = html; }
   };
   U.on('coop:changed', () => HUD.coop());
-  HUD.show = (v) => { hudVisible = !!v; if (el) el.classList.toggle('hidden', !v); if (v) lastMini = lastLabels = lastTracker = -Infinity; };
+  HUD.show = (v) => { hudVisible = !!v; if (el) el.classList.toggle('hidden', !v); syncInteriorXp(); if (v) lastMini = lastLabels = lastTracker = lastWayfinding = -Infinity; drawWayfinding(E.WG.world, performance.now(), true); };
+
+  // Reuse the hero's cumulative XP and the rules' existing level thresholds.
+  function syncXp(h, event) {
+    if (!refs.xpHud || !h) return;
+    const total = Number.isFinite(h.xp) ? Math.max(0, h.xp) : 0;
+    const next = C.xpForNext(h), prev = E.R.XP_TABLE[h.level] || 0;
+    const progress = next ? U.clamp((total - prev) / (next - prev) * 100, 0, 100) : 100;
+    const sameHero = xpHeroId === h.id, leveled = sameHero && xpLevel !== null && h.level > xpLevel;
+    if (!sameHero) clearXpFeedback();
+    xpHeroId = h.id; xpLevel = h.level;
+    writeText(refs.xpLevel, `Nv. ${h.level} · `);
+    writeText(refs.xpTotal, next ? `${xpNumber.format(total)} / ${xpNumber.format(next)}` : `${xpNumber.format(total)} · nível máximo`);
+    writeStyle(refs.xp, 'width', `${progress}%`);
+    refs.xpBar.setAttribute('aria-valuenow', String(Math.round(progress)));
+    const description = next ? `Nível ${h.level}. ${xpNumber.format(total)} XP de ${xpNumber.format(next)}. Faltam ${xpNumber.format(Math.max(0, next - total))} XP para o nível ${h.level + 1}.` : `Nível ${h.level}, nível máximo. ${xpNumber.format(total)} XP.`;
+    refs.xpBar.setAttribute('aria-valuetext', description); refs.xpHud.title = description;
+    if (!event || !(event.gained > 0)) return;
+    clearXpFeedback();
+    writeText(refs.xpFeedback, `+${xpNumber.format(event.gained)} XP${leveled ? ` · Nv. ${h.level}!` : ''}`);
+    if (!U.reducedMotion()) void refs.xpBar.offsetWidth;
+    refs.xpHud.classList.add('xp-gained');
+    if (leveled) refs.xpHud.classList.add('xp-level-up');
+    xpFeedbackTimer = setTimeout(clearXpFeedback, 2200);
+  }
+  function clearXpFeedback() {
+    clearTimeout(xpFeedbackTimer);
+    if (!refs.xpHud) return;
+    refs.xpHud.classList.remove('xp-gained', 'xp-level-up');
+    writeText(refs.xpFeedback, '');
+  }
+  // Interiors hide the exploration HUD. Only its existing XP widget may remain.
+  function syncInteriorXp() {
+    if (!el) return;
+    const inside = E.Interior && E.Interior.current;
+    const show = !!(!hudVisible && inside && E.WG.mode() === 'interior' && !inside.edit && !inside.sleeping && !inside.lockMove && !(UI.anyOpen && UI.anyOpen()) && !(E.WorldServices && E.WorldServices.active) && !document.querySelector('.modal-bg,#dialog,.wish-anim,.reveal,.summary,.death-roll'));
+    el.classList.toggle('xp-interior', show);
+  }
+  U.on('hero:xp', (event) => {
+    if (!el || !event) return;
+    const h = E.Store.hero();
+    if (!h || (event.id || event.hero && event.hero.id) !== h.id) return;
+    syncXp(h, event); HUD.update(); syncInteriorXp();
+  });
+  U.on('ui:screen', syncInteriorXp);
+  setInterval(() => { if (!hudVisible && el && !document.hidden) syncInteriorXp(); }, 250);
 
   // ---------- atualizações ----------
   HUD.update = () => {
@@ -137,6 +193,7 @@
     const h = E.Store.hero();
     if (!h) return;
     const w = E.WG.world;
+    drawWayfinding(w, performance.now(), true);
     writeText(refs.region, w ? w.reg.name : '');
     if (w && w.reg.name !== bannerRegion) { bannerRegion = w.reg.name; HUD.banner(w.reg.name, w.reg.weather || ''); }
     HUD.party();
@@ -150,8 +207,7 @@
     writeStyle(refs.hp, 'width', pct + '%');
     writeStyle(refs.temp, 'width', Math.min(100, (h.tempHp || 0) / max * 100) + '%');
     refs.hpbar.classList.toggle('low', pct < 30);
-    const next = C.xpForNext(h), prev = E.R.XP_TABLE[h.level];
-    writeStyle(refs.xp, 'width', next ? ((h.xp - prev) / (next - prev) * 100) + '%' : '100%');
+    syncXp(h);
     HUD.tracker();
     HUD.syncSim(true);
   };
@@ -162,9 +218,13 @@
     const h = E.Store.hero(); if (!h) return; const d = E.Sim.data(h), c = E.Sim.clock(), hr = E.WG.world && E.WG.world.hero;
     const hunger = U.clamp(Math.ceil(d.hunger || 0), 0, 100);
     writeText(refs.lifeTime, c.text || `Dia ${c.day} · ${String(Math.floor(c.hour)).padStart(2, '0')}:${String(c.minute || 0).padStart(2, '0')}`);
-    writeText(refs.foodLabel, `${hunger}%`); writeStyle(refs.foodFill, 'width', hunger + '%');
+    writeText(refs.foodLabel, `${hunger}%`); writeStyle(refs.foodFill, 'width', U.clamp(d.hunger || 0, 0, 100) + '%');
+    refs.food.classList.toggle('low', hunger <= 25); refs.food.classList.toggle('critical', hunger <= 10);
     refs.food.classList.toggle('empty', hunger <= 0); refs.food.setAttribute('aria-label', `Saciedade ${hunger}%. Abrir comida`);
-    const can = E.Sim.canSprint(h) && !(hr && (hr.boat || hr.exhaust || hr.st <= 0)); refs.sprint.disabled = !can; refs.sprint.classList.toggle('running', !!(hr && hr.sprinting));
+    refs.foodFill.parentElement.setAttribute('aria-valuenow', String(hunger));
+    const can = E.Sim.canSprint(h) && !(hr && (hr.boat || hr.exhaust || hr.st <= 0)); refs.sprint.disabled = !can; refs.sprint.classList.toggle('running', !!(hr && (hr.sprinting || hr.fastSwimming)));
+    const boostLabel = hr && hr.swim ? 'Nadar rápido' : 'Correr';
+    refs.sprint.setAttribute('aria-label', `${boostLabel} (segure)`); refs.sprint.title = `${boostLabel}: segure este botão ou Shift`;
     refs.sprint.setAttribute('aria-pressed', String(!!E.WG.input.sprint));
     const glide = hr && hr.jump > .15 && E.Sim.hasGlider(h); refs.jump.setAttribute('aria-label', glide ? 'Abrir planador' : 'Pular'); refs.jump.title = glide ? 'Abrir planador (um toque)' : 'Pular';
     refs.jump.disabled=!!(hr&&hr.boat);
@@ -203,8 +263,9 @@
   // ---------- minimapa ----------
   HUD.frame = () => {
     const w = E.WG.world;
-    if (!w || !el || !hudVisible || document.hidden || (UI.anyOpen && UI.anyOpen())) return;
     const now = performance.now();
+    drawWayfinding(w, now);
+    if (!w || !el || !hudVisible || document.hidden || (UI.anyOpen && UI.anyOpen())) return;
     if (lastWorld !== w) {
       for (const entry of npcLabels.values()) entry.node.remove();
       npcLabels.clear(); onlineLabelsEl.replaceChildren(); onlineLabels.length = 0;
@@ -216,6 +277,30 @@
     HUD.syncSim();
     if (now - lastLabels >= 1000 / 15) { lastLabels = now; drawLabels(w); drawStamina(w); drawMark(w); calm(w, now); }
   };
+  // Two passive bearings point at the actual walk-in entrances, even beyond the minimap.
+  function drawWayfinding(w, now, force = false) {
+    if (!refs.wayfinding) return;
+    const show = !!(hudVisible && w && w.id === 'aurenna' && w.reg.metro && !w.cave && w.hero && E.WG.mode() === 'world' && !(E.Interior && E.Interior.current) && !(UI.anyOpen && UI.anyOpen()));
+    if (!show) { refs.wayfinding.hidden = true; lastWayfinding = -Infinity; return; }
+    if (!force && lastWorld === w && now - lastWayfinding < 125) return;
+    lastWayfinding = now;
+    let visible = 0;
+    const compass = ['N', 'NE', 'L', 'SE', 'S', 'SO', 'O', 'NO'], yaw = w.cam ? w.cam.yaw : 0;
+    for (const cue of refs.landmarks) {
+      const target = (w.metroDoors || []).find((door) => door.service === cue.service && Number.isFinite(door.x) && Number.isFinite(door.z));
+      cue.node.hidden = !target;
+      if (!target) continue;
+      visible++;
+      const dx = target.x - w.hero.x, dz = target.z - w.hero.z, distance = Math.round(Math.hypot(dx, dz));
+      const bearing = Math.atan2(dx, -dz), direction = compass[(Math.round(bearing / (Math.PI / 4)) + 8) % 8];
+      const right = dx * Math.cos(yaw) - dz * Math.sin(yaw), forward = -dx * Math.sin(yaw) - dz * Math.cos(yaw);
+      writeText(cue.metric, `${distance <= 3 ? 'ENTRADA' : direction} · ${distance} m`);
+      writeStyle(cue.arrow, 'transform', `rotate(${Math.atan2(right, forward).toFixed(3)}rad)`);
+      cue.node.classList.toggle('at-entrance', distance <= 3);
+      cue.node.setAttribute('aria-label', `${cue.label}: entrada a ${distance} metros, ${direction}.`);
+    }
+    refs.wayfinding.hidden = visible === 0;
+  }
   // Parado e sem tocar em nada, os botões e o rastreador recuam; qualquer ação os traz de volta.
   let lastInput = performance.now();
   for (const type of ['pointerdown', 'keydown', 'wheel']) addEventListener(type, () => { lastInput = performance.now(); }, { passive: true, capture: true });
@@ -265,6 +350,8 @@
     scales: 'M12 4v15M8 19.5h8M5 7h14M5 7l-2.5 5a2.5 2.5 0 005 0zM19 7l-2.5 5a2.5 2.5 0 005 0z',
     pick: 'M4 9c4.5-4.5 11.5-4.5 16 0M13.5 7L7 20',
     search: 'M10.5 16a5.5 5.5 0 100-11 5.5 5.5 0 000 11zM15 15l5 5',
+    casino: 'M4 5h11v15H4zM9 3h11v14M9.5 9l3 3-3 3-3-3z',
+    shield: 'M12 3l8 3v6c0 4-4 7-8 9-4-2-8-5-8-9V6z',
   };
   const iconPaths = () => { if (!MI.ok) { for (const k in ICON) MI[k] = mpath(ICON[k]); MI.ok = true; } return MI; };
   function drawMini(w) {
@@ -316,12 +403,14 @@
     for (const c of w.chests) badge(c.x, c.z, c.tier === 'luxuoso' ? '#e0a020' : c.tier === 'precioso' ? '#9a5ad0' : c.tier === 'requintado' ? '#4a7ad0' : '#a87a3a', 'chest', 7);
     for (const c of w.camps) if (!c.dead) badge(c.x, c.z, c.diff === 'alta' ? '#8a3ad0' : '#d0443a', c.diff === 'alta' ? 'skull' : 'camp', c.diff === 'alta' ? 8 : 7);
     if (w.tradePos) badge(w.tradePos.x, w.tradePos.z, '#b8862a', 'scales', 7);
-    for (const d2 of w.metroDoors || []) badge(d2.x, d2.z, '#c8902a', 'door', 8);
+    for (const d2 of w.metroDoors || []) if (w.id !== 'aurenna' || !cityLandmarks.some((landmark) => landmark.service === d2.service)) badge(d2.x, d2.z, '#c8902a', 'door', 8);
     for (const n of w.npcs) badge(n.x, n.z, n.marker.visible ? '#e0a020' : '#5a6a88', n.marker.visible ? 'quest' : 'npc', n.marker.visible ? 8.5 : 7);
     if (w.landmark) badge(w.landmark.x, w.landmark.z, (E.state.world.landmarks || {})[w.id] ? '#6a7488' : '#c8902a', 'eye', 8, { clamp: true });
     if (w.lairBoss) badge(w.lairPos.x, w.lairPos.z, '#c81e3a', 'skull', 9.5, { clamp: true, pulse: true });
     for (const l of w.lumes || []) if (!l.taken) pip(l.x, l.z, l.high ? '#ffd36b' : '#fff6c8', 2.6);
     if (w.extra && w.extra.cave && w.reg.caveId) badge(w.extra.cave.x, w.extra.cave.z, '#7a5a3a', 'pick', 8.5, { clamp: true });
+    if (w.extra && w.extra.dragonCave) badge(w.extra.dragonCave.x, w.extra.dragonCave.z, '#b74732', 'skull', 8.5, { clamp: true });
+    if (w.reg.dragonLair && w.reg.threshold) badge(w.reg.threshold.x, w.reg.threshold.z, '#b74732', 'skull', 9.5, { clamp: true });
     if (w.extra && w.extra.altar) badge(w.extra.altar.x, w.extra.altar.z, '#d4a020', 'star', 7.5);
     if (w.extra && w.extra.domain) badge(w.extra.domain.x, w.extra.domain.z, '#8a4ad0', 'gate', 8, { clamp: true });
     // v4.5: correntes de vento, Lumes-Guia e Santuários das Tochas
@@ -338,6 +427,7 @@
     else badge(w.waypoint.x, w.waypoint.z - 1.2, '#6a8aa8', 'door', 8.5, { clamp: true });
     if (w.questSpot) badge(w.questSpot.x, w.questSpot.z, '#2aa8c8', 'search', 9, { clamp: true, pulse: true });
     if (w.objective) badge(w.objective.x, w.objective.z, '#e8a820', 'star', 10, { clamp: true, pulse: true });
+    if (w.id === 'aurenna' && w.reg.metro && !w.cave) for (const landmark of cityLandmarks) { const target = (w.metroDoors || []).find((door) => door.service === landmark.service); if (target) badge(target.x, target.z, landmark.color, landmark.icon, 9, { clamp: true }); }
     // cone de visão + herói
     x.save();
     x.rotate(-w.cam.yaw + Math.PI);

@@ -8,7 +8,7 @@
     {id:'cassino',service:'casino',name:'Fortuna Dourada',icon:'casino',x:-23,z:-25,w:13,d:9,h:3.5,rotation:0,color:'#e3d6bd',roofC:'#8e445a',accent:'#d1ac61',style:'casino'},
     {id:'bolsa',service:'market',name:'Galeria dos Mercadores',icon:'scales',x:-6,z:-27,w:13,d:8,h:3.6,rotation:0,color:'#eadfc9',roofC:'#5f8580',accent:'#c6a46a',style:'loggia'},
     {id:'guilda',service:'guild',name:'Casa dos Ofícios',icon:'journal',x:11,z:-26,w:11,d:9,h:3.5,rotation:0,color:'#ddd7c9',roofC:'#546f8d',accent:'#c6ac74',style:'guild'},
-    {id:'arena',service:'arena',name:'Pátio dos Gladiadores',icon:'shield',x:29,z:-24,w:14,d:12,h:3.1,rotation:0,color:'#d6c3a1',roofC:'#a35f51',accent:'#b99865',style:'arena'},
+    {id:'arena',service:'arena',name:'Coliseu de Aurenna',icon:'shield',x:29,z:-24,w:14,d:12,h:3.1,rotation:0,color:'#d6c3a1',roofC:'#a35f51',accent:'#b99865',style:'arena'},
     {id:'forja',service:'smith',name:'Oficina da Bigorna Celeste',icon:'anvil',x:-27,z:-7,w:10,d:8,h:3.3,rotation:Math.PI/2,color:'#c8c1ad',roofC:'#627779',accent:'#b79b65',style:'smith'},
     {id:'taverna',service:'food',name:'Caneco Dourado',icon:'cooking',x:-27,z:9,w:12,d:8,h:3.2,rotation:Math.PI/2,color:'#e4d3b6',roofC:'#ad7458',accent:'#d1b17a',style:'tavern'},
     {id:'emporio',service:'general',name:'Empório dos Viajantes',icon:'shop',x:25,z:-6,w:10,d:8,h:3.25,rotation:-Math.PI/2,color:'#e8dfc7',roofC:'#548b80',accent:'#c3a669',style:'general'},
@@ -206,8 +206,22 @@
       for(const x of[-v.w/2+.7,v.w/2-.7])cyl(w,g,'#e9e0cc',x,1.82,hd,.23,3.64,8);
       box(w,g,'#d0c2a3',0,3.85,-hd+.5,v.w+.5,.28,1.0);
     }else if(v.service==='arena'){
+      // A supported arena gateway replaces only this venue's awning; the city footprint stays intact.
+      if(v.awning)v.awning.visible=false;
       for(let k=0;k<3;k++){const width=v.w-1.8+k*.15,z=-hd+.48+k*.50;box(w,g,'#c4b08d',0,.35+k*.42,z,width,.65,.52);}
-      for(const side of[-1,1]){const banner=box(w,g,'#a75c4d',side*(v.w/2-.5),2.2,-hd+.24,.8,2.4,.06);box(w,g,'#d4b87e',side*(v.w/2-.5),3.48,-hd+.25,1.0,.10,.12);}
+      for(const side of[-1,1]){
+        const px=side*3.0;box(w,g,'#ad9576',px,2.5,hd+.12,.78,5,1.05);box(w,g,'#d7c6a3',px,4.95,hd+.12,1.08,.28,1.28);
+        const pt=E.Shopfronts.point(v,px,hd+.12);w.colliders.push({...pt,r:.49,city:true,venue:v.id});
+        box(w,g,'#a75c4d',side*5.0,3.35,hd+.17,1.15,2.8,.08);box(w,g,'#d4b87e',side*5.0,4.82,hd+.25,1.45,.16,.19);
+        cyl(w,g,'#bba276',side*5.0,3.2,hd,.07,3.5,6);
+      }
+      box(w,g,'#d2bd95',0,5.1,hd+.12,7.25,.5,1.18);box(w,g,'#a58a65',0,5.48,hd+.12,7.7,.22,1.32);
+      const arch=new THREE.Mesh(new THREE.TorusGeometry(2.52,.21,5,18,Math.PI),material(w,'#c8b18b'));arch.position.set(0,2.7,hd+.69);g.add(arch);
+      // Hinged gates animate open when the visitor enters the Coliseum.
+      w.coliseumGate={panels:[],open:0,target:0};
+      for(const side of[-1,1]){const gate=new THREE.Group();gate.userData.noStaticBatch=true;gate.userData.side=side;gate.position.set(side*2.5,0,hd+.26);g.add(gate);for(let k=0;k<7;k++)box(w,gate,'#655c4c',-side*(k*.35+.1),1.34,0,.075,2.56,.075);for(const yy of[.35,1.35,2.48])box(w,gate,'#8b7958',-side*1.18,yy,0,2.46,.11,.12);w.coliseumGate.panels.push(gate);}
+      for(let x=-2.1;x<=2.11;x+=.6){const pt=E.Shopfronts.point(v,x,hd+.26);w.colliders.push({...pt,r:.41,city:true,venue:v.id,arenaGateBarrier:true});}
+      if(v.signMesh){v.signMesh.position.set(0,5.12,hd+.78);v.signMesh.scale.set(1.35,.92,1);}
     }else if(v.service==='alchemy'){
       for(const x of[-2.2,2.2]){const orb=new THREE.Mesh(new THREE.OctahedronGeometry(.40,0),material(w,x<0?'#9badb6':'#bf9eaa'));orb.position.set(x,3.75,-hd+.4);g.add(orb);}
     }
@@ -275,6 +289,7 @@
     if(E.ScenePerf)w.metroBatch=E.ScenePerf.batch(city,{cellSize:34,exclude:[w.metroFountain,w.metroCoin,...(w.metroBoats||[]),...(w.metroJets?w.metroJets.jets.map(j=>j.m):[])]});
   };
   MT.update=(w,t,dt)=>{
+    if(w.coliseumGate){const g=w.coliseumGate;g.open=U.lerp(g.open,g.target,Math.min(1,(dt||0)*12));for(const p of g.panels)p.rotation.y=p.userData.side*g.open*1.15;}
     if(w.metroClock){const c=w.metroClock,clock=E.Sim?E.Sim.clock():{hour:8,minute:0},minute=clock.hour*60+clock.minute;if(c.last!==minute){c.last=minute;const face=new THREE.Matrix4(),rotate=new THREE.Matrix4(),shift=new THREE.Matrix4(),scale=new THREE.Matrix4(),matrix=new THREE.Matrix4();for(let side=0;side<4;side++){const a=side*Math.PI/2;face.makeRotationY(a);face.setPosition(c.x+Math.sin(a)*3.43,c.y,c.z+Math.cos(a)*3.43);for(let hand=0;hand<2;hand++){const length=hand?1.03:.72,angle=hand?clock.minute/60*TAU:(clock.hour%12+clock.minute/60)/12*TAU;rotate.makeRotationZ(-angle);shift.makeTranslation(0,length*.45,0);scale.makeScale(hand ? .045 : .07,length,.035);matrix.copy(face).multiply(rotate).multiply(shift).multiply(scale);c.hands.setMatrixAt(side*2+hand,matrix);}}c.hands.instanceMatrix.needsUpdate=true;}}
     if(w.metroBasin){w.metroBasin.material.uniforms.t.value=t;E.Water.setNight(w.metroBasin,w.cycle?w.cycle.lastNight?1:0:0);}
     if(w.metroJets){const {jets,fx,fy,fz}=w.metroJets;for(const j of jets){const k=(t*.75+j.ph)%1;j.m.position.set(fx+Math.cos(j.a)*k*2.4,fy+2.35+Math.sin(k*Math.PI)*.9-k*1.65,fz+Math.sin(j.a)*k*2.4);}}

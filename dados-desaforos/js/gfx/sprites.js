@@ -601,7 +601,7 @@
     return canvas;
   };
   SP.hero = (h, frame = 'idle0', weaponType) => {
-    const look = E.CH.normalize(h.look, h.cls, h.species);
+    const look = E.CH.normalize(h.look, h.cls, h.species, h.ancestry);
     const wi = SP.heroWeaponInfo(h);
     const wt = weaponType === undefined ? wi.type : weaponType;
     // Identity, both palette colors and base silhouette matter; equal rarity is not equal art.

@@ -4,6 +4,80 @@
   const SH = {};
   let tab = 'atributos';
 
+  const breakdown = (title, detail) => {
+    if (!detail || !detail.parts || !detail.parts.length) return '';
+    return `<details class="feat" style="margin-top:10px"><summary>${U.esc(title)}${detail.total === undefined ? '' : `: ${detail.total}`}</summary>${detail.formula ? `<p>${U.esc(detail.formula)}</p>` : ''}<div class="attr-list">${detail.parts.map((part) => `<div class="attr"><span>${U.esc(part.label)}${part.custom ? ' <small>· regra autoral</small>' : ''}${part.source ? `<small style="display:block">${U.esc(part.source)}</small>` : ''}</span><b>${typeof part.value === 'number' ? U.sign(part.value) : U.esc(String(part.value))}</b></div>`).join('')}</div></details>`;
+  };
+  SH.chooseMagicInitiateAbility = async (h) => {
+    const choices = C.magicInitiateAbilityChoices ? C.magicInitiateAbilityChoices(h) : [];
+    if (!choices.length) return false;
+    if (E.BattleUI.current) { UI.toast('Escolha o atributo do talento depois do combate.'); return false; }
+    const ability = await UI.choose({ title: 'Atributo de Iniciado em Magia', text: 'Escolha uma vez o atributo usado por todas as magias deste talento. As magias da sua classe mantêm o atributo da classe.', options: choices.map((id) => ({ id, label: `${R.AB[id].name} (${U.sign(C.mod(h, id))})` })).concat([{ id: 'later', label: 'Decidir depois' }]) });
+    if (!ability || ability === 'later') return false;
+    const result = C.chooseMagicInitiateAbility(h, ability);
+    if (!result.ok) { UI.toast(result.error); return false; }
+    E.Store.save();
+    if (E.HUD.update) E.HUD.update();
+    return true;
+  };
+  let resolvingChoices = null;
+  SH.resolveProgression = (h) => {
+    if (resolvingChoices) return resolvingChoices;
+    resolvingChoices = (async () => {
+      if (!C.progressionChoices || !C.applyProgressionChoice) return false;
+      if (E.BattleUI.current) { UI.toast('Escolha suas características depois do combate.'); return false; }
+      let changed = false;
+      if (C.reconcileOriginFeat && C.reconcileOriginFeat(h)) { changed = true; E.Store.save(); }
+      if (h.pendingOriginFeat && C.originFeatChoices) {
+        const removed = H.FEATS[h.pendingOriginFeat.removed];
+        const picked = await UI.choose({ title: 'Talento de Origem do Humano', text: `Uma versão anterior oferecia talentos Gerais nesta escolha de Origem. ${removed ? removed.name + ' foi retirado dessa escolha e ficou registrado para recuperação. ' : ''}Escolha seu talento de Origem; o antecedente foi preservado.`, options: C.originFeatChoices(h).map((id) => ({ id, label: H.FEATS[id].name })).concat([{ id: 'later', label: 'Decidir depois' }]) });
+        if (!picked || picked === 'later') return changed;
+        const result = C.chooseOriginFeat(h, picked);
+        if (!result.ok) { UI.toast(result.error); return changed; }
+        changed = true; E.Store.save();
+        if (E.HUD.update) E.HUD.update();
+      }
+      if (C.magicInitiateAbilityChoices && C.magicInitiateAbilityChoices(h).length) {
+        const selected = await SH.chooseMagicInitiateAbility(h);
+        if (!selected) return changed;
+        changed = true;
+      }
+      for (;;) {
+        const choice = C.progressionChoices(h)[0];
+        if (!choice) return changed;
+        if (!choice.count) {
+          UI.toast(choice.id.startsWith('skilled_') ? 'Não há mais perícias disponíveis. A escolha de ferramentas de Habilidoso continua pendente.' : 'Não há perícias elegíveis para esta escolha. O benefício continua pendente.');
+          return changed;
+        }
+        const selected = new Set();
+        const p = UI.modal({ title: choice.name, html: `<p>Escolha ${choice.count} ${choice.kind === 'expertise' ? 'perícia(s) com proficiência para receber Especialização' : 'perícia(s) para receber proficiência'}.</p><p class="lead" data-count></p><div class="checks"></div>`, cls: 'wide', buttons: [{ label: 'Decidir depois', value: false }, { label: 'Confirmar', value: true, cls: 'primary' }] });
+        const body = UI._modalBody, box = body.querySelector('.checks');
+        const confirm = body.parentElement.querySelector('.row .primary');
+        const draw = () => {
+          body.querySelector('[data-count]').textContent = `${selected.size} de ${choice.count} escolhida(s)`;
+          confirm.disabled = selected.size !== choice.count;
+          box.innerHTML = '';
+          for (const id of choice.options) {
+            const skill = R.SKILLS[id];
+            if (!skill) continue;
+            const active = selected.has(id);
+            const b = U.h(`<button class="check ${active ? 'on' : ''}" aria-pressed="${active}"><i>${active ? '✓' : ''}</i>${U.esc(skill.name)} (${R.AB[skill.ab].short})</button>`);
+            b.onclick = () => { if (active) selected.delete(id); else if (selected.size < choice.count) selected.add(id); draw(); };
+            box.appendChild(b);
+          }
+        };
+        draw();
+        if (!(await p)) return changed;
+        const result = C.applyProgressionChoice(h, choice.id, [...selected]);
+        if (!result || !result.ok) { UI.toast(result?.error || 'Não foi possível aplicar esta escolha.'); return changed; }
+        changed = true;
+        E.Store.save();
+        if (E.HUD.update) E.HUD.update();
+      }
+    })().finally(() => { resolvingChoices = null; });
+    return resolvingChoices;
+  };
+
   SH.open = (startTab) => {
     const h = E.Store.hero();
     if (!h) return;
@@ -52,10 +126,16 @@
         ${h.fightingStyle ? `<div class="attr"><span>Estilo de Luta</span><b>${C.styles(h).map((s) => H.FIGHTING_STYLES[s].name).join(' + ')}</b></div>` : ''}
         ${C.cls(h).masteryCount ? `<div class="attr"><span>Maestria em Armas (${C.cls(h).masteryCount})</span><b>${(h.masteries || []).map((b) => `${R.WEAPONS[b].name} (${R.MASTERY[R.WEAPONS[b].mastery].name})`).join(', ') || '—'}</b></div>` : ''}
       </div>
+      ${breakdown('Como a Classe de Armadura foi calculada', C.acBreakdown ? C.acBreakdown(h) : null)}
+      ${breakdown('Bônus de ataque com arma', prof.breakdown?.toHit)}
+      ${h.pendingOriginFeat || (C.magicInitiateAbilityChoices && C.magicInitiateAbilityChoices(h).length) || (C.progressionChoices && C.progressionChoices(h).length) ? '<div style="margin-top:14px"><button class="btn primary" data-a="rules"><span class="ico">✦</span>Escolher características pendentes</button></div>' : ''}
       ${h.pendingAsi ? '<div style="margin-top:14px"><button class="btn primary" data-a="asi"><span class="ico">✦</span>Aumento de Atributo ou Talento disponível!</button></div>' : ''}
       ${h.pendingStyle ? '<div style="margin-top:10px"><button class="btn primary" data-a="style"><span class="ico">⚔</span>Escolher Estilo de Luta</button></div>' : ''}
-      ${h.level >= H.SUB_LEVEL && !h.subChosen ? '<div style="margin-top:10px"><button class="btn primary" data-a="sub"><span class="ico">✦</span>Escolher sua Subclasse</button></div>' : ''}`;
+      ${h.level >= H.SUB_LEVEL && !h.subChosen ? '<div style="margin-top:10px"><button class="btn primary" data-a="sub"><span class="ico">✦</span>Escolher sua Subclasse</button></div>' : ''}
+      <p style="margin-top:16px"><a href="regras-fontes.html" target="_blank" rel="noopener">Regras e fontes: referência oficial e conteúdo de Elarion</a></p>`;
     const asi = body.querySelector('[data-a=asi]');
+    const rules = body.querySelector('[data-a=rules]');
+    if (rules) rules.onclick = async () => { await SH.resolveProgression(h); draw(); };
     if (asi) asi.onclick = async () => { await SH.asi(h); draw(); };
     const sty = body.querySelector('[data-a=style]');
     if (sty) sty.onclick = async () => { await SH.style(h); draw(); };
@@ -73,6 +153,10 @@
     }
     const prof = C.attackProfile(h);
     body.appendChild(U.h(`<div class="feat"><div class="fh"><span>Perfil de ataque</span></div><p>${U.esc(prof.name)}: ${U.sign(prof.toHit)} para acertar (${R.AB[prof.ability].name}${prof.proficient ? ' + proficiência' : ', <b>sem proficiência</b>'}), dano ${prof.dice}${prof.dmgMod ? U.sign(prof.dmgMod) : ''} ${R.DAMAGE[prof.type].name}. Crítico em ${prof.crit}–20.${prof.mastery ? ` Maestria: <b>${R.MASTERY[prof.mastery].name}</b> — ${R.MASTERY[prof.mastery].desc}` : C.cls(h).masteryCount ? ' A maestria desta arma fica ativa depois de um Descanso Longo.' : ''}</p></div>`));
+    for (const [title, detail] of [['Bônus de ataque', prof.breakdown?.toHit], ['Modificadores de dano', prof.breakdown?.damage]]) {
+      const html = breakdown(title, detail);
+      if (html) body.appendChild(U.h(html));
+    }
   }
 
   function caracteristicas(body, h, draw) {
@@ -84,7 +168,7 @@
     // subclasse
     const sb = C.sub(h) || (H.SUBCLASSES[h.cls] || {})[H.SUB_DEFAULT[h.cls]];
     if (sb) {
-      const box = U.h(`<div class="sub-card"><div class="sc-h"><span class="sc-i">${sb.icon}</span><div><b>${U.esc(sb.name)}</b><small>${h.level >= H.SUB_LEVEL ? 'Subclasse' : `Subclasse — escolhida no nível ${H.SUB_LEVEL}`}${sb.srd ? ' · SRD 5.2' : ''}</small></div></div><p class="sc-b">${U.esc(sb.blurb)}</p></div>`);
+      const box = U.h(`<div class="sub-card"><div class="sc-h"><span class="sc-i">${sb.icon}</span><div><b>${U.esc(sb.name)}</b><small>${h.level >= H.SUB_LEVEL ? 'Subclasse' : `Subclasse — escolhida no nível ${H.SUB_LEVEL}`} · ${sb.srd ? 'SRD 5.2.1 · resumo adaptado' : 'Livro do Jogador 2024 · referência não conferida'}</small></div></div><p class="sc-b">${U.esc(sb.blurb)}</p></div>`);
       for (const [lv, , n, d] of sb.features) box.appendChild(U.h(`<div class="feat" style="${h.level < lv ? 'opacity:.5' : ''}"><div class="fh"><span>${n}</span><small>Nível ${lv}</small></div><p>${d}</p></div>`));
       const pw = (sb.powers || []).filter((p) => h.level >= p.lvl);
       if (pw.length) box.appendChild(U.h(`<p class="sc-p">No combate: ${pw.map((p) => `<b>${p.icon} ${U.esc(p.name)}</b>`).join(' · ')}</p>`));
@@ -110,13 +194,16 @@
     if (!cls.caster) {
       const sc = C.caster(h);
       body.innerHTML = `${sc ? `<p class="lead">${U.esc(C.sub(h).name)}: conjura magias de Mago com <b>${R.AB[sc.ab].name}</b> · Ataque ${U.sign(C.spellAttack(h))} · CD ${C.spellDC(h)}. As magias da subclasse ficam sempre preparadas.</p>` : ''}${h.mi && h.mi.spell ? `<p class="lead">Iniciado em Magia: você conhece ${(h.mi.cantrips || []).map((s) => S.SPELLS[s].name).join(', ')} e pode conjurar ${S.SPELLS[h.mi.spell].name} uma vez por Descanso Longo.</p>` : ''}`;
-      const ids = [...granted].sort((a, b) => S.SPELLS[a].level - S.SPELLS[b].level);
+      spellOrigins(body, h, draw);
+      const ids = [...new Set([...granted, ...(h.mi ? [...(h.mi.cantrips || []), h.mi.spell] : [])])].filter((id) => S.SPELLS[id]).sort((a, b) => S.SPELLS[a].level - S.SPELLS[b].level);
       for (const id of ids) body.appendChild(spellRow(h, id, true, true, draw));
       return;
     }
     const pm = C.preparedMax(h), maxLv = C.maxSpellLevel(h), ck = S.cantripsKnown(h.cls, h.level);
     body.innerHTML = `<p class="lead">Atributo: <b>${R.AB[cls.caster.ab].name}</b> · Ataque ${U.sign(C.spellAttack(h))} · CD ${C.spellDC(h)}. Truques ${h.cantrips.length}/${ck} · Preparadas ${h.prepared.length}/${pm}. Toque para preparar/desmarcar (fora de combate).${granted.size ? ' Magias da subclasse ficam sempre preparadas e não contam no limite.' : ''}</p>`;
-    const list = [...new Set([...S.listFor(h.cls).filter((id) => S.SPELLS[id].level <= maxLv && S.SPELLS[id].time !== 'smite' || (id === 'golpe_cegante' && maxLv >= 3)), ...granted])];
+    spellOrigins(body, h, draw);
+    const featSpells = h.mi ? [...(h.mi.cantrips || []), h.mi.spell].filter((id) => S.SPELLS[id]) : [];
+    const list = [...new Set([...S.listFor(h.cls).filter((id) => S.SPELLS[id].level <= maxLv && S.SPELLS[id].time !== 'smite' || (id === 'golpe_cegante' && maxLv >= 3)), ...granted, ...featSpells])];
     list.sort((a, b) => S.SPELLS[a].level - S.SPELLS[b].level);
     let lastLv = -1;
     for (const id of list) {
@@ -125,17 +212,45 @@
       const arr = s.level === 0 ? h.cantrips : h.prepared;
       const max = s.level === 0 ? ck : pm;
       const always = (h.cls === 'paladino' && id === 'golpe_divino') || (h.cls === 'patrulheiro' && id === 'marca_cacador') || granted.has(id);
-      const on = always || arr.includes(id);
+      const classOn = arr.includes(id), featOwns = featSpells.includes(id);
+      const on = always || classOn || featOwns;
       const b = spellRow(h, id, on, always, draw);
       b.onclick = () => {
         if (always) return;
         if (E.BattleUI.current) return UI.toast('Não dá para trocar magias durante o combate.');
-        if (on) arr.splice(arr.indexOf(id), 1);
+        if (!S.listFor(h.cls).includes(id)) return;
+        if (classOn) arr.splice(arr.indexOf(id), 1);
         else if (arr.length < max) arr.push(id);
         else return UI.toast('Limite atingido — desmarque outra magia.');
         E.Store.save(); draw();
       };
       body.appendChild(b);
+    }
+  }
+
+  function spellOrigins(body, h, draw) {
+    if (!h.mi || !R.AB[h.mi.ab] || !C.spellSourceInfo) return;
+    body.appendChild(U.h(`<p class="lead">Iniciado em Magia usa <b>${R.AB[h.mi.ab].name}</b>. A magia de 1º círculo pode ser conjurada gratuitamente uma vez por Descanso Longo, usando esse atributo.</p>`));
+    if (C.magicInitiateAbilityChoices && C.magicInitiateAbilityChoices(h).length) {
+      const ability = U.h('<button class="btn sm dark" data-mi-ability>Escolher atributo do talento</button>');
+      ability.onclick = async () => { if (await SH.chooseMagicInitiateAbility(h)) draw(); };
+      body.appendChild(ability);
+    }
+    for (const id of [...new Set([...(h.mi.cantrips || []), h.mi.spell])]) {
+      if (!S.SPELLS[id]) continue;
+      const info = C.spellSourceInfo(h, id);
+      if (info.options.length < 2) continue;
+      const selected = info.origin === 'mi' ? 'Iniciado em Magia' : C.cls(h).name;
+      const button = U.h(`<button class="btn sm dark" style="display:block;max-width:100%;white-space:normal;text-align:left;line-height:1.4;margin:4px 0 10px" data-spell-source="${id}">${U.esc(S.SPELLS[id].name)}: ${U.esc(selected)} (${R.AB[info.ability].short}) · escolher origem</button>`);
+      button.onclick = async () => {
+        if (E.BattleUI.current) return UI.toast('Escolha a origem das magias depois do combate.');
+        const source = await UI.choose({ title: S.SPELLS[id].name, text: 'Qual característica você usa para conjurar esta magia? O uso gratuito de Iniciado em Magia sempre usa o atributo do talento.', options: info.options.map((value) => ({ id: value, label: `${value === 'mi' ? 'Iniciado em Magia' : C.cls(h).name} · ${R.AB[C.castAb(h, id, value)].name} · Ataque ${U.sign(C.spellAttack(h, id, value))} / CD ${C.spellDC(h, id, value)}` })).concat([{ id: 'cancel', label: 'Cancelar' }]) });
+        if (!source || source === 'cancel') return;
+        const result = C.setSpellSource(h, id, source);
+        if (!result.ok) return UI.toast(result.error);
+        E.Store.save(); draw();
+      };
+      body.appendChild(button);
     }
   }
 
@@ -170,12 +285,12 @@
 
   // Nível 4 e 8: Aumento de Valor de Atributo OU um talento (regra de 2024)
   SH.asi = async (h) => {
-    const ch = await UI.choose({ title: 'Aumento de Atributo ou Talento', text: 'No Livro do Jogador 2024 você escolhe: +2 em atributos ou um Talento (que também dá +1 num atributo).', options: [{ id: 'asi', label: 'Aumento de Valor de Atributo (+2 / +1 e +1)', icon: '⬆' }, { id: 'feat', label: 'Escolher um Talento', icon: '✦' }, { id: 'no', label: 'Decidir depois' }] });
+    const ch = await UI.choose({ title: 'Aumento de Atributo ou Talento', text: 'Escolha +2 em atributos ou um talento cujos pré-requisitos você cumpra. Talentos de Origem não aumentam atributos.', options: [{ id: 'asi', label: 'Aumento de Valor de Atributo (+2 / +1 e +1)', icon: '⬆' }, { id: 'feat', label: 'Escolher um Talento', icon: '✦' }, { id: 'no', label: 'Decidir depois' }] });
     if (ch === 'feat') { if (!(await SH.feat(h))) return SH.asi(h); return true; }
     if (ch === 'asi') return SH.asiScores(h);
     return false;
   };
-  SH.featOptions = (h) => Object.entries(H.FEATS).filter(([id, f]) => (f.general || H.FEATS_AT_ASI.includes(id)) && !(h.feats || []).includes(id));
+  SH.featOptions = (h) => Object.entries(H.FEATS).filter(([id, f]) => (f.general || H.FEATS_AT_ASI.includes(id)) && (f.repeatable || !(h.feats || []).includes(id)));
   SH.feat = async (h) => {
     const list = SH.featOptions(h).sort((a, b) => (b[1].general ? 1 : 0) - (a[1].general ? 1 : 0));
     let ch = null;
@@ -211,6 +326,7 @@
     h.pendingAsi--;
     E.Store.save();
     UI.toast(`✦ Talento: ${f.name}`, 'gold');
+    if (C.progressionChoices && C.progressionChoices(h).length) await SH.resolveProgression(h);
     return true;
   };
   SH.asiScores = async (h) => {
@@ -279,8 +395,10 @@
     E.Audio.sfx('levelup');
     UI.toast(`✦ ${sb.icon} ${sb.name}`, 'gold');
     if (E.HUD.update) E.HUD.update();
+    if (C.progressionChoices && C.progressionChoices(h).length) await SH.resolveProgression(h);
     return true;
   };
 
   E.Sheet = SH;
+  E.RuleChoices = { resolve: SH.resolveProgression };
 })();

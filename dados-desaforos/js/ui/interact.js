@@ -11,6 +11,7 @@
     if (CW && CW.guest && ((it.kind === 'chest' && CW.blocked('chest')) || (it.kind === 'story' && CW.blocked('story')) || (it.kind === 'qinvestigate' && CW.blocked('quest')))) return;
     busy = true;
     try {
+      if (E.DragonLairs && ['dragonCave','dragonChallenge'].includes(it.kind)) return await E.DragonLairs.run(it);
       if (it.kind === 'venue' && E.WorldServices) return E.WorldServices.use(it);
       if (it.kind === 'citizen' && E.Crowds) return E.Crowds.talk(it);
       if (it.kind === 'customer' && E.StallLife) return E.StallLife.use(it);
@@ -217,6 +218,7 @@
 
   // ---------- covil do chefe ----------
   IN.lair = async (it) => {
+    if (E.DragonLairs && E.DragonLairs.handles(it.key)) return E.DragonLairs.run({kind:'dragonCave',key:it.key,cave:'covil_ignarax'});
     const h = E.Store.hero(), def = E.M.MONSTERS[it.key];
     const danger = h.level < it.lvl;
     const esc = (def.escort || []).reduce((m, k) => { m[k] = (m[k] || 0) + 1; return m; }, {});

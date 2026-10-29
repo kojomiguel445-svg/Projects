@@ -72,6 +72,7 @@
     const h = E.Store.hero();
     const el = UI.screen('Inventário', { right: `<span class="chip gold">🪙 ${h.gold} po</span>` });
     const body = el.querySelector('.screen-body');
+    let baitOpen=false;
     const draw = () => {
       body.innerHTML = '<h3 style="font-family:var(--display)">Consumíveis</h3>';
       let any = false;
@@ -97,6 +98,21 @@
       if (!mats.length) body.appendChild(U.h('<p style="color:#5a6378">Colha ervas brilhantes pelo mundo.</p>'));
       for (const [m, n] of mats) body.appendChild(U.h(`<div class="shop-item"><div class="si">🌿</div><div class="sx"><b>${U.esc(m)} ×${n}</b><small>Material de região — usado em missões.</small></div></div>`));
       body.appendChild(U.h(`<h3 style="font-family:var(--display)">Equipamento</h3><div class="shop-item"><div class="si">🛡</div><div class="sx"><b>${R.ARMOR[h.equip.armor].name}${h.equip.shield ? ' + Escudo' : ''}</b><small>CA ${C.ac(h)}</small></div></div>`));
+      if(E.Life&&E.Life.rodBait){
+        const d=E.Life.data(h),rod=E.L.RODS[d.rod]||E.L.RODS[0],bait=E.Life.rodBait(h);
+        const row=U.h(`<div class="shop-item"><div class="si">${E.Icons?E.Icons.html('fishing',{decorative:true}):'◆'}</div><div class="sx"><b>${U.esc(rod.name)}</b><small>Espaço de isca: ${bait?`${U.esc(bait.name)} ×${d[bait.key]||0}`:'vazio'}</small></div><button class="btn sm dark" data-rod-bait aria-expanded="${baitOpen}">Selecionar vara</button></div>`);
+        row.querySelector('button').onclick=()=>{baitOpen=!baitOpen;draw();};body.appendChild(row);
+        if(baitOpen){
+          const slot=U.h('<div class="detail rod-bait-slot"><h4>Espaço de isca</h4><p class="muted">Cada lançamento usa uma unidade. Pescar sem isca continua possível; a isca de corrente profunda funciona somente no mar.</p></div>');
+          for(const b of E.Life.baitTypes()){
+            const n=d[b.key]||0,selected=bait&&bait.key===b.key;
+            const item=U.h(`<div class="shop-item"><div class="sx"><b>${U.esc(b.name)} ×${n}</b><small>${U.esc(b.desc||'')}${selected?' · Equipada':''}</small></div><button class="btn sm ${selected?'dark':'primary'}" data-bait-key="${b.key}" ${!n||selected?'disabled':''}>${selected?'Equipada':'Equipar'}</button></div>`);
+            item.querySelector('button').onclick=()=>{const out=E.Life.equipRodBait(h,b.key);UI.toast(out.message);draw();};slot.appendChild(item);
+          }
+          const remove=U.h(`<button class="btn sm dark" data-remove-bait ${bait?'':'disabled'}>Remover isca</button>`);remove.onclick=()=>{const out=E.Life.equipRodBait(h,null);UI.toast(out.message);draw();};slot.appendChild(remove);body.appendChild(slot);
+        }
+      }
+
     };
     draw();
     UI.open(el);
@@ -104,7 +120,7 @@
 
   // ---------------- Bestiário ----------------
   J.bestiary = () => {
-    const el = UI.screen('Bestiário · Manual dos Monstros');
+    const el = UI.screen('Bestiário · SRD 5.2.1 e Elarion');
     const body = el.querySelector('.screen-body');
     const seen = E.state.bestiary || {};
     let sel = Object.keys(seen)[0] || null;
@@ -114,7 +130,7 @@
       const list = body.querySelector('.list');
       for (const k of all.sort((a, b) => M.MONSTERS[a].cr - M.MONSTERS[b].cr)) {
         const m = M.MONSTERS[k], known = !!seen[k];
-        const b = U.h(`<button class="li-item ${sel === k ? 'on' : ''}" style="${known ? '' : 'opacity:.55'}"><div class="lt">${known ? m.name : '???'}</div><div class="ls">ND ${R.crLabel(m.cr)} · ${M.TYPES[m.type]}${known ? ` · derrotados: ${seen[k]}` : ''}</div></button>`);
+        const b = U.h(`<button class="li-item ${sel === k ? 'on' : ''}" style="${known ? '' : 'opacity:.55'}"><div class="lt">${known ? m.title || m.name : '???'}</div><div class="ls">ND ${R.crLabel(m.cr)} · ${M.TYPES[m.type]}${known ? ` · derrotados: ${seen[k]}` : ''}</div></button>`);
         b.onclick = () => { sel = k; draw(); };
         list.appendChild(b);
       }
@@ -123,15 +139,21 @@
       const m = M.MONSTERS[sel], known = !!seen[sel];
       const hpAvg = U.avgDice(m.hp);
       const ab = (v) => `${v} (${U.sign(U.mod(v))})`;
-      sb.innerHTML = `<div class="statblock"><img class="mon-sprite" src="${E.SP.portrait(E.SP.monster(sel), 3)}" alt="" style="${known ? '' : 'filter:brightness(0)'}"><h3>${known ? m.name : '???'}</h3><div class="it">${M.TYPES[m.type]} ${m.size}</div><p style="font-style:italic">${m.desc}</p><hr>
+      const lairs = Object.values(E.WD.DRAGON_LAIRS || {}).filter((def) => def.dragonLair === sel);
+      const regions = Object.entries(M.BY_REGION).filter(([, pool]) => pool.includes(sel)).map(([id]) => E.WD.reg(id)).filter(Boolean).map((reg) => reg.name);
+      const habitat = M.isTrueDragon(sel) ? (lairs.length ? lairs.map((def) => def.name).join(', ') + ' · encontro específico e opcional' : 'Nenhum covil ativo; fora dos encontros comuns') : regions.join(', ') || 'Encontro específico';
+      const source = m.rulesSource;
+      const limitations = source ? [...(source.unsupportedAbilities || []), ...(M.RULES_SOURCE.engineLimitations || [])] : [];
+      sb.innerHTML = `<div class="statblock"><img class="mon-sprite" src="${E.SP.portrait(E.SP.monster(sel), 3)}" alt="" style="${known ? '' : 'filter:brightness(0)'}"><h3>${known ? m.title || m.name : '???'}</h3><div class="it">${M.TYPES[m.type]} ${m.size}</div><p style="font-style:italic">${m.desc}</p><hr>
         <p><b>CA</b> ${m.ac} · <b>PV</b> ${hpAvg} (${m.hp}) · <b>ND</b> ${R.crLabel(m.cr)} (${R.CR_XP[m.cr]} XP)</p><hr>
         ${known ? `<div class="ab6">${R.ABILITIES.map((a) => `<div><b>${a.short}</b>${ab(m.ab[a.id])}</div>`).join('')}</div><hr>
         ${m.resist ? `<p><b>Resistências</b> ${m.resist.map((t) => R.DAMAGE[t].name).join(', ')}</p>` : ''}${m.immune ? `<p><b>Imunidades</b> ${m.immune.map((t) => R.DAMAGE[t].name).join(', ')}</p>` : ''}${m.vuln ? `<p><b>Vulnerabilidades</b> ${m.vuln.map((t) => R.DAMAGE[t].name).join(', ')}</p>` : ''}
         ${m.traits ? `<div class="sec">Traços</div>${m.traits.map(([, n, d]) => `<p><b><i>${n}.</i></b> ${d}</p>`).join('')}` : ''}
         <div class="sec">Ações</div>${m.multi ? `<p><b><i>Ataques Múltiplos.</i></b> Faz ${m.multi} ataques.</p>` : ''}${m.attacks.map((a) => `<p><b><i>${a.n}.</i></b> <i>Jogada de Ataque ${a.r === 'dist' ? 'à Distância' : 'Corpo a Corpo'}:</i> ${U.sign(a.b)}. <i>Acerto:</i> ${U.avgDice(a.d)} (${a.d}) de dano ${R.DAMAGE[a.t].name}${a.x ? ` mais ${U.avgDice(a.x[0])} (${a.x[0]}) ${R.DAMAGE[a.x[1]].name}` : ''}${a.fx && a.fx.cond ? `; o alvo fica ${R.CONDITIONS[a.fx.cond].name}${a.fx.save ? ` (TR de ${R.AB[a.fx.save].name} CD ${a.fx.dc} evita)` : ''}` : ''}.</p>`).join('')}
-        ${m.special ? `<p><b><i>${m.special.n} (Recarga ${m.special.recharge}–6).</i></b> ${m.special.desc}</p>` : ''}
+        ${m.special ? `<p><b><i>${m.special.n}${m.special.recharge ? ` (Recarga ${m.special.recharge}–6)` : ''}.</i></b> ${m.special.desc}</p>` : ''}
         ${m.legendaryActions ? `<div class="sec">Ações Lendárias</div><p>Após o seu turno, a criatura usa: <b>${m.legendaryActions[0].n}</b> (${U.sign(m.legendaryActions[0].b)}, ${m.legendaryActions[0].d} ${R.DAMAGE[m.legendaryActions[0].t].name}).</p>` : ''}` : '<p style="color:#8a6a5a">Derrote esta criatura para registrar suas estatísticas.</p>'}
-        <p style="font-size:11px;color:#8a7a6a;margin-top:12px">Habitat: ${Object.entries(M.BY_REGION).filter(([, l]) => l.includes(sel)).map(([r]) => E.WD.REGIONS[r].name).join(', ') || 'Abismo de Véspera'}</p></div>`;
+        <p style="font-size:11px;color:#8a7a6a;margin-top:12px">Habitat: ${U.esc(habitat)}</p>
+        ${known && source ? `<details class="rules-provenance"><summary>Fonte oficial e limites da implementação</summary><p>Base: <b>${U.esc(source.officialName)}</b> · <a href="${U.esc(M.RULES_SOURCE.url)}#page=${source.pages[0]}" target="_blank" rel="noopener">SRD 5.2.1, p. ${source.pages.join(', ')}</a> · regras D&D 2024/2025. Implementação parcial.</p><p>Nomes próprios, descrições e localização: conteúdo original de Elarion.</p>${(source.adaptations || []).map((text) => `<p>Adaptação de Elarion: ${U.esc(text)}</p>`).join('')}${limitations.length ? `<ul>${limitations.map((text) => `<li>${U.esc(text)}</li>`).join('')}</ul>` : ''}</details>` : ''}</div>`;
     };
     draw();
     UI.open(el);

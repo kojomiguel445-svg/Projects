@@ -4,6 +4,13 @@
   const U = E.U, D = E.SIM_DATA;
   if (!D) throw new Error('Carregue data/simulation.js antes de engine/simulation.js.');
   const S = { FOODS: D.FOODS, DAY_SECONDS: D.DAY_SECONDS, GLIDER_PRICE: D.GLIDER_PRICE };
+  // Active-play seconds: a full stomach lasts about five minutes of walking.
+  // Body effects apply to travel/survival only, never to official character attributes.
+  S.BALANCE = {
+    hungerPerSecond: { idle: .28, walking: .34, running: .46, battle: .38 },
+    fat: { hunger: 1.30, run: .85, jump: .84, glideDescent: 1.22 },
+    swim: { normalSpeed: 3.1, fastSpeed: 5.2, staminaPerSecond: 14 },
+  };
   const hero = () => E.Store && E.Store.hero ? E.Store.hero() : null;
   const save = () => { if (E.Store && E.Store.save) E.Store.save(); };
   const emit = (name, data) => { if (U && U.emit) U.emit(name, data); };
@@ -12,7 +19,11 @@
   const result = (ok, message, extra) => Object.assign({ ok, message }, extra || {});
   const changed = (h, persist = true) => { if (persist) save(); emit('survival:changed', { hero: h, hunger: S.data(h).hunger, clock: S.clock() }); };
   let statusTime = 0;
+  let lastFrameToken;
   const seenBattles = new WeakSet();
+
+  S.bodyModifiers = (h = hero()) => h && h.look && h.look.build === 'gordo'
+    ? Object.assign({}, S.BALANCE.fat) : { hunger: 1, run: 1, jump: 1, glideDescent: 1 };
 
   S.data = (h = hero()) => {
     if (!h) return null;
@@ -74,12 +85,18 @@
     if (!Number.isFinite(dt) || dt <= 0 || !['world', 'arena', 'interior'].includes(ctx.mode) || (typeof document !== 'undefined' && document.hidden)) return false;
     const h = hero();
     if (!h || h.dead) return false;
+    // The render loop supplies one token for the shared clock/food update, even across scene changes.
+    if (Number.isFinite(ctx.frameToken)) {
+      if (ctx.frameToken === lastFrameToken) return false;
+      lastFrameToken = ctx.frameToken;
+    }
     // A resumed/background tab cannot silently charge days or food for missed frames.
     dt = Math.min(dt, 1);
     S.advance(dt);
-    const rate = ctx.mode === 'arena' ? D.HUNGER_RATE.battle : ctx.sprinting && ctx.moving ? D.HUNGER_RATE.running : ctx.moving ? D.HUNGER_RATE.walking : D.HUNGER_RATE.idle;
+    const rates = S.BALANCE.hungerPerSecond;
+    const rate = ctx.mode === 'arena' ? rates.battle : ctx.sprinting && ctx.moving ? rates.running : ctx.moving ? rates.walking : rates.idle;
     const d = S.data(h), before = d.hunger;
-    d.hunger = Math.max(0, d.hunger - rate * dt);
+    d.hunger = Math.max(0, d.hunger - rate * S.bodyModifiers(h).hunger * dt);
     statusTime += dt;
     if (statusTime >= .5 || before > 0 && d.hunger === 0) { statusTime = 0; changed(h, false); }
     return true;
@@ -179,7 +196,7 @@
     if (seenBattles.has(battle) || battle.id && S.data(h).lastBattle === battle.id) return result(false, 'Combate já contabilizado.');
     seenBattles.add(battle);
     const d = S.data(h); if (battle.id) d.lastBattle = battle.id;
-    d.hunger = Math.max(0, d.hunger - 3);
+    d.hunger = Math.max(0, d.hunger - 3 * S.bodyModifiers(h).hunger);
     const loot = {};
     if (battle.outcome === 'win') for (const key of (Array.isArray(battle.keys) ? battle.keys : Array.isArray(battle.kills) ? battle.kills : [])) {
       const def = E.M && E.M.MONSTERS && E.M.MONSTERS[key];

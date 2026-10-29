@@ -51,7 +51,7 @@
   // efeitos passivos das subclasses e talentos (ver js/data/subclasses.js)
   C.styles = (h) => [h.fightingStyle, h.fightingStyle2].filter(Boolean);
   C.hasStyle = (h, id) => C.styles(h).includes(id);
-  C.fxList = (h) => [...C.cls(h).features.filter(([lv]) => h.level >= lv).map((f) => f[4]).filter(Boolean), ...C.styles(h).map((s) => (H.FIGHTING_STYLES[s] || {}).fx).filter(Boolean), ...C.subFeatures(h).map((f) => f[4]).filter(Boolean), ...(h.feats || []).map((f) => { const fx = (H.FEATS[f] || {}).fx; return typeof fx === 'function' ? fx(h) : fx; }).filter(Boolean), ...(h.fightingStyle && H.FIGHTING_STYLES[h.fightingStyle] && H.FIGHTING_STYLES[h.fightingStyle].fx ? [H.FIGHTING_STYLES[h.fightingStyle].fx] : []), ...(E.Eco ? E.Eco.fx(h) : [])];
+  C.fxList = (h) => [...C.cls(h).features.filter(([lv]) => h.level >= lv).map((f) => f[4]).filter(Boolean), ...C.styles(h).map((s) => (H.FIGHTING_STYLES[s] || {}).fx).filter(Boolean), ...C.subFeatures(h).map((f) => f[4]).filter(Boolean), ...(h.feats || []).map((f) => { const fx = (H.FEATS[f] || {}).fx; return typeof fx === 'function' ? fx(h) : fx; }).filter(Boolean), ...(E.Eco ? E.Eco.fx(h) : [])];
   C.hasFx = (h, key) => C.fxList(h).some((f) => f[key]);
   C.fxVals = (h, key) => C.fxList(h).map((f) => f[key]).filter((v) => v !== undefined && v !== false);
   C.fxNum = (h, key) => C.fxVals(h, key).reduce((a, v) => a + (typeof v === 'number' ? v : typeof v === 'string' ? Math.max(0, C.mod(h, v)) : typeof v === 'function' ? v(h) : 0), 0);
@@ -95,6 +95,9 @@
     return w && w.kind === 'cac' && (w.cat === 'simples' || w.props.includes('leve')) && !w.props.includes('pesada');
   };
   C.canCast = (h) => !!C.caster(h) || (h.mi && h.mi.spell);
+  C.hasArmorTraining = (h, type) => (C.cls(h).armor || []).includes(type) || C.fxArr(h, 'armor').includes(type)
+    || (type === 'pesada' && h.cls === 'clerigo' && C.has(h, 'ordem_divina'))
+    || (type === 'media' && h.cls === 'druida' && C.has(h, 'ordem_primal'));
 
   // ---------------- PV ----------------
   C.hpPerLevel = (h) => {
@@ -108,38 +111,66 @@
     const hd = C.cls(h).hd, con = C.mod(h, 'con');
     let hp = hd + con + (h.level - 1) * (Math.floor(hd / 2) + 1 + con);
     hp += h.level * C.hpPerLevel(h);
-    if (h.buffs && h.buffs.auxilio) hp += 5;
+    hp += C.aidBonus(h);
     hp -= h.maxHpReduce || 0;
     return Math.max(1, hp);
   };
+  // SRD 5.2.1 p107 Aid; p106 Combining Spell Effects. Legacy boolean saves mean +5.
+  C.aidBonus = (h) => {
+    const value = h.buffs && h.buffs.auxilio;
+    return typeof value === 'number' ? Math.max(0, value) : value ? 5 : 0;
+  };
+  C.applyAid = (h, slotLevel = 2) => {
+    const old = C.aidBonus(h), bonus = Math.max(old, 5 * Math.max(1, slotLevel - 1));
+    h.buffs = h.buffs || {};
+    h.buffs.auxilio = bonus;
+    const increase = bonus - old;
+    h.hp = Math.min(C.maxHp(h), h.hp + increase);
+    return { bonus, increase };
+  };
 
   // ---------------- CA ----------------
-  C.ac = (h) => {
+  C.acBreakdown = (h) => {
     const dex = C.mod(h, 'des');
-    const armor = R.ARMOR[h.equip.armor || 'nenhuma'];
-    let ac;
+    const armor = R.ARMOR[h.equip.armor || 'nenhuma'] || R.ARMOR.nenhuma;
+    let formula, parts;
+    const part = (label, value, source, custom = false) => ({ label, value, source, custom });
     if (armor.type === 'none') {
-      ac = 10 + dex;
+      formula = '10 + DES';
+      parts = [part('Base sem armadura', 10, 'SRD 5.2.1 p7'), part('Destreza', dex, 'SRD 5.2.1 p7')];
+      const alternative = (label, base, ability, source) => {
+        const next = [part(label, base, source), part('Destreza', dex, source)];
+        if (ability) next.push(part(R.AB[ability].name, C.mod(h, ability), source));
+        if (next.reduce((n, p) => n + p.value, 0) > parts.reduce((n, p) => n + p.value, 0)) {
+          parts = next; formula = `${base} + DES${ability ? ' + ' + R.AB[ability].short : ''}`;
+        }
+      };
       const ud = C.cls(h).unarmored;
-      if (ud === 'con') ac = Math.max(ac, 10 + dex + C.mod(h, 'con'));
-      if (ud === 'sab' && !h.equip.shield) ac = Math.max(ac, 10 + dex + C.mod(h, 'sab'));
-      for (const ab of C.fxVals(h, 'unarmored')) if (!h.equip.shield || ab !== 'car' || h.cls === 'feiticeiro') ac = Math.max(ac, 10 + dex + C.mod(h, ab));
-      if (h.buffs && h.buffs.armadura_arcana) ac = Math.max(ac, 13 + dex);
+      if (ud === 'con') alternative('Defesa sem Armadura', 10, 'con', 'SRD 5.2.1 p29');
+      if (ud === 'sab' && !h.equip.shield) alternative('Defesa sem Armadura', 10, 'sab', 'SRD 5.2.1 p50');
+      for (const ab of C.fxVals(h, 'unarmored')) if (!h.equip.shield || ab !== 'car' || h.cls === 'feiticeiro') alternative('Característica de subclasse', 10, ab, C.sub(h) ? C.sub(h).name : 'Subclasse');
+      if (h.buffs && h.buffs.armadura_arcana) alternative('Armadura Arcana', 13, null, 'SRD 5.2.1, Mage Armor');
     } else {
-      ac = armor.base + Math.min(dex, armor.dex);
-      if (C.hasStyle(h, 'defesa')) ac += 1;
+      formula = armor.name;
+      parts = [part(armor.name, armor.base, 'SRD 5.2.1 p92')];
+      if (armor.type !== 'pesada') parts.push(part('Destreza (limite da armadura)', Math.min(dex, armor.dex), 'SRD 5.2.1 p92'));
+      if (C.hasStyle(h, 'defesa')) parts.push(part('Estilo Defesa', 1, 'SRD 5.2.1 p88'));
     }
-    if (h.equip.shield) ac += 2;
-    ac += C.fxNum(h, 'ac');
-    if (armor.type !== 'none' && C.hasFx(h, 'armorAc')) ac += 1;
+    if (h.equip.shield) parts.push(part(C.hasArmorTraining(h, 'escudo') ? 'Escudo (treinado)' : 'Escudo (sem treinamento)', C.hasArmorTraining(h, 'escudo') ? 2 : 0, 'SRD 5.2.1 p92'));
+    for (const fx of C.fxList(h)) if (fx.ac) {
+      const value = typeof fx.ac === 'number' ? fx.ac : typeof fx.ac === 'string' ? Math.max(0, C.mod(h, fx.ac)) : typeof fx.ac === 'function' ? fx.ac(h) : 0;
+      parts.push(part(fx.eco ? 'Eco (autoral)' : 'Característica ou talento', value, fx.eco ? 'Dados e Desaforos — Ecos' : 'Característica/talento', !!fx.eco));
+    }
+    if (armor.type !== 'none' && C.hasFx(h, 'armorAc')) parts.push(part('Talento de armadura', 1, 'Talento equipado'));
     const w = C.equipped(h, 'weapon');
     if (w && w.def.passive) {
       const p = w.def.passive;
-      if (p.kind === 'ac') ac += p.vals[w.refine - 1];
-      if (p.ac) ac += p.ac;
+      if (p.kind === 'ac') parts.push(part(`Passiva: ${p.name || w.def.name} (autoral)`, p.vals[w.refine - 1], 'Dados e Desaforos — Armas', true));
+      if (p.ac) parts.push(part(`Passiva: ${p.name || w.def.name} (autoral)`, p.ac, 'Dados e Desaforos — Armas', true));
     }
-    return ac;
+    return { total: parts.reduce((n, p) => n + p.value, 0), formula, parts };
   };
+  C.ac = (h) => C.acBreakdown(h).total;
 
   // ---------------- iniciativa / testes ----------------
   C.initiative = (h) => {
@@ -185,12 +216,13 @@
     const wd = R.WEAPONS[base];
     const ranged = wd.kind === 'dist';
     const str = C.mod(h, 'for'), dex = C.mod(h, 'des');
-    const monk = h.cls === 'monge' && (base === 'desarmado' || C.isMonkWeapon(h, base));
+    // SRD p50: Martial Arts requires no armor, no Shield, and only Monk weapons.
+    const monk = h.cls === 'monge' && (h.equip.armor || 'nenhuma') === 'nenhuma' && !h.equip.shield && (base === 'desarmado' || C.isMonkWeapon(h, base)) && (!w || !w.def.base || C.isMonkWeapon(h, w.def.base));
     let ability = ranged ? 'des' : 'for';
     if (wd.props.includes('acuidade') || monk) ability = dex > str ? 'des' : 'for';
     const abMod = ability === 'des' ? dex : str;
     const armed = w && base !== 'desarmado' && !opts.unarmed;
-    const proficient = base === 'desarmado' || (C.proficientWith(h, base) && (!armed || w.aff));
+    const proficient = base === 'desarmado' || C.proficientWith(h, base);
     const magic = armed ? w.bonus : 0;
     let toHit = abMod + (proficient ? C.pb(h) : 0) + magic + (armed ? w.hitUp : 0) + (base !== 'desarmado' ? C.fxNum(h, 'toHit') : 0);
     if (ranged && C.hasStyle(h, 'arquearia')) toHit += 2;
@@ -223,6 +255,21 @@
     const hungerPenalty = E.Sim ? E.Sim.penalty(h) : 0;
     toHit -= hungerPenalty; dmgMod -= hungerPenalty;
     const masteryOk = C.cls(h).masteryCount > 0 && wd.mastery && (h.masteries || []).includes(base) && (!armed || w.aff);
+    const makePart = (label, value, source, custom = false) => ({ label, value, source, custom });
+    const finalMod = dance ? Math.max(abMod, dex) : abMod;
+    const resonance = armed ? w.res || 0 : 0;
+    const ecoHit = base !== 'desarmado' ? C.fxList(h).filter((f) => f.eco && typeof f.toHit === 'number').reduce((n, f) => n + f.toHit, 0) : 0;
+    const hitParts = [makePart(R.AB[ability].name, finalMod, 'SRD 5.2.1 p22'), makePart(proficient ? 'Proficiência' : 'Sem proficiência', proficient ? C.pb(h) : 0, 'SRD 5.2.1 p7')];
+    const damageParts = [makePart(R.AB[ability].name, finalMod, 'SRD 5.2.1 p22')];
+    if (magic) { hitParts.push(makePart('Raridade da arma (autoral)', magic, 'Dados e Desaforos — Armas', true)); damageParts.push(makePart('Raridade da arma (autoral)', magic, 'Dados e Desaforos — Armas', true)); }
+    if (armed && w.hitUp - resonance) hitParts.push(makePart('Forja/ascensão (autoral)', w.hitUp - resonance, 'Dados e Desaforos — Forja', true));
+    if (armed && w.dmgUp - resonance) damageParts.push(makePart('Forja/nível (autoral)', w.dmgUp - resonance, 'Dados e Desaforos — Forja', true));
+    if (resonance) { hitParts.push(makePart('Ressonância (autoral)', resonance, 'Dados e Desaforos — Linhagem', true)); damageParts.push(makePart('Ressonância (autoral)', resonance, 'Dados e Desaforos — Linhagem', true)); }
+    if (ecoHit) hitParts.push(makePart('Eco (autoral)', ecoHit, 'Dados e Desaforos — Ecos', true));
+    if (hungerPenalty) { hitParts.push(makePart('Fome (autoral)', -hungerPenalty, 'Dados e Desaforos — Sobrevivência', true)); damageParts.push(makePart('Fome (autoral)', -hungerPenalty, 'Dados e Desaforos — Sobrevivência', true)); }
+    const hitOther = toHit - hitParts.reduce((n, p) => n + p.value, 0), damageOther = dmgMod - damageParts.reduce((n, p) => n + p.value, 0);
+    if (hitOther) hitParts.push(makePart('Características e estilos', hitOther, 'Características/talentos/estilos'));
+    if (damageOther) damageParts.push(makePart('Características e estilos', damageOther, 'Características/talentos/estilos'));
     return {
       name: opts.unarmed || !w ? (monk ? 'Golpe Desarmado' : 'Ataque Desarmado') : w.def.name,
       base, ranged, ability, abMod, proficient, toHit, dice, dmgMod, type: wd.type, crit,
@@ -233,18 +280,49 @@
       heavy: wd.props.includes('pesada'),
       light: wd.props.includes('leve'),
       finesse: wd.props.includes('acuidade'),
+      breakdown: { toHit: { total: toHit, parts: hitParts }, damage: { total: dmgMod, parts: damageParts } },
     };
   };
   C.attacksPerAction = (h) => (C.has(h, 'ataque_extra') || C.hasFx(h, 'extraAttack') ? 2 : 1);
 
   // ---------------- magia ----------------
-  C.castAb = (h) => (C.caster(h) ? C.caster(h).ab : h.mi ? h.mi.ab : 'int');
+  // SRD p23: the feature granting a spell determines its casting ability; Magic Initiate p87.
+  C.spellSourceInfo = (h, spellOrId, source) => {
+    const id = typeof spellOrId === 'string' ? spellOrId : Object.keys(S.SPELLS).find((key) => S.SPELLS[key] === spellOrId);
+    const spell = id ? S.SPELLS[id] : null;
+    const caster = C.caster(h), fallback = caster ? caster.ab : h.mi && R.AB[h.mi.ab] ? h.mi.ab : 'int';
+    const featOwns = !!(id && h.mi && R.AB[h.mi.ab] && (h.mi.spell === id || (h.mi.cantrips || []).includes(id)));
+    const classOwns = !!(spell && caster && (((h.cantrips || []).includes(id) || (h.prepared || []).includes(id))
+      || (h.cls === 'paladino' && h.level >= 2 && id === 'golpe_divino') || (h.cls === 'patrulheiro' && id === 'marca_cacador')
+      || C.fxVals(h, 'grantSpells').some((list) => list.some(([level, ...ids]) => h.level >= level && ids.includes(id)))));
+    const options = [classOwns && 'class', featOwns && 'mi'].filter(Boolean);
+    const stored = h.spellSources && options.includes(h.spellSources[id]) ? h.spellSources[id] : null;
+    const selected = options.includes(source) ? source : stored;
+    const useFeat = featOwns && (selected === 'mi' || (!classOwns && selected !== 'class'));
+    return { id, ability: useFeat ? h.mi.ab : fallback, origin: useFeat ? 'mi' : caster ? 'class' : featOwns ? 'mi' : 'default', ambiguous: featOwns && classOwns && !selected, options, selected: selected || (useFeat ? 'mi' : classOwns ? 'class' : null), stored: !!stored };
+  };
+  C.setSpellSource = (h, id, source) => {
+    if (!C.spellSourceInfo(h, id).options.includes(source)) return { error: 'Esta origem não concede a magia ao personagem.' };
+    h.spellSources = Object.assign({}, h.spellSources, { [id]: source });
+    return { ok: true };
+  };
+  C.magicInitiateAbilityChoices = (h) => h.mi && !h.mi.abilityChosen ? ['int', 'sab', 'car'] : [];
+  C.chooseMagicInitiateAbility = (h, ability) => {
+    if (!C.magicInitiateAbilityChoices(h).includes(ability)) return { error: 'Escolha um atributo de conjuração disponível para Iniciado em Magia.' };
+    h.mi = Object.assign({}, h.mi, { ab: ability, abilityChosen: true });
+    return { ok: true };
+  };
+  C.castAb = (h, spellOrId, source) => C.spellSourceInfo(h, spellOrId, source).ability;
+  C.spellMod = (h, spellOrId, source) => C.mod(h, C.castAb(h, spellOrId, source));
   C.focusBonus = (h) => {
     const f = C.equipped(h, 'focus');
     return f && f.aff ? f.bonus + f.hitUp : 0;
   };
-  C.spellAttack = (h) => C.pb(h) + C.mod(h, C.castAb(h)) + C.focusBonus(h) - (E.Sim ? E.Sim.penalty(h) : 0);
-  C.spellDC = (h, sp) => 8 + C.pb(h) + C.mod(h, C.castAb(h)) + C.focusBonus(h) + (sp ? C.fxVals(h, 'spellDc').reduce((a, d) => a + (d.schools.includes(sp.school) ? d.bonus : 0), 0) : 0);
+  C.spellAttack = (h, spellOrId, source) => C.pb(h) + C.spellMod(h, spellOrId, source) + C.focusBonus(h) - (E.Sim ? E.Sim.penalty(h) : 0);
+  C.spellDC = (h, spellOrId, source) => {
+    const sp = typeof spellOrId === 'string' ? S.SPELLS[spellOrId] : spellOrId;
+    return 8 + C.pb(h) + C.spellMod(h, spellOrId, source) + C.focusBonus(h) + (sp ? C.fxVals(h, 'spellDc').reduce((a, d) => a + (d.schools.includes(sp.school) ? d.bonus : 0), 0) : 0);
+  };
   C.slotsMax = (h) => (C.caster(h) ? H.slotsFor(C.caster(h).type, h.level) : []);
   C.slotsLeft = (h) => C.slotsMax(h).map((n, i) => Math.max(0, n - ((h.slotsUsed || [])[i] || 0)));
   C.maxSpellLevel = (h) => {
@@ -283,7 +361,7 @@
       const n = d.n + (up && lvl > sp.level ? (lvl - sp.level) * up.n : 0);
       let amt = 0;
       for (let i = 0; i < n; i++) amt += E.U.die(d.s);
-      amt += d.mod + (sp.healMod ? C.mod(h, C.castAb(h)) : 0);
+      amt += d.mod + (sp.healMod ? C.spellMod(h, id, free ? 'mi' : undefined) : 0);
       if (C.has(h, 'discipulo_vida')) amt += 2 + lvl;
       amt += C.fxNum(h, 'healBonus');
       const before = h.hp;
@@ -291,9 +369,12 @@
       return { text: `${sp.name}: +${h.hp - before} PV` };
     }
     h.buffs = h.buffs || {};
+    if (sp.buff === 'auxilio') {
+      const aid = C.applyAid(h, lvl);
+      return { text: `Auxílio: +${aid.bonus} PV máximos; +${aid.increase} PV atuais (efeitos iguais não acumulam).` };
+    }
     h.buffs[sp.buff] = true;
-    if (sp.buff === 'auxilio') h.hp += 5;
-    return { text: sp.buff === 'auxilio' ? 'Auxílio: +5 PV máximos até o Descanso Longo.' : `Armadura Arcana: CA ${C.ac(h)} até o Descanso Longo.` };
+    return { text: `Armadura Arcana: CA ${C.ac(h)} até o Descanso Longo.` };
   };
   C.preparedMax = (h) => (S.PREPARED[h.cls] ? S.PREPARED[h.cls][h.level] : 0);
 
@@ -408,6 +489,105 @@
 
   // ---------------- XP e níveis ----------------
   C.xpForNext = (h) => (h.level >= R.MAX_LEVEL ? null : R.XP_TABLE[h.level + 1]);
+  // SRD 5.2.1 pp86–87: Human Versatile grants an Origin feat, never a General feat.
+  // The old creator stored [background feat, extra feat] and applied no ability increase.
+  C.reconcileOriginFeat = (h) => {
+    if (!h || h.species !== 'humano' || h.level >= 4 || Math.max(h.peak || 0, h.level) >= 4 || h.pendingOriginFeat || (h.ruleBackups && h.ruleBackups.humanOrigin)) return false;
+    const bg = H.BACKGROUNDS[h.background], feats = h.feats || [];
+    if (!bg || feats.length !== 2 || feats[0] !== bg.feat || !H.FEATS[feats[1]] || !H.FEATS[feats[1]].general) return false;
+    // Without a proven grant ledger, do not infer/reverse ability changes in an ambiguous save.
+    if (Object.values(h.asi || {}).some((n) => n !== 0)) return false;
+    const removed = feats[1];
+    h.ruleBackups = Object.assign({}, h.ruleBackups, { humanOrigin: JSON.parse(JSON.stringify({ feats, featData: h.featData || {}, asi: h.asi || {}, hp: h.hp, source: '5.12.1 creator: General feat offered as Human Origin feat', removed })) });
+    h.feats = [bg.feat];
+    h.pendingOriginFeat = { removed, source: 'SRD 5.2.1 pp86–87 — Human Versatile / feat categories' };
+    return true;
+  };
+  C.originFeatChoices = (h) => h.pendingOriginFeat && h.species === 'humano'
+    ? Object.keys(H.FEATS).filter((id) => !H.FEATS[id].general && (H.FEATS[id].repeatable || !(h.feats || []).includes(id))) : [];
+  C.chooseOriginFeat = (h, id) => {
+    if (!C.originFeatChoices(h).includes(id)) return { error: 'Escolha um talento de Origem elegível.' };
+    const before = C.maxHp(h);
+    h.feats = [...(h.feats || []), id];
+    if (id === 'iniciado_magia' && !h.mi) h.mi = { cantrips: ['raio_fogo', 'raio_gelo'], spell: 'misseis_magicos', ab: 'int' };
+    h.hp += Math.max(0, C.maxHp(h) - before);
+    delete h.pendingOriginFeat;
+    return { ok: true };
+  };
+  // Explicit choices, never guessed from class recommendations. SRD 5.2.1 pp29,32,59,61,78,87.
+  const ruleSources = (h) => {
+    const sources = [], all = Object.keys(R.SKILLS);
+    const add = (id, kind, count, name, level, source, pool = all) => {
+      if (h.level >= level) sources.push({ id, kind, count, name, source, pool });
+    };
+    if (h.cls === 'ladino') {
+      add('rogue_expertise_1', 'expertise', 2, 'Especialização de Ladino (nível 1)', 1, 'SRD 5.2.1 p61');
+      add('rogue_expertise_6', 'expertise', 2, 'Especialização de Ladino (nível 6)', 6, 'SRD 5.2.1 p61');
+    }
+    if (h.cls === 'bardo') {
+      add('bard_expertise_2', 'expertise', 2, 'Especialização de Bardo (nível 2)', 2, 'SRD 5.2.1 p32');
+      add('bard_expertise_9', 'expertise', 2, 'Especialização de Bardo (nível 9)', 9, 'SRD 5.2.1 p32');
+      if (h.subChosen && C.subId(h) === 'conhecimento') add('lore_skills_3', 'skill', 3, 'Proficiências do Colégio do Conhecimento', 3, 'SRD 5.2.1 p35');
+    }
+    if (h.cls === 'patrulheiro') {
+      add('ranger_expertise_2', 'expertise', 1, 'Explorador Hábil', 2, 'SRD 5.2.1 p59');
+      add('ranger_expertise_9', 'expertise', 2, 'Especialização de Patrulheiro (nível 9)', 9, 'SRD 5.2.1 p59');
+    }
+    if (h.cls === 'mago') add('wizard_scholar_2', 'expertise', 1, 'Erudito', 2, 'SRD 5.2.1 p78', ['arcanismo', 'historia', 'investigacao', 'medicina', 'natureza', 'religiao']);
+    if (h.cls === 'barbaro') add('barbarian_skill_3', 'skill', 1, 'Conhecimento Primal', 3, 'SRD 5.2.1 p29', C.cls(h).skills.from);
+    (h.feats || []).forEach((feat, index) => {
+      if (feat === 'habilidoso') add('skilled_' + index, 'skill', 3, 'Habilidoso — perícias', 1, 'SRD 5.2.1 p87 (ferramentas ainda indisponíveis)');
+    });
+    return sources;
+  };
+  C.progressionChoices = (h) => {
+    const sources = ruleSources(h), grants = h.ruleGrants || {};
+    const skills = [...new Set((h.skills || []).filter((s) => R.SKILLS[s]))];
+    const expertise = [...new Set((h.expertise || []).filter((s) => skills.includes(s)))];
+    const marked = sources.filter((s) => s.kind === 'expertise').flatMap((s) => grants[s.id] || []).filter((s) => R.SKILLS[s]);
+    const legacyExpertise = expertise.filter((s) => !marked.includes(s));
+    const sp = C.species(h).hooks || {}, bg = H.BACKGROUNDS[h.background];
+    const baseline = Array.isArray(h.ruleBaseSkills) ? h.ruleBaseSkills.length
+      : new Set((bg && bg.skills) || []).size + C.cls(h).skills.n + (sp.extraSkill || (sp.skillChoice ? 1 : 0));
+    const markedSkills = sources.filter((s) => s.kind === 'skill').flatMap((s) => grants[s.id] || []);
+    let legacySkillCredit = Math.max(0, skills.length - baseline - new Set(markedSkills).size);
+    const pending = [];
+    for (const src of sources) {
+      const owns = src.kind === 'expertise' ? expertise : skills;
+      const explicit = [...new Set(grants[src.id] || [])].filter((s) => src.pool.includes(s) && owns.includes(s));
+      let remaining = Math.max(0, src.count - explicit.length);
+      if (src.kind === 'expertise') {
+        for (let i = 0; i < legacyExpertise.length && remaining > 0;) {
+          if (src.pool.includes(legacyExpertise[i])) { legacyExpertise.splice(i, 1); remaining--; }
+          else i++;
+        }
+      } else {
+        // Credit already-held legacy extra skills without replacing or inventing their choices.
+        const credit = Math.min(remaining, legacySkillCredit);
+        legacySkillCredit -= credit; remaining -= credit;
+      }
+      const options = src.pool.filter((s) => src.kind === 'expertise' ? skills.includes(s) && !expertise.includes(s) : !skills.includes(s));
+      if (remaining) pending.push({ id: src.id, kind: src.kind, count: Math.min(remaining, options.length), unavailableCount: Math.max(0, remaining - options.length), name: src.name, source: src.source, options });
+    }
+    return pending;
+  };
+  C.applyProgressionChoice = (h, id, values) => {
+    if (!Array.isArray(values) || new Set(values).size !== values.length) return { error: 'Escolha perícias diferentes.' };
+    const choice = C.progressionChoices(h).find((c) => c.id === id);
+    if (!choice) {
+      const old = h.ruleGrants && h.ruleGrants[id];
+      return Array.isArray(old) && values.length && values.every((s) => old.includes(s)) ? { ok: true, already: true } : { error: 'Esta escolha não está disponível.' };
+    }
+    if (!choice.count) return { error: 'As escolhas restantes dependem de opções ainda indisponíveis (por exemplo, ferramentas).' };
+    if (values.length !== choice.count || values.some((s) => !choice.options.includes(s))) return { error: `Escolha ${choice.count} perícia(s) elegível(is).` };
+    const key = choice.kind === 'expertise' ? 'expertise' : 'skills';
+    h[key] = [...new Set([...(h[key] || []), ...values])];
+    h.ruleGrants = h.ruleGrants || {};
+    h.ruleGrants[id] = [...new Set([...(h.ruleGrants[id] || []), ...values])];
+    return { ok: true };
+  };
+  C.ruleChoices = C.progressionChoices;
+  C.chooseRule = C.applyProgressionChoice;
   // Penalidade de morte (fora do modo Hardcore): perde um nível (ou XP no nível 1), 30% do ouro e parte dos itens.
   C.deathPenalty = (h) => {
     const out = { from: h.level, to: h.level, levelLost: false, xp: 0, gold: 0, items: [] };
@@ -447,9 +627,10 @@
       // ao recuperar um nível perdido na morte não se ganha de novo o Aumento de Atributo
       const fresh = h.level > (h.peak || 0);
       if (fresh) { h.peak = h.level; h.lastFresh++; }
-      if (fresh && (h.level === 4 || h.level === 8)) h.pendingAsi = (h.pendingAsi || 0) + 1;
+      if (fresh && (h.level === 4 || h.level === 8 || (h.cls === 'guerreiro' && h.level === 6) || (h.cls === 'ladino' && h.level === 10))) h.pendingAsi = (h.pendingAsi || 0) + 1; // SRD pp47,62
       if ((h.cls === 'paladino' || h.cls === 'patrulheiro') && h.level === 2 && !h.fightingStyle) h.pendingStyle = true;
     }
+    U.emit('hero:xp', { hero: h, id: h.id, xp: h.xp, level: h.level, gained: xp });
     return gained;
   };
   // Mantém truques/magias preparadas no limite, completando automaticamente com as melhores opções
@@ -475,6 +656,7 @@
   // ---------------- criação ----------------
   C.create = (o) => {
     const cls = H.CLASSES[o.cls], sp = H.SPECIES[o.species], bg = H.BACKGROUNDS[o.background];
+    const extra = o.species === 'humano' && H.FEATS[o.extraFeat] && !H.FEATS[o.extraFeat].general && (o.extraFeat !== bg.feat || o.extraFeat === 'habilidoso') ? o.extraFeat : null;
     const h = {
       id: U.uid(), name: o.name || 'Viajante', cls: o.cls, species: o.species, background: o.background,
       ancestry: o.ancestry || null,
@@ -482,7 +664,7 @@
       level: 1, xp: 0, hp: 1, tempHp: 0, hdUsed: 0, slotsUsed: [], used: {},
       skills: [...new Set([...(bg.skills || []), ...(o.skills || [])])],
       expertise: [],
-      feats: [bg.feat].concat(o.extraFeat ? [o.extraFeat] : []),
+      feats: [bg.feat].concat(extra ? [extra] : []),
       fightingStyle: o.fightingStyle || null,
       masteries: [],
       cantrips: o.cantrips || [], prepared: o.prepared || [],
@@ -494,10 +676,10 @@
       buffs: {}, quests: {}, created: Date.now(), dead: false, deathSaves: { s: 0, f: 0 },
       kills: {}, materials: {},
     };
-    if (h.cls === 'ladino') h.expertise = h.skills.filter((s) => ['furtividade', 'percepcao', 'prestidigitacao', 'acrobacia', 'investigacao'].includes(s)).slice(0, 2);
-    if (h.cls === 'bardo' && h.level >= 2) h.expertise = h.skills.slice(0, 2);
+    h.ruleGrants = {};
+    h.ruleBaseSkills = h.skills.slice();
     // Iniciado em Magia do antecedente
-    if (bg.feat === 'iniciado_magia' || o.extraFeat === 'iniciado_magia') {
+    if (bg.feat === 'iniciado_magia' || extra === 'iniciado_magia') {
       const lst = bg.featList || 'mago';
       const presets = {
         clerigo: { cantrips: ['chama_sagrada', 'palavra_radiante'], spell: 'curar_ferimentos', ab: 'sab' },

@@ -1,4 +1,6 @@
-/* Espécies, Antecedentes, Talentos e Classes — D&D 2024 (Livro do Jogador / SRD 5.2). Textos resumidos com palavras próprias. */
+/* Espécies, Antecedentes, Talentos e Classes — D&D 2024, com resumos adaptados a Elarion.
+   Referência verificada: SRD 5.2.1. Conteúdo atribuído ao Livro do Jogador e ausente do SRD aguarda
+   conferência contra a obra completa; sua ausência no SRD não significa que seja inventado. */
 (() => {
   const H = {};
 
@@ -128,7 +130,7 @@
     alerta: { name: 'Alerta', desc: 'Some o Bônus de Proficiência à Iniciativa e pode trocar a Iniciativa com um aliado.' },
     iniciado_magia: { name: 'Iniciado em Magia', desc: 'Aprende dois truques e uma magia de 1º círculo de uma lista (Clérigo, Druida ou Mago).' },
     atacante_selvagem: { name: 'Atacante Selvagem', desc: 'Uma vez por turno, role os dados de dano da arma duas vezes e use o maior.' },
-    habilidoso: { name: 'Habilidoso', desc: 'Proficiência em três perícias ou ferramentas.' },
+    habilidoso: { name: 'Habilidoso', repeatable: true, source: 'SRD 5.2.1, p. 87 — Skilled', desc: 'Proficiência em três perícias ou ferramentas. Pode ser escolhido mais de uma vez.' },
     vigoroso: { name: 'Vigoroso', desc: 'Seus Pontos de Vida máximos aumentam em 2 por nível.' },
     curandeiro: { name: 'Curandeiro', desc: 'Usar um kit de curandeiro cura 1d6 + 4 PV + dados de vida; rerrola 1 nos dados de cura.' },
     sortudo: { name: 'Sortudo', desc: 'Pontos de Sorte iguais ao BP por Descanso Longo: gaste 1 para ter Vantagem num Teste de d20.' },
@@ -405,6 +407,7 @@
   };
 
   H.CLASS_ORDER = ['guerreiro', 'barbaro', 'paladino', 'patrulheiro', 'ladino', 'monge', 'clerigo', 'druida', 'bardo', 'bruxo', 'feiticeiro', 'mago'];
+  H.RULE_REFERENCE = { edition: '2024', srd: '5.2.1', url: 'https://media.dndbeyond.com/compendium-images/srd/5.2/SRD_CC_v5.2.1.pdf' };
 
   E.H = H;
 })();

@@ -345,10 +345,10 @@
         const bonus = sp.time === 'bonus';
         const can = !hc.raging && slots.length && (bonus ? t.bonus > 0 : t.action > 0 || (sp.level === 0 && battle.warMagicReady())) && !(sp.level > 0 && t.once && t.once.slotSpell && !slots.includes('free'));
         const dmg = sp.dmg ? (sp.level === 0 ? C.cantripDice(h, sp) : sp.dmg) : sp.heal || '';
-        add({ icon: sp.level ? `<b style="color:#c9b4ff">${sp.level}º</b>` : '<b style="color:#9fd4ff">T</b>', name: sp.name, desc: `${sp.attack ? `${UI.signed(C.spellAttack(h))} ataque` : sp.save ? `TR ${R.AB[sp.save].short} CD ${C.spellDC(h, sp)}` : sp.heal ? 'Cura' : 'Efeito'}${dmg ? ' · ' + dmg : ''}${sp.conc ? ' · Conc.' : ''}${sp.aoe ? ' · Área' : ''}`, cost: bonus ? 'b' : 'a', disabled: !can, run: async () => {
+        add({ icon: sp.level ? `<b style="color:#c9b4ff">${sp.level}º</b>` : '<b style="color:#9fd4ff">T</b>', name: sp.name, desc: `${sp.attack ? `${UI.signed(C.spellAttack(h, id))} ataque` : sp.save ? `TR ${R.AB[sp.save].short} CD ${C.spellDC(h, id)}` : sp.heal ? 'Cura' : 'Efeito'}${dmg ? ' · ' + dmg : ''}${sp.conc ? ' · Conc.' : ''}${sp.aoe ? ' · Área' : ''}`, cost: bonus ? 'b' : 'a', disabled: !can, run: async () => {
           let slot = slots[0];
           if (slots.length > 1) {
-            const ch = await UI.choose({ title: sp.name, text: 'Escolha o espaço de magia (círculos maiores aumentam o efeito).', options: slots.map((s) => ({ id: String(s), label: s === 0 ? 'Truque' : s === 'free' ? 'Uso gratuito' : `${s}º círculo (${C.slotsLeft(h)[s - 1]} restante${C.slotsLeft(h)[s - 1] > 1 ? 's' : ''})` })).concat([{ id: 'no', label: 'Cancelar' }]) });
+            const ch = await UI.choose({ title: sp.name, text: 'Escolha o espaço de magia (círculos maiores aumentam o efeito).', options: slots.map((s) => ({ id: String(s), label: s === 0 ? 'Truque' : s === 'free' ? `Uso gratuito${h.mi && h.mi.spell === id && R.AB[h.mi.ab] ? ` · ${R.AB[h.mi.ab].short} · Ataque ${UI.signed(C.spellAttack(h, id, 'mi'))} / CD ${C.spellDC(h, id, 'mi')}` : ''}` : `${s}º círculo (${C.slotsLeft(h)[s - 1]} restante${C.slotsLeft(h)[s - 1] > 1 ? 's' : ''})` })).concat([{ id: 'no', label: 'Cancelar' }]) });
             if (!ch || ch === 'no') return;
             slot = ch === 'free' ? 'free' : Number(ch);
           }

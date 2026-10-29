@@ -93,7 +93,7 @@
     const bars = Object.entries(E.L.ROD_STATS || {}).map(([k, n]) => `<span class="fi-stat" title="${n}: ${st[k]}/10"><i>${n}</i><b style="--v:${st[k] * 10}%"></b></span>`).join('');
     const el = U.h(`<div class="fishing"><div class="fi-panel">
       <div class="fi-top"><span class="fi-rod">${U.esc(rod.name)}</span><span class="fi-stats">${bars}</span></div>
-      <div class="fi-chips"><span>Pesca Nv. ${E.Life.level(h, 'pesca')}</span>${bait ? `<span>${U.esc(bait.name)} ×${d[bait.key]}</span>` : ''}${spot.fromBoat?'<span>Barco de pesca · '+(biome==='sea'?'Mar aberto':'Lago')+'</span>':''}${seat ? '<span>Sentado no banco</span>' : ''}${E.Life.buff(h, 'pescador') ? '<span class="gold">Faro de Pescador</span>' : ''}</div>
+      <div class="fi-chips"><span>Pesca Nv. ${E.Life.level(h, 'pesca')}</span><span data-fi-bait>${bait ? `${U.esc(bait.name)} ×${d[bait.key]}` : 'Sem isca equipada'}</span>${spot.fromBoat?'<span>Barco de pesca · '+(biome==='sea'?'Mar aberto':'Lago')+'</span>':''}${seat ? '<span>Sentado no banco</span>' : ''}${E.Life.buff(h, 'pescador') ? '<span class="gold">Faro de Pescador</span>' : ''}</div>
       <div class="fi-stage"></div>
       <div class="fi-help"></div>
       <div class="fi-btns"><button class="btn dark" data-a="quit"><span class="ico">✕</span>${seat ? 'Levantar' : 'Sair'}</button><button class="btn primary fi-main" data-a="main"><span class="ico">🎣</span><b>Lançar</b></button></div>
@@ -129,17 +129,23 @@
 
     const round = async () => {
       if (spot.left <= 0) { stage.innerHTML = '<div class="fi-msg">Os peixes daqui se espantaram. Volte em alguns minutos ou procure outro ponto.</div>'; setMain('Lançar', '🎣', null); return; }
+      const baitStatus=el.querySelector('[data-fi-bait]');
+      const updateBait=(used)=>{const b=E.Life.rodBait(h);baitStatus.textContent=b?`${b.name} ×${d[b.key]||0}${used?' · nesta linha':b.key==='sbait'&&biome!=='sea'?' · somente no mar':!(d[b.key]>0)?' · esgotada':''}`:'Sem isca equipada';};
+      updateBait(false);
       // 1. lançar
       stage.innerHTML = '<div class="fi-msg">Toque em <b>Lançar</b> (ou Espaço) para jogar a linha.</div>';
       help.textContent = '';
       await new Promise((r) => setMain('Lançar', '🎣', r));
       if (quit) return;
+      const castBait=E.Life.activeBait(h,biome),receipt=E.Life.beginFishingCast(h,biome);
+      if(!receipt){UI.toast('A isca não está mais disponível.');return round();}
+      updateBait(!!castBait);
       E.Audio.sfx('slash');
       w.fishFx && w.fishFx('cast', spot, { reach: st.reach });
       setMain('Aguarde…', '⏳', null);
       stage.innerHTML = '<div class="fi-wait"><div class="fi-float"><i></i><u></u><u></u></div><div class="fi-msg">A boia balança na água…</div></div>';
       // 2. espera (a fisgada vem antes com varas mais sensíveis)
-      await U.wait((1400 + U.rand() * 3600) * (1 - (st.hook - 3) * 0.06));
+      await U.wait((1400 + U.rand() * 3600) * (1 - (st.hook - 3) * 0.06) * (castBait?castBait.waitMult:1));
       if (quit) return;
       // 3. fisgada
       w.fishFx && w.fishFx('bite', spot);
@@ -149,15 +155,15 @@
       let hooked = false;
       await Promise.race([new Promise((r) => setMain('Fisgar!', '❗', () => { hooked = true; r(); })), U.wait(winMs)]);
       if (quit) return;
-      if (!hooked) { const lost=E.Life.activeBait&&E.Life.activeBait(h,biome);if(lost)E.Life.spendBait(h,lost.key);stage.innerHTML = '<div class="fi-msg">Ah, não! O peixe roubou a isca e fugiu. Seja mais rápido!</div>'; E.Audio.sfx('fail'); w.fishFx && w.fishFx('escape', spot); setMain('Tentar de novo', '🎣', () => round()); return; }
+      if (!hooked) { updateBait(false);stage.innerHTML = '<div class="fi-msg">Ah, não! O peixe roubou a isca e fugiu. Seja mais rápido!</div>'; E.Audio.sfx('fail'); w.fishFx && w.fishFx('escape', spot); setMain('Tentar de novo', '🎣', () => round()); return; }
       // 4. luta com tensão na linha
-      const res = E.Life.rollCatch(h, biome, w.id);
+      const res = E.Life.rollCatch(h, biome, w.id, receipt);
       const ok = await reel(res.junk ? null : res.fish);
       if (quit) return;
       spot.left--;
       if (spot.left <= 0) { E.state.world.fishDep = E.state.world.fishDep || {}; E.state.world.fishDep[`${w.id}:${spot.i}`] = Date.now(); }
       if (ok !== true) {
-        if(res.baitKey)E.Life.spendBait(h,res.baitKey);
+        updateBait(false);
         stage.innerHTML = `<div class="fi-msg">${ok === 'break' ? 'A linha arrebentou com a tensão… solte quando o peixe correr.' : ok === 'slack' ? 'A linha ficou frouxa e o peixe se soltou do anzol.' : 'O peixe levou a linha e escapou.'}</div>`;
         E.Audio.sfx('fail'); buzz(140); w.fishFx && w.fishFx('escape', spot); setMain('Pescar de novo', '🎣', () => round()); return;
       }
@@ -165,7 +171,7 @@
       w.fishFx && w.fishFx('catch', spot, { art: FI.artCanvas(caught), r: res.fish ? res.fish.r : 1 });
       // 5. resultado
       const first = res.fish && !d.dex[res.fish.id];
-      E.Life.landCatch(h, res);
+      E.Life.landCatch(h, res);updateBait(false);
       E.Audio.sfx(res.fish && res.fish.r >= 4 ? 'crit' : 'chest');
       if (res.junk) stage.innerHTML = `<div class="fi-result"><div class="fr-ic">${res.junk.icon}</div><div><div class="fr-n">${res.junk.name}</div><div class="fr-d">${res.junk.desc}</div></div></div>`;
       else {

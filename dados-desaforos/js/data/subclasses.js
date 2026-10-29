@@ -1,5 +1,6 @@
-/* Subclasses do Livro do Jogador 2024 (quatro por classe, escolhidas no nível 3), revisadas pelo texto de 2024.
-   As marcadas com srd: true vêm do SRD 5.2; as demais seguem o Livro do Jogador 2024, resumidas para o combate de Elarion.
+/* Subclasses escolhidas no nível 3, resumidas para o combate de Elarion.
+   As marcadas com srd: true têm referência no SRD 5.2.1; as demais têm atribuição ao Livro do Jogador 2024
+   ainda pendente de conferência contra o texto oficial completo. Ausência no SRD não indica conteúdo inventado.
    O que depende de mapa, deslocamento ou exploração aparece só como descrição. "Só aliados" = afeta outras criaturas
    (no cooperativo, os aliados do grupo).
    Característica: [nível, id, nome, descrição, efeitos]. Os efeitos (fx) são interpretados pelo motor de combate:
@@ -30,7 +31,7 @@
       berserker: { name: 'Caminho do Berserker', icon: '🪓', srd: true, blurb: 'Fúria pura, sem freio: cada golpe descuidado vira uma tempestade de dano.',
         features: [
           [3, 'frenesi', 'Frenesi', 'Se usar Ataque Descuidado em Fúria, o primeiro alvo que você acertar no turno sofre dano extra: d6s iguais ao seu bônus de dano de Fúria.'],
-          [6, 'furia_irracional', 'Fúria Irracional', 'Em Fúria você é imune a Amedrontado e Enfeitiçado (entrar em Fúria encerra essas condições).', { condImmRage: ['amedrontado', 'adormecido'] }],
+          [6, 'furia_irracional', 'Fúria Irracional', 'Em Fúria você é imune a Amedrontado e Enfeitiçado (entrar em Fúria encerra essas condições).', { condImmRage: ['amedrontado', 'enfeiticado'] }],
           [10, 'retaliacao', 'Retaliação', 'Reação: quando uma criatura a até 1,5 m causa dano a você, faça um ataque corpo a corpo contra ela.', { retaliate: true }],
         ] },
       coracao_selvagem: { name: 'Caminho do Coração Selvagem', icon: '🐻', blurb: 'O espírito do urso, da águia e do lobo corre nas suas veias.',
@@ -303,7 +304,7 @@
     mago: {
       evocador: { name: 'Evocador', icon: '🔥', srd: true, blurb: 'Fogo, gelo e raios — sempre na medida certa.',
         features: [
-          [3, 'truque_potente', 'Truque Potente', 'Quando um alvo passar no TR contra seu truque de dano, ainda sofre metade do dano.'],
+          [3, 'truque_potente', 'Truque Potente', 'Quando seu truque de dano errar o ataque, ou o alvo passar no teste de resistência, ele ainda sofre metade do dano, sem outros efeitos.'],
           [6, 'esculpir', 'Esculpir Magias', 'Protege aliados das suas magias de Evocação (só aliados).'],
           [10, 'evocacao_potencializada', 'Evocação Potencializada', 'Some INT a uma rolagem de dano das suas magias de Evocação.', { spellDmgMod: { schools: ['Evocação'], ab: 'int' } }],
         ] },
@@ -370,7 +371,7 @@
       devocao: { name: 'Juramento de Devoção', icon: '🕊', srd: true, blurb: 'O cavaleiro ideal: honra, pureza e uma arma que brilha.',
         features: [
           [3, 'arma_sagrada', 'Arma Sagrada', 'Canalizar Divindade: soma CAR às jogadas de ataque por 10 minutos. Magias sempre preparadas: Proteção contra o Bem e o Mal, Escudo da Fé; Auxílio.', { grantSpells: [[3, 'protecao_mal_bem', 'escudo_fe'], [5, 'auxilio']] }],
-          [7, 'aura_devocao', 'Aura de Devoção', 'Você e aliados na aura são imunes a Enfeitiçado.', { condImm: ['adormecido'] }],
+          [7, 'aura_devocao', 'Aura de Devoção', 'Você e aliados na aura são imunes a Enfeitiçado.', { condImm: ['enfeiticado'] }],
         ] },
       gloria: { name: 'Juramento da Glória', icon: '🏅', blurb: 'Herói de lenda: cada golpe divino inspira e protege.',
         features: [
@@ -443,7 +444,7 @@
   addFeat('barbaro', [5, 'movimento_rapido', 'Movimento Rápido', 'Deslocamento +3 m sem armadura pesada.']);
   addFeat('barbaro', [7, 'bote_instintivo', 'Bote Instintivo', 'Ao entrar em Fúria, move-se metade do deslocamento.']);
   addFeat('bardo', [2, 'especializacao_bardo', 'Especialização', 'Dobra o BP em duas perícias.']);
-  addFeat('bardo', [7, 'contraencanto', 'Contraencanto', 'Vantagem em TR contra Enfeitiçado e Amedrontado (e Reação para repetir o TR de um aliado).', { saveAdvVs: ['fear', 'charm'] }]);
+  addFeat('bardo', [7, 'contraencanto', 'Contraencanto', 'Reação: após você falhar num teste de resistência contra Enfeitiçado ou Amedrontado, repete o teste com Vantagem.', { countercharm: true }]);
   addFeat('bardo', [9, 'especializacao_bardo2', 'Especialização', 'Mais duas perícias com BP dobrado.']);
   addFeat('bardo', [10, 'segredos_magicos', 'Segredos Mágicos', 'Escolhe magias das listas de Bardo, Clérigo, Druida e Mago.']);
   addFeat('bruxo', [9, 'contatar_patrono', 'Contatar Patrono', 'Contatar Outro Plano sem espaço para falar com o patrono (1×/Descanso Longo).']);
@@ -479,6 +480,14 @@
   addFeat('patrulheiro', [6, 'andarilho', 'Andarilho', 'Deslocamento +3 m, escalada e natação.']);
   addFeat('patrulheiro', [9, 'especializacao_patrulheiro', 'Especialização', 'Mais duas perícias com BP dobrado.']);
   addFeat('patrulheiro', [10, 'incansavel', 'Incansável', 'Ação de Magia (SAB vezes/Descanso Longo): 1d8 + SAB PV temporários; descansos reduzem a Exaustão.']);
+
+  // Referências das características alteradas nesta revisão; não certifica os demais resumos.
+  H.FEATURE_REFERENCES = {
+    truque_potente: 'SRD 5.2.1, p. 82 — Potent Cantrip',
+    furia_irracional: 'SRD 5.2.1, p. 30 — Mindless Rage',
+    aura_devocao: 'SRD 5.2.1, p. 56 — Aura of Devotion',
+    contraencanto: 'SRD 5.2.1, p. 33 — Countercharm',
+  };
 
   // lista ordenada para telas
   H.subclassesOf = (cls) => Object.entries(H.SUBCLASSES[cls] || {}).map(([id, d]) => Object.assign({ id }, d));

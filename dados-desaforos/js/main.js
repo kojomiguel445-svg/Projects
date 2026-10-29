@@ -62,6 +62,7 @@
   G.enterWorld = async (fresh) => {
     const h = E.Store.hero();
     if (!h || h.dead) return E.Creator.open();
+    if (C.reconcileOriginFeat) C.reconcileOriginFeat(h);
     UI.closeAll();
     E.WG.locked = false;
     E.WG.loadRegion(E.state.world.region || 'bosque');
@@ -73,10 +74,11 @@
     if (!fresh && E.state.seenVersion !== E.Title.VERSION) { await U.wait(1200); await G.whatsNew(); }
     // heróis antigos (nível 3+) escolhem a subclasse uma vez
     if (!fresh && h.level >= E.H.SUB_LEVEL && !h.subChosen && !h.subAsked) { await U.wait(400); await E.Sheet.subclass(h); }
+    if (E.RuleChoices) await E.RuleChoices.resolve(h);
     if (fresh) {
       E.state.seenVersion = E.Title.VERSION; E.Store.save();
       await U.wait(900);
-      await E.Interact.dialog({ name: 'Morgana', title: 'Sua guia', lines: [E.WD.MORGANA.welcome, `Você é ${h.name}, ${C.species(h).name.toLowerCase()} ${C.cls(h).name.toLowerCase()}. As regras aqui são as de D&D 5.5: d20, Vantagem, Maestria em Armas, tudo certinho!`, 'Use WASD (ou o joystick) para andar, arraste a tela para girar a câmera e F (ou o botão de mão) para interagir.', 'Toma 1600 Gemas Estelares e 10 Selos de boas-vindas. Visite o Oráculo (a estrela no canto) para tentar a sorte com armas lendárias!'], options: [{ id: 'ok', label: 'Vamos lá!', icon: '✦' }] });
+      await E.Interact.dialog({ name: 'Morgana', title: 'Sua guia', lines: [E.WD.MORGANA.welcome, `Você é ${h.name}, ${C.species(h).name.toLowerCase()} ${C.cls(h).name.toLowerCase()}. Elarion combina regras revisadas do SRD 5.2.1 com sistemas próprios. Na ficha, você pode conferir a composição dos valores e as fontes.`, 'Use WASD, o joystick ou clique no chão para andar. No computador, segure o botão direito e arraste para girar a câmera; no celular, arraste a tela. F ou o botão de mão interage.', 'Toma 1600 Gemas Estelares e 10 Selos de boas-vindas. Visite o Oráculo (a estrela no canto) para tentar a sorte com armas lendárias!'], options: [{ id: 'ok', label: 'Vamos lá!', icon: '✦' }] });
     }
   };
 
@@ -84,11 +86,11 @@
   G.whatsNew = async () => {
     E.state.seenVersion = E.Title.VERSION; E.Store.save();
     const html = `<div class="whatsnew"><ul>
-      <li><b>Trabalho de verdade em todos os empregos:</b> chega de questionário. Na cozinha você monta os pedidos e acerta o ponto; na peixaria separa e limpa o pescado; na forja, marcenaria e lapidação acerta os golpes; nas entregas, armazém, cais e rouparia organiza os itens; na recepção e no cassino faz a conta e entrega o troco. O atendente do empório continua no caixa da loja.</li>
-      <li><b>XP por dia de trabalho:</b> cada dia trabalhado dá salário, XP de nível e XP de especialidade no seu ramo (Culinária, Pesca, Forja, Comércio...). Cada nível de especialidade aumenta o salário em 5% e muda o seu cargo (Aprendiz, Auxiliar, Profissional, Especialista, Mestre).</li>
-      <li><b>Fornecedor da peixaria:</b> no empório e peixaria (e no cais das cidades) há um balcão para vender o que você pesca e cumprir as encomendas do dia, que pagam 50% a mais. Entregar sobe sua reputação de fornecedor e aumenta o preço do seu pescado.</li>
-      <li><b>Loja mais simples e lucrativa:</b> painel único em Menu → Minha Loja. Coloque produtos da mochila na prateleira, confira o preço e abra: de dia os clientes compram sozinhos quando o preço está justo, mesmo com você longe. O aluguel caiu de 120 para 30 po por dia, os funcionários ficaram mais baratos e o painel mostra visitantes, vendas e saldo do dia.</li>
-      <li><b>5.10:</b> grupo de até 3 personagens com troca animada, companheiros na luta, demissão pela carteira e HUD sem pixel.</li>
+      <li><b>Regras e fontes:</b> correções verificadas no SRD 5.2.1 para CA, proficiência, magias, condições e progressão. A ficha mostra a composição dos bônus e distingue regras autorais. As lacunas da revisão estão identificadas nas fontes.</li>
+      <li><b>Movimento com mouse:</b> clique no chão para caminhar contornando obstáculos; WASD cancela a rota. Segure o botão direito e arraste para girar a câmera. Os controles de toque continuam disponíveis.</li>
+      <li><b>Experiência no HUD:</b> a barra mostra XP e o próximo nível sem abrir a ficha.</li>
+      <li><b>Covil de Ignarax:</b> os dragões saíram dos encontros comuns. Explore o covil, observe o desafio e decida quando lutar.</li>
+      <li><b>Cassino:</b> encontre a mesa de pôquer e o balcão de Nara para penhorar armas elegíveis, conferir os termos e resgatá-las depois. Somente moeda fictícia do jogo.</li>
     </ul></div>`;
     await UI.modal({ title: `✦ Novidades da versão ${E.Title.VERSION}`, html, buttons: [{ label: 'Ver o Oráculo', value: 'wish' }, { label: 'Bora jogar!', value: true, cls: 'primary' }] }).then((v) => { if (v === 'wish') E.Wish.open(); });
   };
@@ -150,6 +152,7 @@
     if (h.pendingStyle) await E.Sheet.style(h);
     if (C.hasFx(h, 'styleExtra') && !h.fightingStyle2) await E.Sheet.style(h, 2);
     if (h.pendingAsi) await E.Sheet.asi(h);
+    if (E.RuleChoices) await E.RuleChoices.resolve(h);
     if (E.WG.world) E.WG.world.refreshHeroFrames();
     E.Store.save();
     E.HUD.update();

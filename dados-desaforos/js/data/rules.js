@@ -70,6 +70,7 @@
   };
 
   R.CONDITIONS = {
+    enfeiticado: { name: 'Enfeitiçado', desc: 'Não pode atacar quem o enfeitiçou nem alvejá-lo com habilidades ou efeitos mágicos nocivos. Quem o enfeitiçou tem Vantagem nos testes de atributo para interagir socialmente com ele.' }, // SRD 5.2.1 p178, Charmed
     caido: { name: 'Caído', desc: 'Ataques corpo a corpo contra ele têm Vantagem; seus ataques têm Desvantagem. Levanta-se gastando movimento.' },
     envenenado: { name: 'Envenenado', desc: 'Desvantagem em jogadas de ataque e testes de atributo.' },
     amedrontado: { name: 'Amedrontado', desc: 'Desvantagem em ataques e testes enquanto a fonte do medo estiver à vista.' },
@@ -83,16 +84,16 @@
     enfraquecido: { name: 'Enfraquecido', desc: 'Desvantagem na próxima jogada de ataque (Maestria Enfraquecer).' },
     marcado: { name: 'Marcado', desc: 'Sofre dano extra dos ataques de quem o marcou.' },
     abencoado: { name: 'Abençoado', desc: '+1d4 em jogadas de ataque e testes de resistência.' },
-    iluminado: { name: 'Iluminado', desc: 'O próximo ataque contra ele tem Vantagem (Raio Guia / Fogo das Fadas).' },
+    iluminado: { name: 'Iluminado', desc: 'O próximo ataque contra ele tem Vantagem (Raio Guia).' },
     esquivando: { name: 'Esquivando', desc: 'Ataques contra ele têm Desvantagem; Vantagem em resistências de Destreza.' },
     furia: { name: 'Fúria', desc: 'Dano extra com Força, Resistência a dano Cortante, Perfurante e de Concussão.' },
-    adormecido: { name: 'Enfeitiçado', desc: 'Incapacitado (sono, encanto ou transe). Termina se sofrer dano; ataques contra ele têm Vantagem.' },
+    adormecido: { name: 'Inconsciente', desc: 'Incapacitado e sem percepção dos arredores. Ataques contra ele têm Vantagem; falha automaticamente em resistências de FOR e DES. A duração e as formas de despertar dependem do efeito.' }, // SRD 5.2.1 p191, Unconscious
     banido: { name: 'Banido', desc: 'Enviado a outro plano enquanto durar a Concentração.' },
     atormentado: { name: 'Atormentado', desc: 'O próximo ataque contra ele tem Vantagem (Maestria Atormentar).' },
     perdicao: { name: 'Perdição', desc: 'Subtrai 1d4 das jogadas de ataque e dos testes de resistência.' },
     lentificado: { name: 'Lentificado', desc: '−2 na CA e só um ataque por turno (magia Lentidão).' },
     mistico: { name: 'Mente Abalada', desc: 'Desvantagem no próximo TR contra as suas magias.' },
-    iluminado_conc: { name: 'Delineado', desc: 'Ataques contra ele têm Vantagem (Fogo das Fadas).' },
+    iluminado_conc: { name: 'Delineado', desc: 'Todos os ataques contra ele têm Vantagem enquanto durar o efeito (Fogo das Fadas / Golpe Brilhante).' },
     empurrado: { name: 'Empurrado', desc: 'Afastado 3 m (Maestria Empurrar): fugir dele é automático neste turno.' },
   };
 

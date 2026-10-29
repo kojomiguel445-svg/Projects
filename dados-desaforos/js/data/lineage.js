@@ -176,7 +176,7 @@
     const [sp, cls, name, type, base, focus, tpl, c1, c2, c3, dtype, insp, sigName, sigIcon, lore, extra] = r;
     const id = `lin_${sp}_${cls}`;
     W.CATALOG[id] = {
-      name, type, rarity: 5, base, focus: focus || undefined, lineage: { species: sp, cls },
+      name, type, rarity: 5, base, focus: focus || undefined, lineage: { species: sp, cls }, rulesSource: 'Elarion — conteúdo original',
       passive: PASS[cls](dtype), insp, lore: `${lore} Inspirada em ${insp}.`,
       art: Object.assign({ tpl, c1, c2, c3, v: 0, shape: focus || type }, extra || {}),
     };

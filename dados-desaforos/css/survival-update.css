@@ -1,0 +1,31 @@
+/* One nutrition bar, immediately below the existing health bar. */
+#hud .hud-bottom .hunger-bar {
+  display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0;
+  margin: 5px 0 0; padding: 1px 0; border: 0; border-radius: 0;
+  background: transparent; box-shadow: none; color: #f2ce8c;
+  font-size: 10px; line-height: 16px; pointer-events: auto;
+  text-shadow: 0 1px 3px #10131e;
+}
+#hud .hud-bottom .hunger-bar img.el-icon,
+#hud .hud-bottom .hunger-bar svg { flex: 0 0 14px; width: 14px; height: 14px; }
+#hud .hud-bottom .hunger-bar > span { min-width: 29px; text-align: right; }
+#hud .hud-bottom .hunger-bar > i {
+  display: block; flex: 1; width: auto; height: 5px; overflow: hidden;
+  border-radius: 4px; background: #201d27bd; box-shadow: 0 0 0 1px #ead3ab55;
+}
+#hud .hud-bottom .hunger-bar > i > b {
+  display: block; height: 100%; border-radius: inherit;
+  background: linear-gradient(180deg, #f6d992, #c18a3f);
+  transition: width .45s linear, background .25s;
+}
+#hud .hud-bottom .hunger-bar.low { color: #ffb777; }
+#hud .hud-bottom .hunger-bar.low > i > b { background: #e9a05d; }
+#hud .hud-bottom .hunger-bar.critical > i { box-shadow: 0 0 0 1px #f0a17b, 0 0 7px #e9734566; }
+#hud .hud-bottom .hunger-bar.critical > i > b { background: #ef795b; }
+#hud .hud-bottom .hunger-bar.critical > span { animation: hunger-warn 1.8s ease-in-out infinite; }
+#hud .hud-bottom .hunger-bar:focus-visible { outline: 1px solid #f6d992; outline-offset: 3px; }
+@keyframes hunger-warn { 50% { opacity: .5; } }
+@media (prefers-reduced-motion: reduce) {
+  #hud .hud-bottom .hunger-bar > i > b { transition: none; }
+  #hud .hud-bottom .hunger-bar.critical > span { animation: none; }
+}

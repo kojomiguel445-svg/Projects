@@ -2,6 +2,7 @@
 (() => {
   const U = E.U, UI = E.UI, R = E.R, H = E.H, S = E.S, C = E.C;
   const CR = {};
+  CR.originFeatOptions = (background) => Object.entries(H.FEATS).filter(([id, feat]) => !feat.general && (id !== H.BACKGROUNDS[background]?.feat || feat.repeatable));
   const NAMES = ['Aelin', 'Bram', 'Caelum', 'Dara', 'Elowen', 'Fenris', 'Galen', 'Helena', 'Isolde', 'Joran', 'Kael', 'Lyra', 'Mirela', 'Nyx', 'Orin', 'Petra', 'Quill', 'Rhea', 'Soren', 'Talia', 'Ulric', 'Vesna', 'Wren', 'Yara', 'Zeno', 'Tainá', 'Iberê', 'Jacira', 'Raoni', 'Moema'];
   const HAIR = ['#2a1f1a', '#5a3a22', '#a8652a', '#d4af37', '#e8e2d0', '#c84b3a', '#3a4a8a', '#5fbf77', '#b77dff', '#ff9ad5'];
   const OUTFITS = ['#e08a3c', '#3a62c8', '#c0392b', '#5f8a4a', '#7b5cff', '#2c3e50', '#f0c75e', '#a8325a', '#3ec7b3', '#9aa3ad'];
@@ -27,7 +28,7 @@
   };
 
   function preview() {
-    const fake = { cls: c.cls, species: c.species, look: c.look, equip: {} };
+    const fake = { cls: c.cls, species: c.species, ancestry: c.ancestry, look: c.look, equip: {} };
     const wt = E.W.typeOfBase(H.CLASSES[c.cls].equip.weapon);
     const cv = E.SP.hero(fake, 'idle0', ['bruxo', 'feiticeiro', 'mago'].includes(c.cls) ? 'catalisador' : wt);
     el.querySelector('.pv').src = E.SP.portrait(cv, 6);
@@ -57,6 +58,8 @@
   }
 
   function validate(name) {
+    if (name === 'Espécie' && c.species === 'humano' && (!H.FEATS[c.extraFeat] || H.FEATS[c.extraFeat].general)) return 'Escolha um Talento de Origem para Versátil.';
+    if (name === 'Espécie' && c.species === 'humano' && c.extraFeat === H.BACKGROUNDS[c.background].feat && !H.FEATS[c.extraFeat].repeatable) return 'Escolha outro Talento de Origem para Versátil.';
     if (name === 'Atributos') {
       if (c.method === 'padrao') { const vals = Object.values(c.base).sort((a, b) => b - a); if (vals.join() !== R.STANDARD_ARRAY.join()) return 'Use cada valor do Conjunto Padrão uma única vez.'; }
       else if (pointsLeft() < 0) return 'Você gastou pontos demais.';
@@ -76,7 +79,7 @@
 
   // ------------------------------------------------ passos
   function stClass(body) {
-    body.innerHTML = `<h3>Escolha sua Classe</h3><p class="lead">A classe define como você luta, que magias usa e quais Dados de Vida tem. As 12 classes seguem o Livro do Jogador 2024.</p><div class="pick-grid"></div><div class="detail"></div>`;
+    body.innerHTML = `<h3>Escolha sua Classe</h3><p class="lead">A classe define como você luta, que magias usa e quais Dados de Vida tem. Escolha entre as 12 classes de D&amp;D 2024, adaptadas ao combate de Elarion.</p><div class="pick-grid"></div><div class="detail"></div>`;
     const grid = body.querySelector('.pick-grid');
     for (const id of H.CLASS_ORDER) {
       const k = H.CLASSES[id];
@@ -134,8 +137,7 @@
     }
     if (c.species === 'humano') {
       const box = U.h('<div style="margin-top:10px"><b>Versátil — Talento de Origem extra:</b><div class="checks" style="margin-top:6px"></div></div>');
-      for (const [id, f] of Object.entries(H.FEATS)) {
-        if (id === H.BACKGROUNDS[c.background].feat) continue;
+      for (const [id, f] of CR.originFeatOptions(c.background)) {
         const b = U.h(`<button class="check ${c.extraFeat === id ? 'on' : ''}" title="${f.desc}"><i>${c.extraFeat === id ? '✓' : ''}</i>${f.name}</button>`);
         b.onclick = () => { c.extraFeat = id; render(); };
         box.querySelector('.checks').appendChild(b);
@@ -254,12 +256,13 @@
   }
 
   function stLook(body) {
+    if (c.species === 'draconato' && E.Skins?.ancestryColor(c.ancestry)) c.look.skin = E.Skins.ancestryColor(c.ancestry);
     body.innerHTML = `<h3>Aparência e Nome</h3><p class="lead">Monte o visual do seu herói. Dá para mudar tudo depois no Guarda-roupa (menu principal).</p>
       <div class="detail"><h4>Nome</h4><div style="display:flex;gap:8px;flex-wrap:wrap"><input class="field" id="heroName" maxlength="18" value="${U.esc(c.name)}" aria-label="Nome do herói" style="flex:1;min-width:0"><button class="btn dark" data-a="rnd"><span class="ico">🎲</span>Aleatório</button></div></div><div class="ap"></div>`;
     const inp = body.querySelector('input');
     inp.oninput = () => { c.name = inp.value; el.querySelector('.sname').textContent = c.name || '—'; };
     body.querySelector('[data-a=rnd]').onclick = () => { c.name = U.pick(NAMES); inp.value = c.name; el.querySelector('.sname').textContent = c.name; };
-    E.Wardrobe.editor(body.querySelector('.ap'), { get: () => c.look, cls: () => c.cls, species: () => c.species, onChange: preview });
+    E.Wardrobe.editor(body.querySelector('.ap'), { get: () => c.look, cls: () => c.cls, species: () => c.species, ancestry: () => c.ancestry, onChange: preview });
   }
 
   function finish() {

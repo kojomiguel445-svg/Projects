@@ -5,7 +5,7 @@
   // A circular footprint moves on the floor independently of the upright pixel artwork.
   const FOOT=.29,BOUNDS={left:-4.55,right:4.55,back:-4.03,front:4.14};
   function free(c,x,z){
-    if(x<BOUNDS.left||x>BOUNDS.right||z<BOUNDS.back||z>BOUNDS.front)return false;
+    const bounds=c.bounds||BOUNDS;if(x<bounds.left||x>bounds.right||z<bounds.back||z>bounds.front)return false;
     return !c.colliders.some(o=>{
       if(o.hw!=null){const dx=Math.max(Math.abs(x-o.x)-o.hw,0),dz=Math.max(Math.abs(z-o.z)-o.hd,0);return dx*dx+dz*dz<FOOT*FOOT-1e-8;}
       return Math.hypot(x-o.x,z-o.z)<(o.r||0)+FOOT-1e-8;
@@ -21,18 +21,19 @@
   }
   function recover(c){
     const h=c.hero;if(free(c,h.x,h.z))return;
-    let best=null,dist=Infinity;
-    for(let z=BOUNDS.back+.1;z<BOUNDS.front;z+=.18)for(let x=BOUNDS.left+.1;x<BOUNDS.right;x+=.18){const d=Math.hypot(x-h.x,z-h.z);if(d<dist&&free(c,x,z)){best={x,z};dist=d;}}
+    let best=null,dist=Infinity;const bounds=c.bounds||BOUNDS;
+    for(let z=bounds.back+.1;z<bounds.front;z+=.18)for(let x=bounds.left+.1;x<bounds.right;x+=.18){const d=Math.hypot(x-h.x,z-h.z);if(d<dist&&free(c,x,z)){best={x,z};dist=d;}}
     if(best)Object.assign(h,best);
   }
   function floorY(c,x,z){
+    if(c.floorAt)return c.floorAt(x,z);
     if(c.kind==='inn'&&Math.abs(x+3.35)<.825){for(let k=3;k>=0;k--)if(Math.abs(z-(-2.18-k*.3))<.17)return .22+k*.26;}
     return .085;
   }
   // Fixed orthographic framing keeps floor pixels, furniture and characters at one scale.
   function fitCamera(c){
     const aspect=innerWidth/innerHeight;if(c.frameAspect===aspect)return;c.frameAspect=aspect;
-    const halfH=Math.max(6.8,8.2/aspect),camera=c.camera;camera.left=-halfH*aspect;camera.right=halfH*aspect;camera.top=halfH;camera.bottom=-halfH;camera.updateProjectionMatrix();camera.updateMatrixWorld(true);
+    const halfH=Math.max(c.frameHalfH||6.8,(c.frameHalfW||8.2)/aspect),camera=c.camera;camera.left=-halfH*aspect;camera.right=halfH*aspect;camera.top=halfH;camera.bottom=-halfH;camera.updateProjectionMatrix();camera.updateMatrixWorld(true);
   }
   I.physics={radius:FOOT,bounds:BOUNDS,free,move,recover};
   I.decorators={};
@@ -241,6 +242,7 @@
     c.overlay.querySelector('[data-exit]').onclick=()=>I.leave();c.act.onclick=()=>I.interact();
     const held=new Set();const updatePad=()=>{keyState.x=(held.has('right')?1:0)-(held.has('left')?1:0);keyState.y=(held.has('up')?1:0)-(held.has('down')?1:0);};
     c.overlay.querySelectorAll('[data-dir]').forEach(b=>{b.onpointerdown=e=>{e.preventDefault();held.add(b.dataset.dir);updatePad();b.setPointerCapture(e.pointerId);};const release=()=>{held.delete(b.dataset.dir);updatePad();};b.onpointerup=release;b.onpointercancel=release;b.onlostpointercapture=release;});
+    if(E.LandmarkDoors)E.LandmarkDoors.opened(c);
     if(I.onOpen)I.onOpen(c);
     E.HUD.show(false);E.WG.locked=true;E.WG.setMode('interior');I.update(0);
   };
@@ -253,7 +255,8 @@
   };
   I.update=(dt)=>{
     const c=I.current;if(!c)return;dt=U.clamp(Number(dt)||0,0,.25);fitCamera(c);c.t+=dt;const h=c.hero,canMove=!E.UI.anyOpen()&&!document.querySelector('.modal-bg')&&!busy()&&!c.sleeping&&!c.edit&&!c.lockMove;
-    const k=E.WG.input.move(),mx=keyState.x||k.x,my=keyState.y||k.y;
+    const k=E.WG.input.move(),raw={x:keyState.x||k.x,y:keyState.y||k.y,sprint:k.sprint};
+    const mv=E.ClickMove?E.ClickMove.motion({mode:'interior',room:c,dt,blocked:!canMove},raw):raw,mx=mv.x,my=mv.y;
     c.moving=canMove&&(Math.abs(mx)+Math.abs(my)>.05);c.sprinting=false;
     if(c.edit){const e=c.edit,n=Math.max(1,Math.hypot(mx,my));e.x=U.clamp(e.x+(mx*.82-my*.57)/n*2.4*dt,-4.6,4.6);e.z=U.clamp(e.z+(-mx*.57-my*.82)/n*2.4*dt,-4.1,3.0);e.gx=snap(e.x);e.gz=snap(e.z);e.preview.g.position.set(e.gx,.02,e.gz);e.preview.g.rotation.y=e.turn*Math.PI/2;e.valid=canPlace(c,e);for(const m of e.materials)m.emissive.set(e.valid?'#3eaf81':'#be665b');e.bar.querySelector('[data-place]').disabled=!e.valid;if(c.t>=(e.nextText||0)){e.nextText=c.t+.2;e.status.textContent=e.valid?'Mova com WASD ou os botões · R gira · Enter coloca':(e.why||'Este espaço está ocupado ou bloqueia a entrada');}}
     if(c.moving&&c.seated){c.seated=false;if(c.seatReturn){h.x=c.seatReturn.x;h.z=c.seatReturn.z;}}
@@ -268,6 +271,7 @@
     for(const f of c.flames)f.scale.y=.85+Math.sin(c.t*8)*.12;
     if(E.Settlements.workTick)E.Settlements.workTick(dt,c);
     if(c.onUpdate)c.onUpdate(dt,c);
+    if(E.LandmarkDoors&&E.LandmarkDoors.updateInterior(c,dt))return;
     if(c.t>=c.hudAt){c.hudAt=c.t+.2;const cl=E.Sim.clock();c.clock.textContent=`${cl.text} · Saciedade ${Math.round(E.Sim.data(E.Store.hero()).hunger)}/100`;const lamps=c.fixtures.filter(f=>f.id==='lamp'&&f.furniture.lit!==false).length;c.ambient.intensity=(cl.night?1.15:1.65)+Math.min(.25,lamps*.10);
       let nearest=null,best=Infinity;for(const f of c.fixtures){const d=Math.hypot(h.x-f.x,h.z-f.z);if(d<f.r+1.05&&d<best){best=d;nearest=f;}}
       c.near=nearest;c.act.disabled=!nearest;c.act.innerHTML=nearest?`${icon(nearest.icon)} ${U.esc(nearest.label)}`:'Aproxime-se de um móvel';c.label.textContent=nearest?nearest.label:'';

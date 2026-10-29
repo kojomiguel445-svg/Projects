@@ -61,6 +61,28 @@
   for (const r of ['cidade', 'costa', 'vazios', 'astrolabio']) WD.REGIONS[r].neighbors.push('aurenna');
   WD.REGION_ORDER = ['bosque', 'cidade', 'aurenna', 'ruinas', 'costa', 'vazios', 'abismo', 'montanhas', 'astrolabio', 'jardins'];
 
+  // CONTEÚDO ORIGINAL: localização, caminhos e ambientação de Elarion.
+  // A ficha de Ignarax usa exclusivamente Young Red Dragon (SRD 5.2.1, p. 318).
+  // Registro adicional: não substitui as Minas da Forja Celeste nem gruta_abismo.
+  WD.DRAGON_LAIRS = {
+    covil_ignarax: {
+      name: 'Covil de Ignarax — Garganta Rubra', parent: 'montanhas', biome: 'cave', cave: true,
+      dragonLair: 'ignarax', level: 10, seed: 5130318, tint: '#713e36', ores: [], mons: [], npcs: [], neighbors: ['montanhas'], herb: null,
+      short: 'Ossos, marcas de garras e um tesouro sob a montanha.',
+      summary: 'Uma passagem original de Elarion une as Montanhas da Forja Celeste às profundezas onde Ignarax, o Rubro, guarda seu tesouro. Explore a galeria e recue livremente; o duelo só começa ao desafiar o dragão na câmara final.',
+      weather: 'Ecos, brasas e respiração distante',
+      provenance: { setting: 'original-elarion', monsterId: 'ignarax', sourceId: 'srd-5.2.1', officialName: 'Young Red Dragon', pages: [318], implementation: 'partial' },
+      legacyBossRegion: 'abismo', retryMs: 60000, victory: 'once-per-save',
+      spawn: { x: 0, z: 21 }, exit: { x: 0, z: 25 }, encounter: { x: 0, z: -21 }, threshold: { x: 0, z: -14 },
+      paths: [
+        [{ x: 0, z: 25 }, { x: 0, z: 18 }, { x: -7, z: 10 }, { x: -8, z: 0 }, { x: 0, z: -10 }, { x: 0, z: -21 }],
+        [{ x: -8, z: 0 }, { x: -18, z: 3 }],
+        [{ x: -7, z: 10 }, { x: 8, z: 10 }],
+      ],
+      rooms: [{ x: 0, z: 20, r: 5 }, { x: -8, z: 1, r: 6 }, { x: -18, z: 3, r: 4.5 }, { x: 8, z: 10, r: 4.5 }, { x: 0, z: -20, r: 8 }],
+    },
+  };
+
   // ---------- NPCs ----------
   // quest: { type:'hunt'|'collect'|'investigate', target, n, skill, dc, reward:{xp,gold,gems,item} }
   WD.NPCS = {
