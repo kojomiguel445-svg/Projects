@@ -307,18 +307,21 @@
       addEventListener('blur', () => { this.keys = {}; this.sprint = false; if (WG.world) WG.world.closeGlider(); });
       // arrastar para girar a câmera
       let drag = null;
-      canvas.addEventListener('pointerdown', (e) => { if (mode === 'idle') return; drag = { id: e.pointerId, x: e.clientX, y: e.clientY, sx:e.clientX, sy:e.clientY }; });
+      // segurar o botão direito (ou arrastar com o esquerdo/dedo) gira a câmera; o menu do navegador não abre
+      canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+      canvas.addEventListener('pointerdown', (e) => { if (mode === 'idle') return; drag = { id: e.pointerId, x: e.clientX, y: e.clientY, sx:e.clientX, sy:e.clientY, button: e.button }; });
       addEventListener('pointermove', (e) => { if (!drag || drag.id !== e.pointerId) return; this.yawDelta += (e.clientX - drag.x) * 0.006; this.pitchDelta += (e.clientY - drag.y) * 0.004; drag.x = e.clientX; drag.y = e.clientY; });
       addEventListener('pointerup', (e) => {
         if (!drag || drag.id !== e.pointerId) return;
-        const click=Math.hypot(e.clientX-drag.sx,e.clientY-drag.sy)<6;drag=null;
+        const click=Math.hypot(e.clientX-drag.sx,e.clientY-drag.sy)<6&&drag.button!==2;drag=null;
         if(!click||e.target!==canvas||mode!=='world'||WG.locked||!WG.world||!E.Interact||E.UI.anyOpen())return;
         const w=WG.world,p=w.hero,targets=(w.interactables||[]).filter(it=>['venue','citizen','customer'].includes(it.kind)&&Math.hypot(p.x-it.x,p.z-it.z)<(it.r||2)+.7).map(it=>({it,obj:it.group||(it.citizen&&it.citizen.sp)||it.sprite||(it.customer&&it.customer.sprite)})).filter(x=>x.obj&&x.obj.isObject3D);
-        if(!targets.length)return;
         const bounds=canvas.getBoundingClientRect(),ray=new THREE.Raycaster();
         ray.setFromCamera(new THREE.Vector2((e.clientX-bounds.left)/bounds.width*2-1,-(e.clientY-bounds.top)/bounds.height*2+1),w.camera);
-        const hits=ray.intersectObjects(targets.map(t=>t.obj),true);
+        const hits=targets.length?ray.intersectObjects(targets.map(t=>t.obj),true):[];
         for(const hit of hits){let o=hit.object;while(o){const target=targets.find(t=>t.obj===o);if(target){E.Interact.run(target.it);return;}o=o.parent;}}
+        // clique no chão: o herói caminha até o ponto (as teclas de movimento cancelam)
+        const spot=w.groundRay(ray.ray);if(spot)w.walkTo(spot.x,spot.z);
       });
       canvas.addEventListener('wheel', (e) => { this.zoomDelta += Math.sign(e.deltaY) * 1.2; e.preventDefault(); }, { passive: false });
       // pinça
@@ -811,6 +814,7 @@
       this.herbPos.forEach((p, i) => this.addHerb(i, p));
       // acampamentos inimigos
       this.campPos.forEach((p, i) => this.addCamp(i, p));
+      if (this.cave) this.addDragonNest();
       // objetivo da história / missões de investigação
       this.refreshObjectives();
     }
@@ -857,6 +861,16 @@
       const obj = { i, group: g, glow, x: p.x, z: p.z };
       this.herbs.push(obj);
       this.interactables.push({ kind: 'herb', id: i, x: p.x, z: p.z, r: 2, label: `Colher ${this.reg.herb}`, icon: '🌿', obj });
+    }
+    // Ninho de dragão no fundo da gruta: um dragão da região (filhote; jovem a partir do nível 7, onde houver).
+    addDragonNest() {
+      const nests = E.M.DRAGON_NESTS && E.M.DRAGON_NESTS[E.WD.home(this.id)];
+      if (!nests || !nests.length) return null;
+      const lvl = (E.Store.hero() || { level: 1 }).level, young = nests.filter((k) => /_jovem$/.test(k)), cubs = nests.filter((k) => !/_jovem$/.test(k));
+      const pool = lvl >= 7 && young.length ? young : cubs.length ? cubs : nests, key = pool[Math.floor(this.rng() * pool.length)];
+      const camp = this.addCamp('nest', this.findSpot(18, 27), { enc: { monsters: [key], xp: E.R.CR_XP[E.M.MONSTERS[key].cr], budget: 0, danger: true }, diff: 'alta' });
+      if (camp) camp.nest = true;
+      return camp;
     }
     addCamp(i, p, forced) {
       // no cooperativo, o visitante vê os acampamentos do mundo do anfitrião (nível e Nível de Mundo dele)
@@ -1155,7 +1169,7 @@
       const h = E.Store.hero() || { cls: 'guerreiro', species: 'humano', look: { skin: '#e3b892', hair: '#3a2a20', hairStyle: 0, outfit: '#e08a3c' }, equip: {} };
       const pos = E.state.world.pos && E.state.world.region === this.id ? E.state.world.pos : this.spawn;
       this.hero = { x: pos.x, z: pos.z, y: this.groundAt(pos.x, pos.z), vy: 0, jump: 0, dir: 1, moving: false, frameT: 0, frame: 0 };
-      this.heroSprite = this.makeSprite(E.SP.hero(h, 'idle0', E.SP.heroWeaponType(h)), WG.heroHeight(h));
+      this.heroSprite = this.makeSprite(E.SP.hero(h, 'idle0', E.Zones ? E.Zones.weaponType(h, this) : E.SP.heroWeaponType(h)), WG.heroHeight(h));
       this.scene.add(this.heroSprite);
       this.heroShadow = this.addShadow(0, 0, 0, 0.55);
       this.glider = new THREE.Sprite(new THREE.SpriteMaterial({ map: gliderTex(), transparent: true, depthWrite: false }));
@@ -1168,7 +1182,7 @@
     // quadros de pesca com a vara que o herói tem agora (a vara é desenhada no sprite, presa no punho)
     fishFrames(h = E.Store.hero()) {
       if (!h || !this.heroFrames) return;
-      const rod = (h.life && h.life.rod) || 0, wt = E.SP.heroWeaponType(h);
+      const rod = (h.life && h.life.rod) || 0, wt = E.Zones ? E.Zones.weaponType(h, this) : E.SP.heroWeaponType(h);
       this.heroFrames.fish = Object.fromEntries(['fcast0', 'fcast1', 'fhold', 'fbite', 'freel0', 'freel1', 'fcatch'].flatMap((k) => [[k, E.SP.hero(h, k + ':' + rod, wt)], ['s' + k, E.SP.hero(h, 's' + k + ':' + rod, wt)]]));
     }
     // Eco (espírito guardião) flutuando atrás do herói
@@ -1187,7 +1201,7 @@
     }
     refreshHeroFrames() {
       const h = E.Store.hero() || { cls: 'guerreiro', species: 'humano', look: { skin: '#e3b892', hair: '#3a2a20', hairStyle: 0, outfit: '#e08a3c' }, equip: {} };
-      const wt = E.SP.heroWeaponType(h);
+      const wt = E.Zones ? E.Zones.weaponType(h, this) : E.SP.heroWeaponType(h);
       const F = (f) => E.SP.hero(h, f, wt);
       this.heroFrames = { idle: [F('idle0'), F('idle1')], walk: Array.from({ length: 12 }, (_, i) => F('w' + i)), crouch: F('jump0'), up: F('jump1'), fall: F('jump2'), land: F('land'), swim: Array.from({ length: 8 }, (_, i) => F('swim' + i)), fish: null };
       this.fishFrames(h);
@@ -1384,6 +1398,46 @@
       const ix = Math.min(f.n - 2, Math.floor(gx)), iz = Math.min(f.n - 2, Math.floor(gz)), tx = gx - ix, tz = gz - iz, k = iz * f.n + ix;
       return U.lerp(U.lerp(f.data[k], f.data[k + 1], tx), U.lerp(f.data[k + f.n], f.data[k + f.n + 1], tx), tz);
     }
+    // ------------------------------------------------------------ clique para andar
+    // Marcha ao longo do raio da câmera até cruzar o terreno (ou a água) e refina por bisseção.
+    groundRay(r) {
+      const surf = (x, z) => Math.max(this.groundAt(x, z), this.waterLevel - .2);
+      let prev = 0, p = r.origin;
+      if (p.y <= surf(p.x, p.z)) return null;
+      for (let t = .5; t < 140; t += .5) {
+        const x = p.x + r.direction.x * t, y = p.y + r.direction.y * t, z = p.z + r.direction.z * t;
+        if (y <= surf(x, z)) {
+          let a = prev, b = t;
+          for (let k = 0; k < 10; k++) { const m = (a + b) / 2, mx = p.x + r.direction.x * m, mz = p.z + r.direction.z * m; if (p.y + r.direction.y * m <= surf(mx, mz)) b = m; else a = m; }
+          const hx = p.x + r.direction.x * b, hz = p.z + r.direction.z * b;
+          return Math.abs(hx) < this.bound + 10 && Math.abs(hz) < this.bound + 10 ? { x: hx, z: hz } : null;
+        }
+        prev = t;
+      }
+      return null;
+    }
+    walkTo(x, z) {
+      this.moveTarget = { x, z, best: Infinity, stuck: 0 };
+      if (!this.moveMark) {
+        this.moveMark = new THREE.Mesh(new THREE.RingGeometry(.32, .5, 24), new THREE.MeshBasicMaterial({ color: '#ffe7a8', transparent: true, opacity: .9, depthWrite: false }));
+        this.moveMark.rotation.x = -Math.PI / 2; this.moveMark.renderOrder = 5; this.scene.add(this.moveMark);
+      }
+      this.moveMark.visible = true; this.moveMark.position.set(x, this.groundAt(x, z) + .06, z); this.moveMark.userData.t = 0;
+    }
+    stopWalk() { this.moveTarget = null; if (this.moveMark) this.moveMark.visible = false; }
+    // Converte o destino em entrada de movimento relativa à câmera, como se fosse o teclado.
+    followTarget(mv, dt) {
+      const tg = this.moveTarget, hr = this.hero;
+      if (this.moveMark && this.moveMark.visible) { const m = this.moveMark, k = (m.userData.t = (m.userData.t || 0) + dt); m.scale.setScalar(1 + Math.sin(k * 6) * .12); }
+      if (!tg) return mv;
+      if (WG.locked || Math.abs(mv.x) + Math.abs(mv.y) > .05 || hr.boat) { this.stopWalk(); return mv; }
+      const dx = tg.x - hr.x, dz = tg.z - hr.z, d = Math.hypot(dx, dz);
+      if (d < .45) { this.stopWalk(); return mv; }
+      // sem progresso por 1,5 s (parede, penhasco): desiste
+      if (d < tg.best - .05) { tg.best = d; tg.stuck = 0; } else if ((tg.stuck += dt) > 1.5) { this.stopWalk(); return mv; }
+      const yaw = this.cam.yaw, ux = dx / d, uz = dz / d, slow = Math.min(1, d / 1.2);
+      return { x: (ux * Math.cos(yaw) - uz * Math.sin(yaw)) * slow, y: (-ux * Math.sin(yaw) - uz * Math.cos(yaw)) * slow, sprint: mv.sprint };
+    }
     // ------------------------------------------------------------ atualização
     update(dt) {
       this.t += dt;
@@ -1391,7 +1445,8 @@
       cam.yaw -= inp.yawDelta; inp.yawDelta = 0;
       cam.pitch = U.clamp(cam.pitch + inp.pitchDelta, 0.18, 1.2); inp.pitchDelta = 0;
       cam.dist = U.clamp(cam.dist + inp.zoomDelta, 5, 22); inp.zoomDelta = 0;
-      const mv = WG.locked ? { x: 0, y: 0 } : inp.move();
+      let mv = WG.locked ? { x: 0, y: 0 } : inp.move();
+      mv = this.followTarget(mv, dt);
       // v4.5: movimento estilo Genshin — vigor, corrida, escalada, nado, queda livre e planador
       if (hr.st === undefined) hr.st = WG.STAMINA;
       const wasAir = hr.jump > 0.02, gNow = this.groundAt(hr.x, hr.z);
@@ -1400,7 +1455,9 @@
       if (inp.keys.Space && wasAir && !WG.locked) this.openGlider('keyboard');
       hr.moving = Math.abs(mv.x) + Math.abs(mv.y) > .05;
       const canSprint = !hr.boat && !!mv.sprint && !hr.exhaust && hr.st > 0 && (!E.Sim || E.Sim.canSprint(E.Store.hero())) && !hr.swim && !wasAir;
-      let speed = hr.boat ? 6.2 : hr.glide ? 7.4 : hr.swim ? 3.1 : canSprint ? 8.5 : 5.2;
+      // nado normal não gasta vigor; segurando Shift o herói nada rápido e gasta vigor (menos que correndo)
+      const fastSwim = hr.swim && !hr.boat && !!mv.sprint && !hr.exhaust && hr.st > 0;
+      let speed = hr.boat ? 6.2 : hr.glide ? 7.4 : hr.swim ? (fastSwim ? 5.8 : 3.1) : canSprint ? 8.5 : 5.2;
       let drain = 0;
       hr.climb = false;
       let moved = 0;
@@ -1451,10 +1508,11 @@
       hr.swim = deep && !air;
       if (hr.swim || !air) this.closeGlider();
       hr.sprinting = canSprint && hr.moving && !hr.climb && !hr.swim && !air && moved > .001;
-      drain = hr.sprinting ? 14 : 0;
+      hr.fastSwim = fastSwim && hr.swim && hr.moving && moved > .001;
+      drain = hr.sprinting ? 14 : hr.fastSwim ? 9 : 0;
       if (!air && hr.wasAir && !hr.swim) { hr.landT = 0.13; if (E.Audio.sfx) E.Audio.sfx('step'); }
       hr.wasAir = air;
-      // A corrida é a única ação que gasta vigor.
+      // Só a corrida e o nado rápido gastam vigor.
       const draining = drain > 0;
       if (draining) { hr.st = Math.max(0, hr.st - drain * dt); hr.stT = 0.7; if (hr.st === 0) hr.exhaust = true; }
       else { hr.stT = (hr.stT || 0) - dt; if (hr.stT <= 0) hr.st = Math.min(WG.STAMINA, hr.st + 26 * dt); }
@@ -1477,7 +1535,7 @@
       else if (hr.boat) cv = HF.idle[Math.floor(this.t*1.7)%2];
       else if (hr.preJump > 0) { cv = HF.crouch; sx = 1.05; sy = 0.93; }
       else if (air) { if (hr.glide) cv = HF.up; else if (hr.vy > 1.2) { cv = HF.up; sx = 0.94; sy = 1.07; } else if (hr.vy > -1.5) cv = HF.up; else { cv = HF.fall; sx = 0.97; sy = 1.03; } }
-      else if (hr.swim && HF.swim && HF.swim.length) { hr.swimPhase = (hr.swimPhase || 0) + dt * (hr.moving ? 10 : 4); cv = HF.swim[Math.floor(hr.swimPhase) % HF.swim.length]; }
+      else if (hr.swim && HF.swim && HF.swim.length) { hr.swimPhase = (hr.swimPhase || 0) + dt * (hr.fastSwim ? 16 : hr.moving ? 10 : 4); cv = HF.swim[Math.floor(hr.swimPhase) % HF.swim.length]; }
       else if (hr.landT > 0) { hr.landT -= dt; cv = HF.land; const k = hr.landT / 0.13; sx = 1 + 0.08 * k; sy = 1 - 0.09 * k; }
       else {
         if (hr.moving) cv = HF.walk[Math.floor(hr.stride / 3.3 * 12) % 12];
@@ -1490,6 +1548,8 @@
       this.heroSprite.material.map = tex(cv);
       const hh = this.heroSprite.userData.h * (cv._k || 1); // quadros de pesca são maiores (cabe a vara)
       this.heroSprite.center.y = cv._cy ?? 0.02;
+      // comer, beber ou guardar a arma: três pequenos 'mastigados' (barra rápida e zonas seguras)
+      if (this.heroEatT > 0) { this.heroEatT -= dt; const k = Math.abs(Math.sin((.6 - this.heroEatT) / .6 * Math.PI * 3)); sx *= 1 + .04 * k; sy *= 1 - .06 * k; }
       this.heroSprite.scale.set(hh * cv.width / cv.height * hr.dir * sx, hh * sy, 1);
       this.heroSprite.position.set(hr.x, hr.y + hr.jump + softBob, hr.z);
       this.heroShadow.position.set(hr.x, hr.y + 0.05, hr.z);
@@ -1595,7 +1655,7 @@
         if (c.dead) continue;
         const d = Math.hypot(hr.x - c.x, hr.z - c.z);
         const wasAggro = c.aggro;
-        c.aggro = !WG.locked && d < 9 && !E.state.settings.peaceful;
+        c.aggro = !WG.locked && d < 9 && !E.state.settings.peaceful && !(E.Zones && E.Zones.safe);
         if (c.aggro && !wasAggro) U.emit('world:aggro', c);
         c.alert.visible = c.aggro;
         let cx = 0, cz = 0;
@@ -2112,6 +2172,7 @@
     if (['world', 'arena', 'interior'].includes(mode)) {
       const actor = mode === 'interior' && E.Interior && E.Interior.current ? E.Interior.current : WG.world && WG.world.hero;
       if (E.Sim && E.Sim.tick) E.Sim.tick(Math.min(1, Math.max(0, elapsed / 1000)), { mode, moving: !!(actor && actor.moving), sprinting: !!(actor && actor.sprinting), world: WG.world });
+      if (E.Zones) E.Zones.tick(mode, WG.world);
       if (mode !== 'arena' && E.Vendor && E.Vendor.tick) E.Vendor.tick(Math.min(1, Math.max(0, elapsed / 1000)));
       if (mode !== 'arena' && E.Business && E.Business.tick) E.Business.tick(Math.min(1, Math.max(0, elapsed / 1000)));
       if (mode !== 'arena' && E.CasinoBusiness && E.CasinoBusiness.tick) E.CasinoBusiness.tick(Math.min(1, Math.max(0, elapsed / 1000)));

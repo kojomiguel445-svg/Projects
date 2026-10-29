@@ -42,7 +42,8 @@
     const can = MP.canTravel(id);
     const h = E.Store.hero();
     const npcs = r.npcs.map((n) => E.WD.NPCS[n].name).join(', ');
-    const mons = E.M.BY_REGION[id].map((k) => E.M.MONSTERS[k].name).join(', ');
+    const nest = (E.M.DRAGON_NESTS || {})[id];
+    const mons = E.M.BY_REGION[id].map((k) => E.M.MONSTERS[k].name).join(', ') + (nest ? ` · na gruta, ninho de ${nest.map((k) => E.M.MONSTERS[k].name).join(' ou ')}` : '');
     const buttons = [{ label: 'Fechar', value: false }];
     if (id !== cur && can) buttons.push({ label: E.state.world.visited[id] ? 'Teletransportar' : 'Viajar', value: true, cls: 'primary' });
     const go = await UI.modal({

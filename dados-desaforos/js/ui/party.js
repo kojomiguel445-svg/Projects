@@ -26,7 +26,7 @@
       };
       const cur = E.state.heroes.find((x) => x.id === ids[sel]);
       body.innerHTML = `<div class="pts">
-        <p class="pts-tip">Até ${E.Party.MAX} personagens. Quem está no grupo aparece à direita da tela, troca com as teclas 1–${E.Party.MAX} e entra junto nas lutas. Cada um guarda os próprios PV, XP, ouro e empregos.</p>
+        <p class="pts-tip">Até ${E.Party.MAX} personagens. Quem está no grupo aparece à direita da tela, troca com as teclas F1–F${E.Party.MAX} e entra junto nas lutas. Cada um guarda os próprios PV, XP, ouro e empregos.</p>
         <div class="pts-slots">${[0, 1, 2].map(slot).join('')}</div>
         <div class="pts-actions">
           <button class="btn sm" data-a="field" ${!cur || (act && cur.id === act.id) ? 'disabled' : ''}><span class="ico">⇄</span>Entrar em campo</button>

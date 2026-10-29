@@ -77,6 +77,7 @@
         swatches(d, 'eyes', CH.EYES);
         d.appendChild(U.h('<div class="ap-lab">Porte</div>'));
         seg(d, 'build', Object.entries(CH.BUILDS));
+        if (L.build === 'gordo') d.appendChild(U.h('<p class="ap-note" style="font-size:12px;margin:4px 0 8px;opacity:.8">Gordo (mecânica do jogo, não é regra de D&amp;D): a fome cai 25% mais rápido e há 8% de chance de <b>Refletir Golpes</b> — devolver ao atacante 25% do dano corpo a corpo recebido, no máximo uma vez por rodada.</p>'));
         const hl = U.h(`<div class="ap-lab">Altura: <b>${Math.round(L.height * 100)}%</b></div>`);
         d.appendChild(hl);
         const r = U.h(`<input type="range" class="ap-range" min="0.85" max="1.15" step="0.01" value="${L.height}" aria-label="Altura">`);

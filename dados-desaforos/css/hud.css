@@ -222,7 +222,7 @@ body.reduced .screen,body.reduced .screen > .screen-body,body.reduced .modal,bod
 #hud .pt-hp { display: block; width: 74px; height: 4px; border-radius: 2px; background: rgba(10,14,22,.55); box-shadow: 0 0 0 1px rgba(255,255,255,.25); overflow: hidden; }
 #hud .pt-hp b { display: block; height: 100%; background: #9be35a; }
 #hud .pt-face { position: relative; width: 54px; height: 54px; border-radius: 50%; background: radial-gradient(circle at 50% 30%, rgba(255,255,255,.22), rgba(16,20,32,.7)) center / cover no-repeat; box-shadow: 0 0 0 2px rgba(255,255,255,.55), 0 4px 10px rgba(0,0,0,.35); transition: transform .25s var(--g-ease), box-shadow .25s; }
-#hud .pt-key { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 5px; background: rgba(16,20,32,.55); box-shadow: 0 0 0 1px rgba(255,255,255,.45) inset; font-size: 12px; font-weight: 800; }
+#hud .pt-key { min-width: 22px; padding: 0 3px; height: 22px; display: grid; place-items: center; border-radius: 5px; background: rgba(16,20,32,.55); box-shadow: 0 0 0 1px rgba(255,255,255,.45) inset; font-size: 12px; font-weight: 800; }
 #hud .pt.on .pt-face { box-shadow: 0 0 0 2.5px #f3dca6, 0 0 16px rgba(243,220,166,.5), 0 4px 10px rgba(0,0,0,.35); }
 #hud .pt.on .pt-name { color: #f3dca6; }
 #hud .pt.swap .pt-face { animation: ptSwap .45s var(--g-ease); }
@@ -374,3 +374,7 @@ body:has(.world-service-panel) #hud .party, body:has(.dlg-wrap) #hud .party { op
   .ac-auto { flex-basis: 100%; width: max-content; padding: 4px 10px; font-size: 10px; }
   .ac-head { padding: 5px 10px 5px 5px; } .ac-head img { width: 30px; height: 30px; } .ac-head b { font-size: 12px; }
 }
+/* 5.12 · origem de cada ponto de CA na ficha */
+.attr .ac-src { display: flex; flex-wrap: wrap; gap: 4px; grid-column: 1 / -1; margin-top: 4px; font-size: 10.5px; font-weight: 700; }
+.attr .ac-src i { font-style: normal; padding: 1px 7px; border-radius: 999px; background: #e6efe0; color: #3d5a2f; }
+.attr .ac-src i.jogo { background: #efe4f7; color: #5a3a7a; }

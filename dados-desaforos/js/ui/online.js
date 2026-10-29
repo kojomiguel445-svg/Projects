@@ -245,7 +245,7 @@
       if (!p.hero || p.region !== w.id) continue;
       seen.add(p.id);
       let r = w.remote.get(p.id);
-      const lookKey = JSON.stringify(p.hero.look) + (p.hero.weapon ? p.hero.weapon.c1 + p.hero.weapon.rar : '');
+      const lookKey = JSON.stringify(p.hero.look) + (p.hero.weapon ? p.hero.weapon.c1 + p.hero.weapon.rar + '|' + p.hero.weapon.type : '');
       if (!r || r.lookKey !== lookKey) {
         if (r) { w.scene.remove(r.sprite); w.scene.remove(r.shadow); }
         const wi = p.hero.weapon || {};

@@ -7,7 +7,7 @@
 
   // ---------------- catálogos de aparência ----------------
   CH.HAIR_STYLES = ['Curto', 'Longo', 'Rabo de cavalo', 'Espetado', 'Coque', 'Tranças', 'Chanel', 'Cacheado', 'Raspado', 'Moicano', 'Maria-chiquinha', 'Black power', 'Coque samurai', 'Ondulado longo', 'Franja de lado'];
-  CH.BUILDS = { magro: 'Magro', medio: 'Médio', forte: 'Forte' };
+  CH.BUILDS = { magro: 'Magro', medio: 'Médio', forte: 'Forte', gordo: 'Gordo' };
   CH.EYES = ['#3a2a20', '#2f6fb3', '#3f8a4a', '#8a5a2a', '#9b6bff', '#d4a017', '#c0392b', '#5a6b7d'];
   CH.HAIR = ['#2a1f1a', '#5a3a22', '#8a5a32', '#c8873a', '#e8c46a', '#f2ead0', '#c84b3a', '#e86a9a', '#3a62c8', '#4a9a6a', '#8a5ad8', '#9aa3ad'];
   CH.CLOTH = ['#e08a3c', '#c0392b', '#3a62c8', '#2c3e50', '#5f8a4a', '#7b5cff', '#f0c75e', '#a8325a', '#3ec7b3', '#f2ead0', '#4a4f5a', '#8a5a32'];
@@ -260,8 +260,10 @@
     if (twoHands) arms = rArm = 'grip';
     if (seated) { lL = rL = 0; sway = Math.max(-1, Math.min(1, sway)); crouch = 0; bob = (f === 'freel1' || f === 'idle1' ? 1 : 0) + 8; }
     bob += crouch;
-    const bw = ({ magro: 0, medio: 1, forte: 3 }[L.build] ?? 1) + (sp === 'anao' ? 2 : sp === 'golias' ? 2 : sp === 'orc' ? 1 : 0);
-    const shoulder = 9 + bw, waist = 7 + bw, legW = 5 + Math.round(bw / 2);
+    const bw = ({ magro: 0, medio: 1, forte: 3, gordo: 2 }[L.build] ?? 1) + (sp === 'anao' ? 2 : sp === 'golias' ? 2 : sp === 'orc' ? 1 : 0);
+    // Gordo: a cintura passa dos ombros (barriga), com pernas um pouco mais grossas.
+    const belly = L.build === 'gordo' ? 6 : 0;
+    const shoulder = 9 + bw, waist = 7 + bw + belly, legW = 5 + Math.round((bw + belly / 3) / 2);
     const outfit = L.outfit;
     const XS = XO[outfit] || null;
     const dark = sh(c1, -0.3), light = sh(c1, 0.22);
@@ -336,6 +338,7 @@
     const torso = XS && XS.torso ? XS.torso(c1, c2, skin) : outfit === 'tribal' ? skin : outfit === 'estelar' ? '#232a5e' : outfit === 'aurora' ? '#f2f2f6' : outfit === 'apostador' ? '#1e1e26' : c1;
     p.poly([[CX - shoulder, ty + 1], [CX + shoulder, ty + 1], [CX + waist, 50 + bob], [CX - waist, 50 + bob]], torso);
     p.rect(CX - shoulder, ty, shoulder * 2, 3, torso);
+    if (belly) { p.poly([[CX - shoulder, ty + 1], [CX - shoulder - 3, ty + 4], [CX - shoulder - 2, ty + 9], [CX + shoulder + 2, ty + 9], [CX + shoulder + 3, ty + 4], [CX + shoulder, ty + 1]], torso); p.ell(CX, 45 + bob, waist - 1, 7, torso); p.ell(CX - 4, 42 + bob, 4, 3, sh(torso, 0.12)); p.line(CX - waist + 4, 51 + bob, CX + waist - 4, 51 + bob, sh(torso, -0.22)); }
     if (outfit === 'tribal') { p.poly([[CX - shoulder - 2, ty - 1], [CX + shoulder + 2, ty - 1], [CX + shoulder - 2, ty + 6], [CX - shoulder + 2, ty + 6]], c1); p.rect(CX - 3, ty + 9, 6, 1, sh(skin, -0.18)); p.rect(CX - 4, ty + 12, 3, 1, sh(skin, -0.15)); p.rect(CX + 1, ty + 12, 3, 1, sh(skin, -0.15)); }
     if (outfit === 'cavaleiro' || outfit === 'aurora') {
       const metal = outfit === 'aurora' ? '#f6f2e4' : c1, trim = outfit === 'aurora' ? '#ffd36b' : sh(c1, 0.35);
@@ -363,7 +366,7 @@
     // ===== braços =====
     const sleeve = XS && XS.sleeve ? XS.sleeve(c1, c2, skin) : ['tribal'].includes(outfit) ? skin : outfit === 'estelar' ? '#232a5e' : outfit === 'aurora' ? '#f2f2f6' : c1;
     const wide = ['manto', 'oriental', 'sacerdote', 'estelar'].includes(outfit) || !!(XS && XS.wide);
-    const armL = CX - shoulder - 4, armR = CX + shoulder;
+    const armL = CX - shoulder - 4 - (belly ? 3 : 0), armR = CX + shoulder + (belly ? 3 : 0);
     Object.assign(k, { armL, armR });
     const gl = XS && XS.glove ? XS.glove(c1, c2) : skin; // mãos (luvas em algumas roupas)
     let weaponPalm = [armR + 2, ty + 15 + aR], secondPalm = null;

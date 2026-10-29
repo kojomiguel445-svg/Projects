@@ -12,6 +12,7 @@
     d.ores = d.ores || {}; d.buffs = d.buffs || {}; d.ach = d.ach || {};
     d.rod = d.rod || 0; d.cart = d.cart || 0; d.chips = d.chips || 0; d.bait = d.bait || 0; d.lbait = d.lbait || 0; d.pick = d.pick || 0; d.fishPts = d.fishPts || 0;
     d.pbait = Number.isSafeInteger(d.pbait)&&d.pbait>0?d.pbait:0; d.sbait = Number.isSafeInteger(d.sbait)&&d.sbait>0?d.sbait:0;
+    if (!['auto', 'none', 'bait', 'pbait', 'sbait'].includes(d.baitSel)) d.baitSel = 'auto'; // isca equipada na vara
     d.aqua = d.aqua || {}; d.aquaDone = d.aquaDone || {}; d.legends = d.legends || {};
     d.stats = Object.assign({ fishCaught: 0, fish5: 0, dexCount: 0, profit: 0, broke: 0, jackpots: 0, blackjacks: 0, bounties: 0, cooked: 0, mined: 0, arenaWins: [], legend: 0, oreSold: 0 }, d.stats || {});
     return d;
@@ -189,7 +190,11 @@
   // ------------------------------------------------------------ pesca
   LF.isNight = () => { if (E.Sim) return E.Sim.clock().night; const hr = new Date().getHours(); return hr >= 19 || hr < 6; };
   LF.timeOk = (f) => !f.when || (f.when === 'noite' ? LF.isNight() : !LF.isNight());
-  LF.activeBait=(h,biome)=>{const d=LF.data(h);return biome==='sea'&&d.sbait>0?{key:'sbait',bonus:.65,name:'Isca de Corrente Profunda'}:d.pbait>0?{key:'pbait',bonus:.35,name:'Isca Luminescente'}:d.bait>0?{key:'bait',bonus:.20,name:'Isca de Minhoca'}:null;};
+  LF.BAIT_INFO={bait:{key:'bait',bonus:.20,name:'Isca de Minhoca'},pbait:{key:'pbait',bonus:.35,name:'Isca Luminescente'},sbait:{key:'sbait',bonus:.65,name:'Isca de Corrente Profunda'}};
+  // Isca equipada na vara: uma escolhida pelo jogador, nenhuma, ou "automática" (a melhor que houver na mochila).
+  // A de corrente profunda só age no mar; em lagos ela fica guardada.
+  LF.activeBait=(h,biome)=>{const d=LF.data(h),sel=d.baitSel||'auto',I=LF.BAIT_INFO;if(sel==='none')return null;if(sel!=='auto')return d[sel]>0&&(sel!=='sbait'||biome==='sea')?I[sel]:null;return biome==='sea'&&d.sbait>0?I.sbait:d.pbait>0?I.pbait:d.bait>0?I.bait:null;};
+  LF.equipBait=(h,sel)=>{const d=LF.data(h);if(!['auto','none','bait','pbait','sbait'].includes(sel))return {ok:false,message:'Isca inválida.'};if(LF.BAIT_INFO[sel]&&!(d[sel]>0))return {ok:false,message:'Você não tem essa isca.'};d.baitSel=sel;E.Store.save();return {ok:true,message:sel==='auto'?'A vara usará a melhor isca da mochila.':sel==='none'?'Vara sem isca.':`${LF.BAIT_INFO[sel].name} presa no anzol.`};};
   LF.spendBait=(h,key)=>{const d=LF.data(h);if(!['bait','pbait','sbait'].includes(key)||!(d[key]>0))return false;d[key]--;E.Store.save();return true;};
   const fishingPrice=(r,n)=>E.Settlements&&E.Settlements.price?E.Settlements.price(r,n):Math.ceil(n*((E.WD&&E.WD.REGIONS[r]||{}).metro?1.65:1));
   LF.rodPrice=(tier,r)=>{const def=L().RODS[tier];return def&&def.retail?fishingPrice(r,def.retail):0;};
@@ -209,7 +214,7 @@
         if (d.lbait > 0) ch = Math.max(ch, 0.3);
         if (U.rand() < ch) return finish({ fish: legend, cm: cm(legend), usedLB: d.lbait > 0 });
       }
-      if (rare && LF.timeOk(rare) && U.rand() < 0.05 * (1 + d.rod * 0.25 + (d.bait > 0 ? 0.3 : 0))) return finish({ fish: rare, cm: cm(rare) });
+      if (rare && LF.timeOk(rare) && U.rand() < 0.05 * (1 + d.rod * 0.25 + (bait ? 0.3 : 0))) return finish({ fish: rare, cm: cm(rare) });
     }
     if (U.rand() < 0.07) { // lixo / tesouro
       const tot = L().JUNK.reduce((a, j) => a + j.w, 0); let r = U.rand() * tot;

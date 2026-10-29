@@ -6,6 +6,9 @@
   G.boot = async () => {
     await E.Icons.preload();
     E.Store.load();
+    // Saves antigos: escolhas de espécie da edição 2024 e características por nível (ver C.migrate)
+    for (const h of E.state.heroes || []) if (h && !h.deleted) { try { C.migrate(h); } catch (e) { console.error(e); } }
+    E.Store.save();
     document.body.classList.toggle('touch', U.isTouch());
     document.body.classList.toggle('reduced', !!E.state.settings.reducedMotion);
     try {
@@ -19,7 +22,8 @@
     U.on('world:near', (l) => E.HUD.setNear(l));
     U.on('world:frame', () => E.HUD.frame());
     U.on('world:aggro', () => E.Audio.sfx('aggro'));
-    U.on('world:encounter', (camp) => G.startBattle(camp.enc.monsters, { camp }));
+    // Em área protegida (vila, Aurenna, interiores) não há combate: a arma está guardada.
+    U.on('world:encounter', (camp) => { if (E.Zones && E.Zones.here().safe) { E.WG.locked = false; return; } G.startBattle(camp.enc.monsters, { camp }); });
     U.on('quests:changed', () => { E.HUD.update(); if (E.WG.world) E.WG.world.refreshNpcMarkers(); });
     // com qualquer tela aberta o herói fica parado (e os inimigos não atacam)
     U.on('ui:screen', (n) => { if (n > 0) E.WG.locked = true; else if (!E.BattleUI.current && !document.getElementById('dialog')) E.WG.locked = false; });
@@ -71,6 +75,8 @@
     E.Audio.music(E.WG.world.B.night ? 'noite' : 'calma');
     G.regionTitle();
     if (!fresh && E.state.seenVersion !== E.Title.VERSION) { await U.wait(1200); await G.whatsNew(); }
+    // escolhas da edição 2024 que faltavam no save (linhagem, ancestralidade, talento de origem)
+    if (!fresh && (h.pendingChoices || []).length && E.Creator.resolvePending) { await U.wait(500); await E.Creator.resolvePending(h); }
     // heróis antigos (nível 3+) escolhem a subclasse uma vez
     if (!fresh && h.level >= E.H.SUB_LEVEL && !h.subChosen && !h.subAsked) { await U.wait(400); await E.Sheet.subclass(h); }
     if (fresh) {
@@ -84,11 +90,12 @@
   G.whatsNew = async () => {
     E.state.seenVersion = E.Title.VERSION; E.Store.save();
     const html = `<div class="whatsnew"><ul>
-      <li><b>Trabalho de verdade em todos os empregos:</b> chega de questionário. Na cozinha você monta os pedidos e acerta o ponto; na peixaria separa e limpa o pescado; na forja, marcenaria e lapidação acerta os golpes; nas entregas, armazém, cais e rouparia organiza os itens; na recepção e no cassino faz a conta e entrega o troco. O atendente do empório continua no caixa da loja.</li>
-      <li><b>XP por dia de trabalho:</b> cada dia trabalhado dá salário, XP de nível e XP de especialidade no seu ramo (Culinária, Pesca, Forja, Comércio...). Cada nível de especialidade aumenta o salário em 5% e muda o seu cargo (Aprendiz, Auxiliar, Profissional, Especialista, Mestre).</li>
-      <li><b>Fornecedor da peixaria:</b> no empório e peixaria (e no cais das cidades) há um balcão para vender o que você pesca e cumprir as encomendas do dia, que pagam 50% a mais. Entregar sobe sua reputação de fornecedor e aumenta o preço do seu pescado.</li>
-      <li><b>Loja mais simples e lucrativa:</b> painel único em Menu → Minha Loja. Coloque produtos da mochila na prateleira, confira o preço e abra: de dia os clientes compram sozinhos quando o preço está justo, mesmo com você longe. O aluguel caiu de 120 para 30 po por dia, os funcionários ficaram mais baratos e o painel mostra visitantes, vendas e saldo do dia.</li>
-      <li><b>5.10:</b> grupo de até 3 personagens com troca animada, companheiros na luta, demissão pela carteira e HUD sem pixel.</li>
+      <li><b>Regras do Livro do Jogador 2024 conferidas:</b> as 10 espécies (sem Meio-Elfo e Meio-Orc), atributos vindos do antecedente, Draconato com sopro em cone ou linha, ancestral que muda a cor das escamas e Voo Dracônico, linhagens dos Elfos e Gnomos, legados do Tiferino, ancestrais gigantes do Golias e Revelação Celestial do Aasimar. A ficha mostra de onde vem cada ponto da CA (regra ou jogo). Personagens antigos foram migrados e, quando falta uma escolha, o jogo pergunta.</li>
+      <li><b>Cozinhar de verdade:</b> no fogão você controla a chama e mexe na hora certa; na fogueira vira o espeto e tira do fogo no ponto — ou queima. O prato sai Mal preparado, Normal, Bem preparado ou Excelente e mata mais ou menos a fome. A fome agora cai mais devagar (cerca de 50 minutos explorando) e o ritmo pode ser ajustado em Ajustes.</li>
+      <li><b>Barra rápida:</b> 9 espaços abaixo da vida e da fome (teclas 1–9). O 1 é a sua arma; os outros guardam atalhos para comidas e poções da mochila — aperte de novo para comer ou beber. Botão direito troca o item. A troca de personagem passou para F1–F3.</li>
+      <li><b>Áreas protegidas:</b> nas vilas, em Aurenna e dentro de lojas e casas a arma vai para a bainha e ninguém briga.</li>
+      <li><b>Tipo físico Gordo:</b> visual próprio, fome um pouco mais rápida e chance de Refletir Golpes corpo a corpo (mecânica do jogo, não é regra de D&amp;D).</li>
+      <li><b>Pendências resolvidas:</b> clique no chão para andar, botão direito do mouse gira a câmera, Shift na água para nadar rápido (nadar normal não cansa), escolha da isca na vara, casa de penhores na Galeria dos Mercadores de Aurenna e dragões morando em ninhos nas grutas.</li>
     </ul></div>`;
     await UI.modal({ title: `✦ Novidades da versão ${E.Title.VERSION}`, html, buttons: [{ label: 'Ver o Oráculo', value: 'wish' }, { label: 'Bora jogar!', value: true, cls: 'primary' }] }).then((v) => { if (v === 'wish') E.Wish.open(); });
   };

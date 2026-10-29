@@ -93,7 +93,7 @@
     const bars = Object.entries(E.L.ROD_STATS || {}).map(([k, n]) => `<span class="fi-stat" title="${n}: ${st[k]}/10"><i>${n}</i><b style="--v:${st[k] * 10}%"></b></span>`).join('');
     const el = U.h(`<div class="fishing"><div class="fi-panel">
       <div class="fi-top"><span class="fi-rod">${U.esc(rod.name)}</span><span class="fi-stats">${bars}</span></div>
-      <div class="fi-chips"><span>Pesca Nv. ${E.Life.level(h, 'pesca')}</span>${bait ? `<span>${U.esc(bait.name)} ×${d[bait.key]}</span>` : ''}${spot.fromBoat?'<span>Barco de pesca · '+(biome==='sea'?'Mar aberto':'Lago')+'</span>':''}${seat ? '<span>Sentado no banco</span>' : ''}${E.Life.buff(h, 'pescador') ? '<span class="gold">Faro de Pescador</span>' : ''}</div>
+      <div class="fi-chips"><span>Pesca Nv. ${E.Life.level(h, 'pesca')}</span><button class="fi-bait" data-a="bait" title="Equipar isca na vara">${bait ? `${U.esc(bait.name)} ×${d[bait.key]}` : 'Sem isca'} ▾</button>${spot.fromBoat?'<span>Barco de pesca · '+(biome==='sea'?'Mar aberto':'Lago')+'</span>':''}${seat ? '<span>Sentado no banco</span>' : ''}${E.Life.buff(h, 'pescador') ? '<span class="gold">Faro de Pescador</span>' : ''}</div>
       <div class="fi-stage"></div>
       <div class="fi-help"></div>
       <div class="fi-btns"><button class="btn dark" data-a="quit"><span class="ico">✕</span>${seat ? 'Levantar' : 'Sair'}</button><button class="btn primary fi-main" data-a="main"><span class="ico">🎣</span><b>Lançar</b></button></div>
@@ -101,6 +101,17 @@
     document.body.appendChild(el);
     const stage = el.querySelector('.fi-stage'), help = el.querySelector('.fi-help'), main = el.querySelector('[data-a=main]');
     let quit = false, pressed = false, onMain = null;
+    // Equipar isca na vara (vale para os próximos lançamentos)
+    const baitChip = el.querySelector('[data-a=bait]');
+    const drawBait = () => { const b = E.Life.activeBait(h, biome); baitChip.textContent = `${b ? `${b.name} ×${d[b.key]}` : 'Sem isca'}${d.baitSel === 'auto' ? ' · auto' : ''} ▾`; };
+    drawBait();
+    baitChip.onclick = async () => {
+      const opts = [['auto', 'Automática', 'A melhor isca da mochila'], ...Object.entries(E.Life.BAIT_INFO).map(([k, b]) => [k, b.name, `${d[k] || 0} na mochila · +${Math.round(b.bonus * 100)}% de raros${k === 'sbait' ? ' · só no mar' : ''}`]), ['none', 'Sem isca', 'Guarde as iscas para depois']];
+      const wait = E.UI.modal({ title: 'Isca da vara', html: `<div class="hb-picker">${opts.map(([k, n, s]) => `<button class="hb-pick" data-bait="${k}" ${E.Life.BAIT_INFO[k] && !(d[k] > 0) ? 'disabled style="opacity:.5"' : ''}><span><b>${n}${d.baitSel === k ? ' ✓' : ''}</b><small>${s}</small></span></button>`).join('')}</div>`, buttons: [{ label: 'Fechar', value: null, cls: 'primary' }] });
+      E.UI._modalBody.querySelectorAll('[data-bait]').forEach((b) => (b.onclick = () => E.UI._modalClose(b.dataset.bait)));
+      const v = await wait; if (!v) return;
+      const r = E.Life.equipBait(h, v); E.UI.toast(r.message); drawBait();
+    };
     const setMain = (txt, icon, fn) => { main.innerHTML = `<span class="ico">${icon}</span><b>${txt}</b>`; onMain = fn; main.disabled = !fn; };
     el.querySelector('[data-a=quit]').onclick = () => { quit = true; close(); };
     const press = (v) => { pressed = v; main.classList.toggle('held', v); };

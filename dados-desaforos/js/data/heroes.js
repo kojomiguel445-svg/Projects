@@ -3,14 +3,17 @@
   const H = {};
 
   // ---------- Espécies ----------
+  // Fonte: SRD 5.2 (CC-BY-4.0) para Anão, Draconato, Elfo, Gnomo, Golias, Humano, Orc, Pequenino e Tiferino;
+  // Livro do Jogador 2024 para o Aasimar (não faz parte do SRD). Em 2024 a espécie NÃO dá aumento de atributo:
+  // os aumentos vêm do antecedente. Todas as espécies são do tipo Humanoide.
   H.SPECIES = {
     humano: {
-      name: 'Humano', size: 'Médio', speed: 9, dark: 0,
+      name: 'Humano', size: 'Médio ou Pequeno', sizes: ['Médio', 'Pequeno'], speed: 9, dark: 0,
       blurb: 'Versáteis e ambiciosos, os humanos se espalharam por todas as nove regiões de Elarion.',
       traits: [
-        ['Engenhoso', 'Recebe Inspiração Heroica a cada Descanso Longo.'],
+        ['Engenhoso', 'Recebe Inspiração Heroica sempre que termina um Descanso Longo.'],
         ['Habilidoso', 'Proficiência em uma perícia à sua escolha.'],
-        ['Versátil', 'Recebe um Talento de Origem extra à sua escolha.'],
+        ['Versátil', 'Recebe um Talento de Origem à sua escolha (Habilidoso é o recomendado).'],
       ],
       hooks: { heroicOnLongRest: true, extraSkill: 1, extraFeat: true },
       look: { skin: ['#f1c9a5', '#d9a07a', '#a8694a', '#6e432c'], ears: 'round' },
@@ -19,13 +22,19 @@
       name: 'Elfo', size: 'Médio', speed: 9, dark: 18,
       blurb: 'Filhos da magia feérica, os elfos guardam memórias de séculos sob as copas do Bosque das Lanternas.',
       traits: [
-        ['Visão no Escuro', '18 metros.'],
+        ['Visão no Escuro', '18 metros (36 m para Drow).'],
         ['Ancestralidade Feérica', 'Vantagem em testes de resistência para evitar ou encerrar a condição Enfeitiçado.'],
         ['Sentidos Aguçados', 'Proficiência em Intuição, Percepção ou Sobrevivência.'],
-        ['Transe', 'Completa um Descanso Longo em 4 horas de meditação.'],
-        ['Linhagem Élfica', 'Alta: truque Prestidigitação extra · Silvestre: deslocamento 10,5 m · Drow: Visão no Escuro 36 m.'],
+        ['Transe', 'Não precisa dormir e magia não o põe para dormir; completa um Descanso Longo em 4 horas de meditação consciente.'],
+        ['Linhagem Élfica', 'Escolha Drow, Alto Elfo ou Elfo Silvestre. Benefício no nível 1 e uma magia nova nos níveis 3 e 5 (sempre preparada; 1 vez por Descanso Longo sem espaço de magia, ou com espaços que você tenha).'],
       ],
-      hooks: { skillChoice: ['intuicao', 'percepcao', 'sobrevivencia'] },
+      hooks: { skillChoice: ['intuicao', 'percepcao', 'sobrevivencia'], lineage: true },
+      lineageLabel: 'Linhagem Élfica',
+      lineages: {
+        drow: { name: 'Drow', dark: 36, l1: 'Visão no Escuro aumenta para 36 m; truque Luzes Dançantes.', l3: 'Fogo das Fadas', l5: 'Escuridão' },
+        alto: { name: 'Alto Elfo', l1: 'Truque Prestidigitação (pode trocá-lo por outro truque de Mago ao terminar um Descanso Longo).', l3: 'Detectar Magia', l5: 'Passo Nebuloso', spells: [[5, 'passo_nebuloso']] },
+        silvestre: { name: 'Elfo Silvestre', speed: 10.5, l1: 'Deslocamento aumenta para 10,5 m; truque Arte Druídica.', l3: 'Passos Longos', l5: 'Passar sem Rastro' },
+      },
       look: { skin: ['#f6dcc4', '#e3b892', '#b98a6a', '#7c6a8f'], ears: 'long' },
     },
     anao: {
@@ -33,9 +42,9 @@
       blurb: 'Forjados como o metal das Montanhas da Forja Celeste, os anões são resistentes e teimosos.',
       traits: [
         ['Visão no Escuro', '36 metros.'],
-        ['Resiliência Anã', 'Resistência a dano de Veneno e Vantagem contra a condição Envenenado.'],
-        ['Robustez Anã', '+1 Ponto de Vida máximo por nível.'],
-        ['Sentido de Pedra', 'Ação Bônus: Sentido Sísmico de 18 m (PB vezes por Descanso Longo).'],
+        ['Resiliência Anã', 'Resistência a dano de Veneno e Vantagem em testes de resistência para evitar ou encerrar a condição Envenenado.'],
+        ['Robustez Anã', 'PV máximos +1, e +1 a cada nível ganho.'],
+        ['Conhecimento de Pedras', 'Ação Bônus: Sentido Sísmico de 18 m por 10 minutos, tocando uma superfície de pedra. BP usos por Descanso Longo.'],
       ],
       hooks: { hpPerLevel: 1, resist: ['veneno'], advVsPoison: true },
       look: { skin: ['#efc19d', '#c98d68', '#8e5a3e'], ears: 'round', beard: true, scale: 0.88 },
@@ -44,10 +53,10 @@
       name: 'Pequenino', size: 'Pequeno', speed: 9, dark: 0,
       blurb: 'Pequeninos são corajosos e sortudos, sempre achando um jeito de escapar de encrenca.',
       traits: [
-        ['Bravura', 'Vantagem em testes de resistência contra a condição Amedrontado.'],
-        ['Agilidade Pequenina', 'Pode atravessar o espaço de criaturas maiores.'],
-        ['Sorte', 'Quando tirar 1 no d20 de um Teste de d20, role de novo e use o novo resultado.'],
-        ['Furtividade Natural', 'Pode se esconder atrás de criaturas maiores.'],
+        ['Bravura', 'Vantagem em testes de resistência para evitar ou encerrar a condição Amedrontado.'],
+        ['Agilidade Pequenina', 'Pode atravessar o espaço de qualquer criatura um tamanho maior que você (sem parar nele).'],
+        ['Sorte', 'Quando tirar 1 no d20 de um Teste de d20, pode rolar de novo e deve usar o novo resultado.'],
+        ['Furtividade Natural', 'Pode usar a ação Esconder mesmo quando só uma criatura pelo menos um tamanho maior te encobre.'],
       ],
       hooks: { luck: true, advVsFear: true },
       look: { skin: ['#f3cba8', '#d79e78', '#9b6648'], ears: 'small', scale: 0.74 },
@@ -56,14 +65,21 @@
       name: 'Draconato', size: 'Médio', speed: 9, dark: 18,
       blurb: 'Descendentes de dragões, os draconatos carregam o sopro dos ancestrais nos pulmões.',
       traits: [
-        ['Ancestralidade Dracônica', 'Escolhe um dragão ancestral que define o tipo de dano do sopro e da resistência.'],
-        ['Arma de Sopro', 'Substitui um ataque: cone de 4,5 m, TR de Destreza (CD 8 + CON + BP), 1d10 de dano (2d10 no nível 5). Usos = BP por Descanso Longo.'],
+        ['Ancestralidade Dracônica', 'Escolha o dragão ancestral: define o dano do sopro, a resistência e a aparência (cor das escamas).'],
+        ['Arma de Sopro', 'Ao usar a ação Atacar, troca um ataque por um cone de 4,5 m ou uma linha de 9 m × 1,5 m (escolha a forma). TR de Destreza (CD 8 + CON + BP): 1d10 de dano do tipo da ancestralidade, metade no sucesso. Aumenta para 2d10 no nível 5, 3d10 no 11 e 4d10 no 17. BP usos por Descanso Longo.'],
         ['Resistência a Dano', 'Resistência ao tipo de dano da sua ancestralidade.'],
         ['Visão no Escuro', '18 metros.'],
+        ['Voo Dracônico', 'Nível 5: Ação Bônus para criar asas espectrais por 10 minutos (Deslocamento de Voo igual ao Deslocamento). 1 vez por Descanso Longo.'],
       ],
       hooks: { breath: true },
-      look: { skin: ['#c84b3a', '#3a7bd5', '#2f9e5a', '#c9a227', '#d8dde3', '#4a4a5a', '#b87333'], ears: 'none', snout: true, scale: 1.08 },
-      ancestries: { fogo: 'Vermelho (Fogo)', frio: 'Branco (Frio)', eletrico: 'Azul (Elétrico)', acido: 'Preto (Ácido)', veneno: 'Verde (Veneno)' },
+      look: { skin: ['#2a2a33', '#3a7bd5', '#c9a227', '#b87333', '#b4643a', '#e0b030', '#2f9e5a', '#c84b3a', '#c8ccd4', '#e8edf2'], ears: 'none', snout: true, scale: 1.08 },
+      ancestries: {
+        preto: { name: 'Preto', type: 'acido', color: '#2a2a33' }, azul: { name: 'Azul', type: 'eletrico', color: '#3a7bd5' },
+        latao: { name: 'Latão', type: 'fogo', color: '#c9a227' }, bronze: { name: 'Bronze', type: 'eletrico', color: '#b87333' },
+        cobre: { name: 'Cobre', type: 'acido', color: '#b4643a' }, ouro: { name: 'Ouro', type: 'fogo', color: '#e0b030' },
+        verde: { name: 'Verde', type: 'veneno', color: '#2f9e5a' }, vermelho: { name: 'Vermelho', type: 'fogo', color: '#c84b3a' },
+        prata: { name: 'Prata', type: 'frio', color: '#c8ccd4' }, branco: { name: 'Branco', type: 'frio', color: '#e8edf2' },
+      },
     },
     gnomo: {
       name: 'Gnomo', size: 'Pequeno', speed: 9, dark: 18,
@@ -71,57 +87,80 @@
       traits: [
         ['Visão no Escuro', '18 metros.'],
         ['Astúcia Gnômica', 'Vantagem em testes de resistência de Inteligência, Sabedoria e Carisma.'],
-        ['Linhagem Gnômica', 'Da Floresta (Ilusão Menor) ou das Rochas (Prestidigitação e Reparar).'],
+        ['Linhagem Gnômica', 'Escolha Gnomo da Floresta ou Gnomo das Rochas (Inteligência, Sabedoria ou Carisma é sua habilidade de conjuração para essas magias).'],
       ],
-      hooks: { advMentalSaves: true },
+      hooks: { advMentalSaves: true, lineage: true },
+      lineageLabel: 'Linhagem Gnômica',
+      lineages: {
+        floresta: { name: 'Gnomo da Floresta', l1: 'Truque Ilusão Menor; Falar com Animais sempre preparada, conjurada sem espaço BP vezes por Descanso Longo.' },
+        rochas: { name: 'Gnomo das Rochas', l1: 'Truques Reparar e Prestidigitação; com 10 minutos conjurando Prestidigitação, cria um pequeno dispositivo mecânico (CA 5, 1 PV).' },
+      },
       look: { skin: ['#f6d3b5', '#dfa883', '#a66e50'], ears: 'small', scale: 0.72 },
     },
     golias: {
       name: 'Golias', size: 'Médio', speed: 10.5, dark: 0,
       blurb: 'Com sangue de gigantes, os golias medem a vida pelos picos que conquistam.',
       traits: [
-        ['Ancestralidade Gigante', 'Dádiva de gigante usada BP vezes por Descanso Longo (Fogo: +1d10 de fogo ao acertar).'],
-        ['Forma Grande', 'A partir do nível 5, pode se tornar Grande por 10 minutos (1×/Descanso Longo).'],
-        ['Constituição Poderosa', 'Vantagem para encerrar Agarrado e conta como um tamanho maior para carga.'],
+        ['Ancestralidade Gigante', 'Escolha uma dádiva de gigante, usada BP vezes por Descanso Longo.'],
+        ['Forma Grande', 'Nível 5: Ação Bônus para ficar Grande por 10 minutos (se houver espaço): Vantagem em testes de Força e Deslocamento +3 m. 1 vez por Descanso Longo.'],
+        ['Constituição Poderosa', 'Vantagem em testes de atributo para encerrar a condição Agarrado; conta como um tamanho maior para capacidade de carga.'],
       ],
-      hooks: { giantFire: true },
+      hooks: { giant: true },
+      giantLabel: 'Ancestralidade Gigante',
+      giants: {
+        nuvem: { name: 'Salto das Nuvens (Gigante das Nuvens)', desc: 'Ação Bônus: teletransporta-se até 9 m para um espaço desocupado que possa ver.' },
+        fogo: { name: 'Queimadura do Fogo (Gigante do Fogo)', desc: 'Ao acertar uma jogada de ataque e causar dano, causa também 1d10 de dano de Fogo.' },
+        gelo: { name: 'Frio do Gelo (Gigante do Gelo)', desc: 'Ao acertar uma jogada de ataque e causar dano, causa também 1d6 de Frio e reduz o Deslocamento do alvo em 3 m até o início do seu próximo turno.' },
+        colina: { name: 'Tombo da Colina (Gigante da Colina)', desc: 'Ao acertar uma criatura Grande ou menor com uma jogada de ataque e causar dano, pode deixá-la Caída.' },
+        pedra: { name: 'Resistência da Pedra (Gigante de Pedra)', desc: 'Reação ao sofrer dano: role 1d12 + CON e reduza o dano nesse valor.' },
+        tempestade: { name: 'Trovão da Tempestade (Gigante da Tempestade)', desc: 'Reação ao sofrer dano de uma criatura a até 18 m: causa 1d8 de dano Trovejante nela.' },
+      },
       look: { skin: ['#b7b9c4', '#9aa0ad', '#8b8a96'], ears: 'round', marks: true, scale: 1.25 },
     },
     orc: {
       name: 'Orc', size: 'Médio', speed: 9, dark: 36,
       blurb: 'Abençoados pela resistência de Gruumsh, os orcs não caem facilmente.',
       traits: [
-        ['Surto de Adrenalina', 'Ação Bônus: Disparada e ganha PV temporários iguais ao BP (BP vezes por Descanso Curto ou Longo).'],
+        ['Surto de Adrenalina', 'Pode usar a ação Disparada como Ação Bônus; ao fazer isso, ganha PV temporários iguais ao BP. BP usos por Descanso Curto ou Longo.'],
         ['Visão no Escuro', '36 metros.'],
-        ['Resistência Implacável', 'Quando cair a 0 PV sem morrer, fica com 1 PV (1×/Descanso Longo).'],
+        ['Resistência Implacável', 'Quando cair a 0 PV sem morrer instantaneamente, pode ficar com 1 PV. 1 vez por Descanso Longo.'],
       ],
       hooks: { relentless: true, adrenaline: true },
       look: { skin: ['#7f9f6a', '#6c8c5a', '#8a9a7d'], ears: 'pointy', tusks: true, scale: 1.1 },
     },
     tiferino: {
-      name: 'Tiferino', size: 'Médio', speed: 9, dark: 18,
-      blurb: 'Marcados por um legado infernal, os tiferinos lutam contra o preconceito com astúcia.',
+      name: 'Tiferino', size: 'Médio ou Pequeno', sizes: ['Médio', 'Pequeno'], speed: 9, dark: 18,
+      blurb: 'Marcados por um legado ínfero, os tiferinos lutam contra o preconceito com astúcia.',
       traits: [
         ['Visão no Escuro', '18 metros.'],
-        ['Legado Ínfero', 'Infernal: Resistência a Fogo e o truque Raio de Fogo.'],
+        ['Legado Ínfero', 'Escolha Abissal, Ctônico ou Infernal: resistência e um truque no nível 1, e uma magia nova nos níveis 3 e 5 (sempre preparada; 1 vez por Descanso Longo sem espaço de magia).'],
         ['Presença Sobrenatural', 'Conhece o truque Taumaturgia.'],
       ],
-      hooks: { resist: ['fogo'], cantrip: 'raio_fogo' },
+      hooks: { legacy: true },
+      legacyLabel: 'Legado Ínfero',
+      legacies: {
+        abissal: { name: 'Abissal', resist: 'veneno', cantrip: 'espirro_veneno', l1: 'Resistência a Veneno; truque Borrifo Venenoso.', l3: 'Raio Nauseante', l5: 'Imobilizar Pessoa', spells: [[3, 'raio_nauseante'], [5, 'imobilizar_pessoa']] },
+        ctonico: { name: 'Ctônico', resist: 'necrotico', cantrip: 'toque_arrepiante', l1: 'Resistência a Necrótico; truque Toque Arrepiante.', l3: 'Vida Falsa', l5: 'Raio do Enfraquecimento', spells: [[3, 'vida_falsa'], [5, 'raio_enfraquecimento']] },
+        infernal: { name: 'Infernal', resist: 'fogo', cantrip: 'raio_fogo', l1: 'Resistência a Fogo; truque Raio de Fogo.', l3: 'Repreensão Infernal', l5: 'Escuridão', spells: [[3, 'repreensao_infernal']] },
+      },
       look: { skin: ['#c4586a', '#9a4a8a', '#d98a70', '#6d4c8f'], ears: 'pointy', horns: true, tail: true },
     },
     aasimar: {
-      name: 'Aasimar', size: 'Médio', speed: 9, dark: 18,
+      name: 'Aasimar', size: 'Médio ou Pequeno', sizes: ['Médio', 'Pequeno'], speed: 9, dark: 18, source: 'Livro do Jogador 2024',
       blurb: 'Tocados pelos planos superiores, os aasimar carregam uma centelha de luz celestial.',
       traits: [
         ['Resistência Celestial', 'Resistência a dano Necrótico e Radiante.'],
-        ['Mãos Curativas', 'Ação de Magia: cura BP d4 PV (1×/Descanso Longo).'],
-        ['Portador da Luz', 'Conhece o truque Luz.'],
-        ['Revelação Celestial', 'Nível 3+: ao se transformar, +BP de dano radiante uma vez por turno.'],
+        ['Visão no Escuro', '18 metros.'],
+        ['Mãos Curativas', 'Ação de Magia: toque uma criatura e role BP d4; ela recupera esse total de PV. 1 vez por Descanso Longo.'],
+        ['Portador da Luz', 'Conhece o truque Luz (Carisma é a habilidade de conjuração).'],
+        ['Revelação Celestial', 'Nível 3: Ação Bônus para se transformar por 1 minuto (1 vez por Descanso Longo). Escolha Asas Celestiais (Deslocamento de Voo), Radiância Interior (no fim de cada turno seu, criaturas a até 3 m sofrem dano Radiante igual ao BP) ou Mortalha Necrótica (criaturas a até 3 m que não sejam aliadas fazem TR de Carisma, CD 8 + CAR + BP, ou ficam Amedrontadas até o fim do seu próximo turno). Uma vez em cada turno seu, causa dano extra igual ao BP (Necrótico na Mortalha; Radiante nas outras).'],
       ],
       hooks: { resist: ['necrotico', 'radiante'], healingHands: true },
       look: { skin: ['#f6e1cf', '#e2b896', '#b9845f', '#8a5a3c'], ears: 'round', halo: true },
     },
   };
+  // Saves antigos guardavam o tipo de dano no lugar da cor do dragão.
+  H.OLD_ANCESTRY = { fogo: 'vermelho', frio: 'branco', eletrico: 'azul', acido: 'preto', veneno: 'verde' };
 
   // ---------- Talentos de Origem ----------
   H.FEATS = {
@@ -130,7 +169,7 @@
     atacante_selvagem: { name: 'Atacante Selvagem', desc: 'Uma vez por turno, role os dados de dano da arma duas vezes e use o maior.' },
     habilidoso: { name: 'Habilidoso', desc: 'Proficiência em três perícias ou ferramentas.' },
     vigoroso: { name: 'Vigoroso', desc: 'Seus Pontos de Vida máximos aumentam em 2 por nível.' },
-    curandeiro: { name: 'Curandeiro', desc: 'Usar um kit de curandeiro cura 1d6 + 4 PV + dados de vida; rerrola 1 nos dados de cura.' },
+    curandeiro: { name: 'Curandeiro', desc: 'Médico de Combate: com um kit de curandeiro, a criatura tratada gasta um Dado de Vida e recupera o resultado + seu BP. Rerrola 1 nos dados de cura de magias e deste talento.' },
     sortudo: { name: 'Sortudo', desc: 'Pontos de Sorte iguais ao BP por Descanso Longo: gaste 1 para ter Vantagem num Teste de d20.' },
     musico: { name: 'Músico', desc: 'Ao terminar um descanso, concede Inspiração Heroica a aliados.' },
     brigao: { name: 'Brigão de Taverna', desc: 'Ataque desarmado causa 1d4 + FOR; rerrola 1 no dano; pode empurrar ao acertar.' },
@@ -140,7 +179,7 @@
   const HASTE = ['glaive', 'alabarda', 'pique', 'bordao', 'lanca'];
   Object.assign(H.FEATS, {
     mestre_armas_grandes: { general: true, name: 'Mestre de Armas Grandes', abil: ['for'], desc: '+1 FOR. Ao acertar com uma arma Pesada, causa dano extra igual ao seu Bônus de Proficiência (1×/turno).', fx: { heavyPb: true } },
-    atirador_elite: { general: true, name: 'Atirador de Elite', abil: ['des'], desc: '+1 DES. Seus disparos ignoram cobertura (+2 nas jogadas de ataque à distância) e alvos Caídos não impõem Desvantagem.', fx: { rangedHit: 2, sharpshooter: true } },
+    atirador_elite: { general: true, name: 'Atirador de Elite', abil: ['des'], desc: '+1 DES. Ignora meia cobertura e três-quartos de cobertura, não tem Desvantagem por atacar à distância com inimigo adjacente nem a longa distância. (O combate do jogo não usa cobertura nem alcance; aqui o efeito prático é o +1 DES.)' },
     mestre_haste: { general: true, name: 'Mestre em Armas de Haste', abil: ['for', 'des'], desc: '+1 FOR ou DES. Com Glaive, Alabarda, Pique, Bordão ou Lança, Ação Bônus: golpe com o cabo (1d4 Concussão).',
       powers: [{ id: 'golpe_cabo', lvl: 1, name: 'Golpe com o Cabo', icon: '🔱', desc: '1d4 Concussão + atributo', cost: 'b', req: (h) => { const w = E.C.equipped(h, 'weapon'); return !!w && HASTE.includes(w.def.base); }, reqTxt: 'Requer arma de haste', effect: { weaponAttack: { dice: '1d4', type: 'concussao', name: 'Golpe com o Cabo' } } }] },
     mestre_escudos: { general: true, name: 'Mestre de Escudos', abil: ['for'], desc: '+1 FOR. Com escudo: Golpe de Escudo ao acertar (1×/turno, TR de Força ou Caído); ao passar num TR de Destreza contra uma habilidade especial, não sofre dano.', fx: { shieldMaster: true } },
@@ -149,8 +188,8 @@
     conjurador_guerra: { general: true, name: 'Conjurador de Guerra', abil: ['int', 'sab', 'car'], desc: '+1 INT, SAB ou CAR. Vantagem nos testes de Constituição para manter a Concentração.', fx: { concAdv: true } },
     duelista_defensivo: { general: true, name: 'Duelista Defensivo', abil: ['des'], desc: '+1 DES. Empunhando arma de Acuidade, Reação: some seu Bônus de Proficiência à CA contra um ataque que te acertaria.', fx: { defDuelist: true } },
     duravel: { general: true, name: 'Durável', abil: ['con'], desc: '+1 CON. Vantagem nos testes contra a morte.', fx: { deathAdv: true } },
-    matador_magos: { general: true, name: 'Matador de Magos', abil: ['for', 'des'], desc: '+1 FOR ou DES. Mente Protegida: uma vez por combate, uma falha em TR de INT, SAB ou CAR vira sucesso.', fx: { guardedMind: true } },
-    lider_inspirador: { general: true, name: 'Líder Inspirador', abil: ['sab', 'car'], desc: '+1 SAB ou CAR. Começa cada combate com PV temporários = nível + SAB ou CAR.', fx: { startTemp: (h) => h.level + Math.max(E.C.mod(h, 'sab'), E.C.mod(h, 'car')) } },
+    matador_magos: { general: true, name: 'Matador de Magos', abil: ['for', 'des'], desc: '+1 FOR ou DES. Mente Protegida: uma falha em TR de INT, SAB ou CAR vira sucesso, 1 vez por Descanso Curto ou Longo.', fx: { guardedMind: true }, resources: { mente_protegida: () => 1 } },
+    lider_inspirador: { general: true, name: 'Líder Inspirador', abil: ['sab', 'car'], desc: '+1 SAB ou CAR. Ao terminar um Descanso Curto ou Longo, você inspira o grupo: PV temporários = nível + SAB ou CAR (no jogo, aplicados no primeiro combate depois do descanso).', fx: { inspiringLeader: true }, resources: { lider: () => 1 } },
     adepto_elemental: { general: true, name: 'Adepto Elemental', abil: ['int', 'sab', 'car'], choose: 'element', desc: '+1 INT, SAB ou CAR. Escolha Ácido, Elétrico, Fogo, Frio ou Trovejante: suas magias ignoram Resistência a esse tipo.', fx: (h) => ({ elemAdept: (h.featData || {}).adepto_elemental }) },
     perfurador: { general: true, name: 'Perfurador', abil: ['for', 'des'], desc: '+1 FOR ou DES. Em acertos críticos com dano Perfurante, role um dado de dano extra.', fx: { piercer: true } },
     esmagador: { general: true, name: 'Esmagador', abil: ['for', 'con'], desc: '+1 FOR ou CON. Uma vez por turno, acertar com dano Contundente empurra o alvo; num crítico, ataques contra ele têm Vantagem.', fx: { crusher: true } },

@@ -456,6 +456,13 @@
     aurenna: ['rato_gigante', 'bandido', 'espiao'],
   };
 
+  // Dragões vivem em ninhos nas grutas da sua região (um por visita), não entre as criaturas comuns dos acampamentos.
+  M.DRAGON_NESTS = {};
+  for (const [rid, list] of Object.entries(M.BY_REGION)) {
+    const dragons = list.filter((k) => M.MONSTERS[k] && M.MONSTERS[k].type === 'dragao' && M.MONSTERS[k].sprite === 'dragon');
+    if (dragons.length) { M.DRAGON_NESTS[rid] = dragons; M.BY_REGION[rid] = list.filter((k) => !dragons.includes(k)); }
+  }
+
   // chefe do covil de cada região
   M.LAIR = { bosque: 'rei_lanterna', cidade: 'colosso_sinos', ruinas: 'arquileitor', costa: 'rei_caranguejo', vazios: 'mimico_leiloeiro', montanhas: 'serpe_obsidiana', astrolabio: 'constelacao_viva', jardins: 'arvore_ancia', abismo: 'ignarax' };
 

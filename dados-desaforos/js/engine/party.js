@@ -1,4 +1,4 @@
-/* Grupo de viagem: até 3 personagens, como no Genshin. Quem está no grupo aparece no HUD, troca com 1–3 e entra
+/* Grupo de viagem: até 3 personagens, como no Genshin. Quem está no grupo aparece no HUD, troca com F1–F3 e entra
    junto nas lutas como companheiro. Cada personagem guarda os próprios PV, poções, XP, ouro e empregos. */
 (() => {
   'use strict';

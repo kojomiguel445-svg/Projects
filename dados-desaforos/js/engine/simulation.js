@@ -77,13 +77,15 @@
     // A resumed/background tab cannot silently charge days or food for missed frames.
     dt = Math.min(dt, 1);
     S.advance(dt);
-    const rate = ctx.mode === 'arena' ? D.HUNGER_RATE.battle : ctx.sprinting && ctx.moving ? D.HUNGER_RATE.running : ctx.moving ? D.HUNGER_RATE.walking : D.HUNGER_RATE.idle;
+    const rate = (ctx.mode === 'arena' ? D.HUNGER_RATE.battle : ctx.sprinting && ctx.moving ? D.HUNGER_RATE.running : ctx.moving ? D.HUNGER_RATE.walking : D.HUNGER_RATE.idle) * S.hungerMult(h);
     const d = S.data(h), before = d.hunger;
     d.hunger = Math.max(0, d.hunger - rate * dt);
     statusTime += dt;
     if (statusTime >= .5 || before > 0 && d.hunger === 0) { statusTime = 0; changed(h, false); }
     return true;
   };
+  // Ritmo da fome: ajuste do jogador (Lento 0,6 · Normal 1 · Rápido 1,4) × tipo físico (Gordo 1,25).
+  S.hungerMult = (h = hero()) => { const set = Number(E.state && E.state.settings && E.state.settings.hungerRate); return (Number.isFinite(set) && set > 0 ? set : 1) * ((D.HUNGER_BUILD || {})[h && h.look && h.look.build] || 1); };
   S.canSprint = (h = hero()) => !!h && S.data(h).hunger > 0;
   S.penalty = (h = hero()) => h && S.data(h).hunger <= 0 ? 2 : 0;
   S.hasGlider = (h = hero()) => !!h && S.data(h).gliderOwned && S.data(h).gliderEquipped;
@@ -174,6 +176,110 @@
     changed(h);
     return result(true, `${D.FOODS[entry.cookTo].name} preparado. Agora você pode comer ou guardar para vender.`, { id: entry.cookTo, n: 1 });
   };
+  // ------------------------------------------------------------ receitas e preparo (fogão e fogueira)
+  // "peixe" aceita filé ou qualquer peixe pescado; "carne" aceita qualquer carne crua.
+  const GROUPS = { carne: ['carne_caca', 'carne_lobo', 'carne_ave'] };
+  const fishBag = (h) => (h.life && h.life.fish) || {};
+  const cheapFish = (h) => Object.keys(fishBag(h)).filter((k) => fishBag(h)[k] > 0 && E.L && E.L.FISH[k]).sort((a, b) => E.L.FISH[a].price - E.L.FISH[b].price);
+  S.ingredientCount = (h, key) => {
+    const food = S.data(h).food;
+    if (key === 'peixe') return (food.peixe_cru || 0) + cheapFish(h).reduce((a, k) => a + fishBag(h)[k], 0);
+    if (GROUPS[key]) return GROUPS[key].reduce((a, k) => a + (food[k] || 0), 0);
+    return food[key] || 0;
+  };
+  S.INGREDIENT_NAMES = { peixe: 'Peixe (qualquer)', carne: 'Carne crua (qualquer)' };
+  S.ingredientName = (key) => S.INGREDIENT_NAMES[key] || (D.FOODS[key] ? D.FOODS[key].name : key);
+  S.recipes = (h = hero(), station) => D.RECIPES.filter((r) => !station || r.stations.includes(station)).map((r) => {
+    const need = Object.entries(r.need).map(([k, n]) => ({ key: k, n, have: S.ingredientCount(h, k), name: S.ingredientName(k) }));
+    return Object.assign({}, r, { dish: D.FOODS[r.result], need, ok: need.every((x) => x.have >= x.n) });
+  });
+  const takeIngredients = (h, need) => {
+    const food = S.data(h).food;
+    for (const [k, n0] of Object.entries(need)) {
+      let n = n0;
+      const take = (bag, id) => { while (n > 0 && bag[id] > 0) { bag[id]--; n--; } if (!bag[id]) delete bag[id]; };
+      if (k === 'peixe') { take(food, 'peixe_cru'); for (const f of cheapFish(h)) take(fishBag(h), f); }
+      else if (GROUPS[k]) for (const id of GROUPS[k]) take(food, id);
+      else take(food, k);
+      if (n > 0) return false;
+    }
+    return true;
+  };
+  // A sessão de preparo vive no motor: a tela só envia ações; a qualidade sai do que aconteceu na panela.
+  let cookS = null;
+  S.cookSession = () => (cookS && cookS.hero === (hero() && hero().id) ? cookS : null);
+  S.cookBegin = (h = hero(), recipeId, station) => {
+    const r = D.RECIPES.find((x) => x.id === recipeId);
+    if (!h || !r) return result(false, 'Receita desconhecida.');
+    if (!r.stations.includes(station)) return result(false, station === 'fogueira' ? 'Essa receita precisa de um fogão.' : 'Essa receita não é feita aqui.');
+    if (!Object.entries(r.need).every(([k, n]) => S.ingredientCount(h, k) >= n)) return result(false, 'Faltam ingredientes para essa receita.');
+    const fire = station === 'fogueira';
+    cookS = { hero: h.id, recipe: r, station, t: 0, done: false, burnt: false,
+      // fogão: temperatura, chama (0 a 4), tempo de preparo útil, mexidas
+      temp: .25, heat: 2, band: [.44, .68], cookTime: 0, need: r.time * 1.4, good: 0, burn: 0, stirAt: 2.6, stirUntil: 0, stirs: 0, stirHits: 0, drift: 0, nextDrift: 2.4, bias: 0,
+      // fogueira: ponto de cada lado do espeto e intensidade do fogo
+      side: 0, sides: [0, 0], flame: 1, flips: 0, rate: 1 / (r.time * .9), fire };
+    return result(true, '', { session: cookS });
+  };
+  S.cookInput = (action) => {
+    const c = S.cookSession(); if (!c || c.done) return result(false, '');
+    if (!c.fire) {
+      if (action === 'up') c.heat = Math.min(4, c.heat + 1);
+      else if (action === 'down') c.heat = Math.max(0, c.heat - 1);
+      else if (action === 'stir') { if (c.t < c.stirUntil) { c.stirHits++; c.stirUntil = 0; return result(true, 'Mexeu na hora certa!', { good: true }); } return result(true, 'Ainda não precisa mexer.', { good: false }); }
+      return result(true, '');
+    }
+    if (action === 'flip') { c.side = 1 - c.side; c.flips++; return result(true, ''); }
+    if (action === 'take') { c.done = true; return result(true, ''); }
+    return result(false, '');
+  };
+  S.cookTick = (dt) => {
+    const c = S.cookSession(); if (!c || c.done || !(dt > 0)) return null;
+    dt = Math.min(dt, .1); c.t += dt;
+    if (!c.fire) {
+      // o fogão nunca fica parado: de tempos em tempos a chama aumenta ou baixa sozinha
+      c.drift += dt;
+      if (c.drift > c.nextDrift) {
+        c.drift = 0; c.nextDrift = 2.4 + Math.random() * 1.6;
+        const was = c.bias; c.bias = [-.17, 0, .17].filter((v) => v !== was)[Math.random() < .5 ? 0 : 1];
+        c.msg = c.bias > 0 ? 'A chama subiu sozinha: baixe o fogo.' : c.bias < 0 ? 'A chama enfraqueceu: aumente o fogo.' : 'A chama estabilizou.'; c.msgN = (c.msgN || 0) + 1;
+      }
+      const target = .12 + c.heat * .2 + c.bias; c.temp += (target - c.temp) * Math.min(1, dt * 1.6);
+      if (c.temp >= .35) c.cookTime += dt;
+      if (c.temp >= c.band[0] && c.temp <= c.band[1]) c.good += dt;
+      if (c.temp > .9) { c.burn += dt; if (c.burn > 1.6) { c.burnt = true; c.done = true; } } else c.burn = Math.max(0, c.burn - dt * .5);
+      if (c.t >= c.stirAt) { c.stirs++; c.stirUntil = c.t + 1.6; c.stirAt = c.t + 2.8 + Math.random() * 1.4; }
+      if (c.cookTime >= c.need) c.done = true;
+    } else {
+      // a chama da fogueira oscila; o lado que está sobre o fogo vai ganhando cor
+      c.flame = Math.min(1.3, Math.max(.75, c.flame + (Math.random() - .5) * dt * 1.2));
+      c.sides[c.side] += c.rate * c.flame * dt;
+      if (c.sides[c.side] > 1.08) { c.burnt = true; c.done = true; }
+    }
+    return c;
+  };
+  S.cookScore = (c) => {
+    if (!c) return 0;
+    if (!c.fire) return Math.max(0, Math.min(1, (c.good / Math.max(1, c.need)) * .75 + (c.stirs ? c.stirHits / c.stirs : 1) * .25));
+    const side = (x) => Math.max(0, 1 - Math.abs(x - .74) / .32);
+    return (side(c.sides[0]) + side(c.sides[1])) / 2;
+  };
+  S.cookFinish = (h = hero()) => {
+    const c = S.cookSession(); if (!h || !c || !c.done) return result(false, 'O preparo ainda não terminou.');
+    cookS = null;
+    if (!takeIngredients(h, c.recipe.need)) return result(false, 'Os ingredientes não estão mais na mochila.');
+    const d = S.data(h), score = S.cookScore(c);
+    let q = c.burnt ? 0 : score >= .9 ? 4 : score >= .7 ? 3 : score >= .45 ? 2 : 1;
+    if (c.fire && !c.burnt && Math.min(c.sides[0], c.sides[1]) < .45) q = 1;
+    const id = q === 0 ? 'comida_queimada' : q === 2 ? c.recipe.result : `${c.recipe.result}_${D.QUALITY[q].tag}`;
+    d.food[id] = Math.min(999999, (d.food[id] || 0) + 1);
+    if (E.Life && E.Life.addXp) E.Life.addXp(h, 'culinaria', q ? 4 + q * 2 : 2);
+    changed(h);
+    const label = q === 0 ? 'Queimada' : D.QUALITY[q].label;
+    return result(true, `${D.FOODS[id].name} pronto: ${label}.`, { id, q, label, score: Math.round(score * 100), food: D.FOODS[id] });
+  };
+  S.cookAbort = () => { cookS = null; };
+
   S.onBattle = (h = hero(), battle = {}) => {
     if (!h || !battle || typeof battle !== 'object') return result(false, 'Combate inválido.');
     if (seenBattles.has(battle) || battle.id && S.data(h).lastBattle === battle.id) return result(false, 'Combate já contabilizado.');
@@ -208,7 +314,7 @@
       const list = body.querySelector('[data-foods]'), items = S.foodItems(h);
       if (!items.length) list.appendChild(U.h('<p class="muted" style="padding:18px">Sem provisões. Compre alimentos na vila, pesque ou obtenha carne de animais de caça.</p>'));
       for (const entry of items) {
-        const row = U.h(`<div class="shop-item"><div class="si">${icon(entry.iconKey)}</div><div class="sx"><b>${esc(entry.name)} ×${entry.n}</b><small>${entry.raw ? 'Ingrediente cru: prepare no fogo.' : `Recupera ${entry.hunger} de saciedade.`}${entry.rarity >= 4 ? ' Peixe valioso: cozinhar consome essa unidade.' : ''}</small></div><div style="display:flex;gap:6px;flex-wrap:wrap">${entry.hunger > 0 && !entry.raw ? '<button class="btn primary sm" data-eat>Comer</button>' : ''}${entry.cookTo ? `<button class="btn dark sm" data-cook ${fire || S.canCook(h) ? '' : 'disabled'}>Preparar</button>` : ''}</div></div>`);
+        const row = U.h(`<div class="shop-item"><div class="si">${E.FoodArt && E.FoodArt.has(entry.id) ? `<img src="${E.FoodArt.url(entry.id, 96)}" alt="" style="width:100%;height:100%;object-fit:contain">` : icon(entry.iconKey)}</div><div class="sx"><b>${esc(entry.name)} ×${entry.n}</b><small>${entry.raw ? 'Ingrediente cru: prepare no fogo.' : `Recupera ${entry.hunger} de saciedade.`}${entry.rarity >= 4 ? ' Peixe valioso: cozinhar consome essa unidade.' : ''}</small></div><div style="display:flex;gap:6px;flex-wrap:wrap">${entry.hunger > 0 && !entry.raw ? '<button class="btn primary sm" data-eat>Comer</button>' : ''}${entry.cookTo ? `<button class="btn dark sm" data-cook ${fire || S.canCook(h) ? '' : 'disabled'}>Preparar</button>` : ''}</div></div>`);
         const eat = row.querySelector('[data-eat]'), cook = row.querySelector('[data-cook]');
         if (eat) eat.onclick = () => { const r = S.eat(h, entry.id); UI.toast(r.message); draw(); };
         if (cook) cook.onclick = () => { const r = S.cook(h, entry.id, { fire }); UI.toast(r.message); draw(); };

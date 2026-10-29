@@ -79,6 +79,7 @@
       document.body.appendChild(d);
       setTimeout(() => d.remove(), 1200);
     },
+    async reflect(uid) { this.float('hero', 'Refletiu!', 'temp'); E.Audio.sfx('impact'); if (arena) { await arena.hit('hero', false); await arena.projectile('hero', uid, '#ffd36b', true); } },
     async hit(uid, crit) { E.Audio.sfx('impact'); if (uid === 'hero') E.App.buzz(crit ? 160 : 50); else if (crit) E.App.buzz(70); if (arena) await arena.hit(uid, crit); },
     async death(uid) { if (arena) await arena.death(uid); render(); },
     async down() { if (arena) await arena.down(); },
@@ -295,7 +296,7 @@
       const prof = C.attackProfile(h);
       const wname = prof.name;
       add({ cls: 'main', icon: '⚔', name: t.attacksLeft > 0 ? `Atacar de novo (${t.attacksLeft} restante${t.attacksLeft > 1 ? 's' : ''})` : `Atacar com ${wname}`, desc: `${UI.signed(prof.toHit)} para acertar · ${prof.dice}${prof.dmgMod ? UI.signed(prof.dmgMod) : ''} ${R.DAMAGE[prof.type].name}${prof.mastery ? ` · Maestria: ${R.MASTERY[prof.mastery].name}` : ''}${!prof.proficient ? ' · sem proficiência!' : ''}${tgt ? ` → ${tgt.name}` : ''}`, cost: 'a', disabled: !canAction || !tgt, run: () => battle.heroAttack(target) });
-      if (C.species(h).hooks.breath && C.res(h, 'sopro') > 0) add({ icon: '🐉', name: 'Arma de Sopro', desc: `Substitui um ataque · ${h.level >= 5 ? 2 : 1}d10 em área`, cost: 'a', disabled: !canAction, run: () => battle.heroAttack(target, { breath: true }) });
+      if (C.species(h).hooks.breath && C.res(h, 'sopro') > 0) add({ icon: '🐉', name: 'Arma de Sopro', desc: `Substitui um ataque · ${h.level >= 17 ? 4 : h.level >= 11 ? 3 : h.level >= 5 ? 2 : 1}d10 ${R.DAMAGE[C.ancestryType(h)] ? R.DAMAGE[C.ancestryType(h)].name : ''} · cone ou linha · ${C.res(h, 'sopro')} uso(s)`, cost: 'a', disabled: !canAction, run: () => battle.heroAttack(target, { breath: true }) });
       if (C.has(h, 'ataque_descuidado')) add({ cls: 'toggle ' + (hc.reckless ? 'on' : ''), icon: '💢', name: 'Ataque Descuidado', desc: 'Vantagem nos ataques de Força; inimigos com Vantagem contra você', cost: 'grátis', disabled: t.attacked, run: () => battle.classAbility('descuidado') });
       if (C.res(h, 'surto') > 0 && !t.surge) add({ icon: '⚡', name: 'Surto de Ação', desc: 'Ganha uma ação extra neste turno', cost: 'grátis', run: () => battle.classAbility('surto') });
       if (h.cls === 'paladino' && C.has(h, 'arma_sagrada') && C.res(h, 'canalizar') > 0 && !hc.sacred) add({ icon: '✨', name: 'Arma Sagrada', desc: `+${Math.max(1, C.mod(h, 'car'))} nos ataques (Canalizar Divindade)`, cost: 'grátis', run: () => battle.classAbility('arma_sagrada') });
@@ -329,7 +330,9 @@
       if (h.cls === 'druida' && h.level >= 2) { const wf = C.fxVals(h, 'wildForm')[0]; B({ icon: '🐺', name: 'Forma Selvagem', desc: wf ? `PV temp. = ${wf.tempMult * h.level} · CA ${wf.acBase + C.mod(h, 'sab')} (${C.res(h, 'forma')})` : `PV temporários = ${h.level} (${C.res(h, 'forma')})`, disabled: t.bonus <= 0 || C.res(h, 'forma') <= 0 || (wf && hc.wild), run: () => battle.classAbility('forma') }); }
       if (hc.weaponSpirit) B({ icon: '🗡', name: 'Arma Espiritual', desc: 'Ataque mágico da arma flutuante', disabled: t.bonus <= 0 || !tgt, run: () => battle.spiritAttack(tgt, false) });
       if (C.species(h).hooks.adrenaline) B({ icon: '💨', name: 'Surto de Adrenalina', desc: `Disparada + ${C.pb(h)} PV temporários (${C.res(h, 'adrenalina')})`, disabled: t.bonus <= 0 || C.res(h, 'adrenalina') <= 0, run: () => battle.classAbility('adrenalina') });
-      if (h.species === 'aasimar' && h.level >= 3) B({ icon: '😇', name: 'Revelação Celestial', desc: `+${C.pb(h)} Radiante 1×/turno`, disabled: t.bonus <= 0 || hc.revelation || (h.used || {}).revelacao, run: () => battle.classAbility('revelacao') });
+      { const gi = C.giant(h); if (gi && gi.id === 'nuvem') B({ icon: '☁', name: 'Salto das Nuvens', desc: `Teletransporta 9 m e escapa do combate · ${C.res(h, 'gigante')} uso(s)`, disabled: t.bonus <= 0 || C.res(h, 'gigante') <= 0, run: () => battle.classAbility('salto_nuvens') }); }
+      if (h.species === 'golias' && h.level >= 5) B({ icon: '⛰', name: 'Forma Grande', desc: 'Fica Grande: Vantagem em testes de Força (1×/Descanso Longo)', disabled: t.bonus <= 0 || hc.large || C.res(h, 'forma_grande') <= 0, run: () => battle.classAbility('forma_grande') });
+      if (h.species === 'aasimar' && h.level >= 3) B({ icon: '😇', name: 'Revelação Celestial', desc: `Asas, Radiância ou Mortalha · +${C.pb(h)} de dano 1×/turno`, disabled: t.bonus <= 0 || hc.revelation || (h.used || {}).revelacao, run: () => battle.classAbility('revelacao') });
       subPowerButtons('b');
       if (C.attackProfile(h).light && C.attackProfile(h).base !== 'desarmado' && C.attackProfile(h).mastery !== 'agil') B({ icon: '🗡', name: 'Ataque com a outra mão', desc: `Arma Leve, depois de Atacar${C.hasFx(h, 'twf') ? ' · soma o atributo ao dano' : ' · sem somar o atributo ao dano'}`, disabled: !battle.canOffhand(), run: () => battle.offhandAttack(target) });
       for (const [id, n] of Object.entries(h.inventory)) if (n > 0 && R.ITEMS[id] && R.ITEMS[id].heal) B({ icon: '🧪', name: R.ITEMS[id].name, desc: `Cura ${R.ITEMS[id].heal} · você tem ${n}`, run: () => battle.usePotion(id) });
