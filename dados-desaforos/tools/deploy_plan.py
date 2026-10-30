@@ -57,7 +57,8 @@ def char_ops(a, b):
 def main():
     release, outdir = sys.argv[1], sys.argv[2]
     src = sys.argv[sys.argv.index('--src') + 1].rstrip('/') if '--src' in sys.argv else None
-    old_releases = [[v, BASE_URL] for v in BASE['releases'] if v != release]
+    # Versões publicadas por outra implantação (ex.: 5.12–5.13) vêm da URL registrada para cada uma.
+    old_releases = [[v, BASE.get('releaseUrls', {}).get(v, BASE_URL)] for v in BASE['releases'] if v != release]
     base = base_files()
     patches, uploaded, removed = {}, [], []
     for rel in base:

@@ -13,6 +13,14 @@
   "5.9.0",
   "5.9.1",
   "5.10.0",
-  "5.11.0"
- ]
+  "5.11.0",
+  "5.12.0",
+  "5.12.1",
+  "5.13.0"
+ ],
+ "releaseUrls": {
+  "5.12.0": "https://dados-desaforos-elarion-hufisa593-kojomiguel445-5477.vercel.app",
+  "5.12.1": "https://dados-desaforos-elarion-hufisa593-kojomiguel445-5477.vercel.app",
+  "5.13.0": "https://dados-desaforos-elarion-hufisa593-kojomiguel445-5477.vercel.app"
+ }
 }

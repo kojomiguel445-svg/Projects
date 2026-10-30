@@ -1,0 +1,30 @@
+/* One persistent hero XP bar, following the existing health and hunger bars. */
+#hud .xp-hud { position: relative; margin-top: 4px; color: #f3dca6; text-shadow: 0 1px 3px #10131e; }
+#hud .xp-meta { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 10px; line-height: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+#hud .xp-caption { flex: none; font-size: 9px; letter-spacing: .06em; white-space: nowrap; }
+#hud .xp-level { display: none; }
+#hud .xp-total { flex: none; margin-left: auto; white-space: nowrap; }
+#hud .hud-bottom .xp-hud .bar.xp { display: block; height: 4px; margin-top: 2px; overflow: hidden; border-radius: 3px; background: #171b28c9; box-shadow: 0 0 0 1px #f3dca640; }
+#hud .xp-hud .bar.xp > i { max-width: 100%; background: linear-gradient(90deg, #b88b48, #f3dca6); transition: width .35s ease-out; }
+#hud .xp-feedback { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: #fff0c5; font-size: 10px; font-weight: 800; white-space: nowrap; }
+#hud .xp-feedback:empty { display: none; }
+#hud .xp-gained .bar.xp { animation: xp-gain-glow .8s ease-out; }
+#hud .xp-level-up .bar.xp { animation: xp-level-glow 1.4s ease-out; }
+@keyframes xp-gain-glow { 35% { box-shadow: 0 0 0 1px #f3dca6b3, 0 0 8px #f3dca666; } }
+@keyframes xp-level-glow { 25%, 60% { box-shadow: 0 0 0 1px #fff1bf, 0 0 12px #f3dca699; } }
+
+/* Keep exploration controls and nutrition hidden inside a room. */
+#hud.hidden.xp-interior { display: block !important; }
+#hud.hidden.xp-interior > :not(.hud-bottom),
+#hud.hidden.xp-interior .hud-bottom > :not(.xp-hud) { display: none !important; }
+#hud.hidden.xp-interior .hud-bottom { width: min(260px, 42vw); bottom: calc(68px + var(--safe-b)); }
+#hud.xp-interior .xp-level { display: inline; }
+body:has(.modal-bg, #dialog, .screen, .world-service-panel, .wish-anim, .reveal, .summary, .death-roll) #hud.hidden.xp-interior { display: none !important; }
+@media (max-height: 430px) {
+  #hud.hidden.xp-interior .hud-bottom { bottom: calc(90px + var(--safe-b)); width: min(240px, 34vw); }
+}
+body.reduced #hud .xp-hud .bar.xp,
+body.reduced #hud .xp-hud .bar.xp > i { animation: none; transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  #hud .xp-hud .bar.xp, #hud .xp-hud .bar.xp > i { animation: none; transition: none; }
+}

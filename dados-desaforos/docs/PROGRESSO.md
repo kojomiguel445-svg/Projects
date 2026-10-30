@@ -54,20 +54,24 @@ de produção 5.3.1 (`dpl_B1hjBGYCHBUraYPjSFCMqfxEdFXA`), conferido por SHA-1 (c
   Loja própria: vendas automáticas pelo preço (`E.Vendor.visit/tick/summary`), painel único
   (`js/ui/vendor.js`), aluguel 30 po/dia (80 nas cidades), funcionários mais baratos (atendente = mais
   visitantes). Testes: `tests/plan-workday.json`, `tests/plan-shop.json`.
-- [x] 5.12.0: auditoria D&D 2024 por fontes (SRD 5.2, CC-BY, pelo pacote npm `@archivist-gg/dnd5e`; Aasimar
-  pelo Livro do Jogador 2024, ausente do SRD; o PDF de 2014 só serviu para diferenças históricas).
-  Espécies em `js/data/heroes.js` (tamanhos, linhagens de Elfo/Gnomo, 10 ancestrais dracônicos com cor,
-  legados do Tiferino, ancestrais gigantes do Golias, Revelação Celestial); `C.lineage/legacy/dragon/giant/
-  speed/darkvision/speciesResist/speciesSpells`; estilo de luta não aplica mais o bônus duas vezes;
-  `C.syncProgression` (Especialização do Ladino/Bardo, Erudito do Mago); `C.acBreakdown` separa regra e
-  jogo; `C.migrate` converte salvamentos antigos e marca `pendingChoices` (resolvidas por
-  `E.Creator.resolvePending`). Fome: `HUNGER_RATE` menor, `settings.hungerRate` (Lento/Normal/Rápido),
-  Gordo ×1,25. Culinária: `D.RECIPES`, qualidade (`_mal/_bem/_exc`), sessão `E.Sim.cookBegin/cookInput/
-  cookTick/cookFinish`, tela `js/ui/cooking.js`, artes `js/gfx/foodart.js`. Barra rápida `js/ui/hotbar.js`
-  (h.hotbar, só atalhos para a mochila; espaço 1 = arma equipada). Zonas seguras `js/engine/zones.js`
-  (interiores, centro das vilas, área urbana de Aurenna): arma na bainha, sem encontros, estado enviado
-  no `Net.hello`. Gordo: `CH.BUILDS.gordo` e `Battle.reflectBlow` (`C.REFLECT` = 8% / 25%, uma vez por
-  rodada, só corpo a corpo, sem refletir reflexo). Pendências: clique no chão (`groundRay/walkTo`),
-  botão direito gira a câmera, nado rápido com Shift (9 de vigor/s; nado normal sem custo), isca equipada
-  (`E.Life.equipBait`, `d.baitSel`), penhores `js/engine/pawn.js` (E.state.pawn, operação atômica),
-  dragões em ninhos nas grutas (`M.DRAGON_NESTS`, `addDragonNest`). Troca de personagem: F1–F3.
+- [x] 5.12.0–5.13.0: publicadas na Vercel fora deste repositório, sobre a 5.11.0; importadas no commit
+  `ab47532` (arquivos baixados da produção e conferidos pelo SHA-1 da listagem da Vercel). Trouxeram:
+  revisão de regras pelo SRD 5.2.1 (`regras-fontes.html`, composição da CA na ficha, escolhas de
+  progressão `C.progressionChoices`), clique para andar com A* (`js/engine/click-move.js`), botão direito
+  gira a câmera, XP e fome no HUD, nado rápido (`E.Sim.BALANCE.swim`), isca na vara (`E.Life.rodBait`),
+  covil de Ignarax (`js/gfx/dragon-lairs.js`, dragões fora dos encontros comuns), pôquer e penhores de
+  Nara (`js/engine/pawn.js`, `js/ui/pawn.js`), skins e tipo físico Gordo com debuffs (`S.BALANCE.fat`).
+- [x] 5.14.0: integração da 5.13.0 com a auditoria de espécies do Livro do Jogador 2024 (SRD 5.2 em
+  CC-BY pelo pacote npm `@archivist-gg/dnd5e`; Aasimar pelo Livro do Jogador 2024, ausente do SRD; o PDF
+  de 2014 só serviu para diferenças históricas): tamanhos, linhagens de Elfo/Gnomo, 10 ancestrais
+  dracônicos com cor e Voo Dracônico, sopro em cone ou linha, legados do Tiferino, ancestrais gigantes do
+  Golias e Revelação Celestial (`js/data/heroes.js`, `C.lineage/legacy/dragon/giant/speed/darkvision/
+  speciesResist/speciesSpells`); `C.migrate` converte saves antigos e marca `pendingChoices`
+  (`E.Creator.resolvePending`). Fome: na 5.13 a barra durava ~5 min; voltou a ~55 min andando
+  (`S.BALANCE.hungerPerSecond`) com Ajustes → Ritmo da fome (`settings.hungerRate`) e Gordo ×1,30.
+  Culinária: `D.RECIPES`, qualidade (`_mal/_bem/_exc`), sessão `E.Sim.cookBegin/cookInput/cookTick/
+  cookFinish`, tela `js/ui/cooking.js`, artes `js/gfx/foodart.js`. Barra rápida `js/ui/hotbar.js` (h.hotbar,
+  atalhos para a mochila; espaço 1 = arma equipada). Zonas seguras `js/engine/zones.js` (interiores, centro
+  das vilas, área urbana de Aurenna): arma na bainha, sem encontros, estado no `Net.hello`. Refletir
+  Golpes do Gordo: `Battle.reflectBlow` e `C.REFLECT` (8% / 25%, uma vez por rodada, só corpo a corpo,
+  sem refletir reflexo). Troca de personagem em F1–F3 (1–9 ficam com a barra rápida).

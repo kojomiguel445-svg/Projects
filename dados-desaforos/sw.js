@@ -1,6 +1,6 @@
 /* One complete release offline; navigations check the network first. */
-const RELEASE = '5.13.0';
-const VERSION = 'elarion-v5.13.0-vercel-living';
+const RELEASE = '5.14.0';
+const VERSION = 'elarion-v5.14.0-vercel-living';
 const OWN_CACHE = /^elarion-v[\d.]+-(?:vercel-)?living$/;
 const ROOT = self.registration.scope;
 const absolute = path => new URL(path, ROOT).href;

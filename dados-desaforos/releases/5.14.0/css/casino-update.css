@@ -1,0 +1,13 @@
+/* Somente as mesas de Fortuna Dourada; o cenário permanece visível. */
+.at-world-table .slot-machine{display:flex;align-items:center;justify-content:center;gap:12px;min-height:130px}
+.slot-machine .reels{gap:7px;flex:1;min-width:0}.slot-machine .reel{width:clamp(50px,15vw,76px);height:92px;border-radius:8px;font-size:39px;overflow:hidden;flex-shrink:1}
+.slot-symbol{font-family:Georgia,serif;font-weight:bold;line-height:1;display:inline-block;color:#a64e43;text-shadow:1px 2px #70433222}.slot-star,.slot-bell{color:#af8331}.slot-gem{color:#467e8e}.slot-dragon{color:#41694b}.slot-lemon{color:#a0953f}.cs-pay .slot-symbol{font-size:16px}
+.slot-lever{position:relative;width:34px;height:108px;flex:none;background:transparent;border:0;cursor:pointer;transform-origin:50% 84%;padding:0}.lever-arm{position:absolute;width:8px;height:66px;left:13px;top:21px;border:1px solid #f1d28b;background:linear-gradient(90deg,#a58a51,#ffe2a2,#9c7b41);border-radius:3px}.lever-knob{position:absolute;width:25px;height:25px;left:5px;top:4px;border-radius:50%;background:radial-gradient(circle at 35% 25%,#efaa89,#ae4a40 60%,#622d31);box-shadow:0 2px 0 2px #171d28}.pulling .slot-lever{animation:casino-pull .55s ease-in-out}.slot-lever:focus-visible{outline:2px solid #f6d282;border-radius:8px}
+.bj-dealer-portrait{font:700 11px var(--display);letter-spacing:.12em;color:#eed5a4;border-bottom:1px solid #d9bc7655;padding:0 0 8px}.at-world-table .cards{flex-wrap:wrap;justify-content:center;gap:4px;min-height:68px}.at-world-table .pc{width:46px;height:66px}.at-world-table .pc b{font-size:20px}.at-world-table .cs-bet{gap:4px}.at-world-table .cs-bet button{min-width:36px;padding:5px 8px}.at-world-table .cs-table{padding:12px 9px}.at-world-table .cs-go{min-width:0;width:100%;font-size:15px}.at-world-table button:disabled{cursor:default;opacity:.6}
+@keyframes casino-pull{0%,100%{transform:rotateX(0) translateY(0)}50%{transform:rotateX(-30deg) translateY(17px)}}
+@media(max-height:600px){.at-world-table .bj-hand{margin:4px 0;gap:2px}.at-world-table .cards{min-height:56px}.at-world-table .pc{width:38px;height:54px}.at-world-table .bj-v{font-size:14px;min-height:17px}.at-world-table .slot-machine{min-height:108px}.at-world-table .reel{height:76px}.at-world-table .cs-pay{font-size:10px}}
+@media(prefers-reduced-motion:reduce){.pulling .slot-lever{animation:none}.reel.spin{animation:none;filter:none}}
+.at-world-table .pc{animation:casino-deal .18s ease both;opacity:1}
+@keyframes casino-deal{from{transform:translateY(-8px) rotate(-3deg)}to{transform:translateY(0) rotate(0)}}
+
+.slot-symbol .el-icon{width:46px;height:46px;vertical-align:middle}.cs-pay .slot-symbol .el-icon{width:16px;height:16px}
