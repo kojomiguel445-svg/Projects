@@ -1,6 +1,6 @@
 {
- "commit": "662f137",
- "url": "https://dados-desaforos-elarion-gzmo0kjok-kojomiguel445-5477.vercel.app",
+ "commit": "c5ca31f",
+ "url": "https://dados-desaforos-elarion-lg3kq2m7p-kojomiguel445-5477.vercel.app",
  "releases": [
   "5.3.0",
   "5.3.1",
@@ -16,11 +16,7 @@
   "5.11.0",
   "5.12.0",
   "5.12.1",
-  "5.13.0"
- ],
- "releaseUrls": {
-  "5.12.0": "https://dados-desaforos-elarion-hufisa593-kojomiguel445-5477.vercel.app",
-  "5.12.1": "https://dados-desaforos-elarion-hufisa593-kojomiguel445-5477.vercel.app",
-  "5.13.0": "https://dados-desaforos-elarion-hufisa593-kojomiguel445-5477.vercel.app"
- }
+  "5.13.0",
+  "5.14.0"
+ ]
 }
