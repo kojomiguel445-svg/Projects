@@ -110,7 +110,9 @@
         <div class="attr"><span>Pontos de Vida</span><b>${h.hp} / ${C.maxHp(h)}${h.tempHp ? ` (+${h.tempHp} temp.)` : ''}</b></div>
         <div class="attr"><span>Classe de Armadura</span><b>${C.ac(h)}</b></div>
         <div class="attr"><span>Iniciativa</span><b>${U.sign(C.initiative(h))}</b></div>
-        <div class="attr"><span>Deslocamento</span><b>${String(C.species(h).speed).replace('.', ',')} m</b></div>
+        <div class="attr"><span>Deslocamento</span><b>${String(C.speed(h)).replace('.', ',')} m</b></div>
+        ${C.darkvision(h) ? `<div class="attr"><span>Visão no Escuro</span><b>${C.darkvision(h)} m</b></div>` : ''}
+        ${h.look && h.look.build === 'gordo' ? `<div class="attr" title="Mecânica própria do jogo, não é regra de D&D"><span>Refletir Golpes <small style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:999px;background:#efe4f7;color:#5a3a7a;margin-left:4px">jogo</small></span><b>${Math.round(C.REFLECT.chance * 100)}% · ${Math.round(C.REFLECT.fraction * 100)}%</b></div>` : ''}
         <div class="attr"><span>Bônus de Proficiência</span><b>+${C.pb(h)}</b></div>
         <div class="attr"><span>Percepção Passiva</span><b>${C.passivePerception(h)}</b></div>
         <div class="attr"><span>Dados de Vida</span><b>${h.level - (h.hdUsed || 0)}/${h.level} d${C.cls(h).hd}</b></div>
@@ -181,6 +183,10 @@
     }
     body.appendChild(U.h(`<h3>${sp.name}</h3>`));
     for (const [n, d] of sp.traits) body.appendChild(U.h(`<div class="feat"><div class="fh"><span>${n}</span></div><p>${d}</p></div>`));
+    // escolhas da espécie feitas na criação (regras 2024)
+    const picks = [C.lineage(h) && [sp.lineageLabel, `${C.lineage(h).name} — ${C.lineage(h).l1}${C.lineage(h).l3 ? ` Nível 3: ${C.lineage(h).l3}${h.level >= 3 ? ' ✓' : ''}. Nível 5: ${C.lineage(h).l5}${h.level >= 5 ? ' ✓' : ''}.` : ''}`], C.legacy(h) && [sp.legacyLabel, `${C.legacy(h).name} — ${C.legacy(h).l1} Nível 3: ${C.legacy(h).l3}${h.level >= 3 ? ' ✓' : ''}. Nível 5: ${C.legacy(h).l5}${h.level >= 5 ? ' ✓' : ''}.`], C.dragon(h) && ['Ancestralidade Dracônica', `${C.dragon(h).name} · ${R.DAMAGE[C.dragon(h).type] ? R.DAMAGE[C.dragon(h).type].name : ''}`], C.giant(h) && [sp.giantLabel, `${C.giant(h).name}: ${C.giant(h).desc}`], h.size && ['Tamanho', h.size]].filter(Boolean);
+    for (const [n, d] of picks) body.appendChild(U.h(`<div class="feat"><div class="fh"><span>${U.esc(n)}</span></div><p>${U.esc(d)}</p></div>`));
+    if (sp.source) body.appendChild(U.h(`<p class="lead" style="font-size:11px">Fonte: ${U.esc(sp.source)}.</p>`));
     body.appendChild(U.h('<h3>Talentos</h3>'));
     for (const f of h.feats || []) if (H.FEATS[f]) body.appendChild(U.h(`<div class="feat"><div class="fh"><span>${H.FEATS[f].name}</span><small>${H.FEATS[f].general ? 'Geral' : 'Origem'}</small></div><p>${H.FEATS[f].desc}${h.featData && h.featData[f] ? ` <b>(${R.AB[h.featData[f]] ? R.AB[h.featData[f]].name : R.DAMAGE[h.featData[f]] ? R.DAMAGE[h.featData[f]].name : h.featData[f]})</b>` : ''}</p></div>`));
     for (const st of C.styles(h)) if (H.FIGHTING_STYLES[st]) body.appendChild(U.h(`<div class="feat"><div class="fh"><span>${H.FIGHTING_STYLES[st].name}</span><small>Estilo de Luta</small></div><p>${H.FIGHTING_STYLES[st].desc}</p></div>`));

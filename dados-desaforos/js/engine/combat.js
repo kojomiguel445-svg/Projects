@@ -75,6 +75,7 @@
       }
       // subclasses: PV temporários, Proteção Arcana, Presságio…
       const hc = this.hc;
+      if (C.hasFx(h, 'inspiringLeader') && C.res(h, 'lider') > 0) { C.spend(h, 'lider'); const n = h.level + Math.max(C.mod(h, 'sab'), C.mod(h, 'car')); if (n > (h.tempHp || 0)) { h.tempHp = n; this.say(`Líder Inspirador: ${n} PV temporários.`, 'good'); } }
       for (const f of C.fxVals(h, 'startTemp')) { const n = typeof f === 'function' ? f(h) : f; if (n > (h.tempHp || 0)) { h.tempHp = n; this.say(`PV temporários da subclasse: ${n}.`, 'good'); } }
       // Proteção Arcana (Abjurador): criada por uma Abjuração com espaço e mantida até o Descanso Longo
       if (C.hasFx(h, 'arcaneWard')) { hc.wardMax = 2 * h.level + C.mod(h, 'int'); if (h.ward !== undefined) { hc.ward = Math.min(hc.wardMax, h.ward); this.say(`Proteção Arcana: ${hc.ward} PV de proteção.`, 'good'); } }
@@ -244,6 +245,13 @@
     async endHeroTurn(skipSaves) {
       if (this.over) return;
       if (!skipSaves) await this.heroEndOfTurnSaves();
+      // Revelação Celestial: Radiância Interior no fim do turno, Mortalha expira, a transformação dura 1 minuto (10 rodadas)
+      const hc0 = this.hc;
+      if (hc0.revelation) {
+        if (hc0.revelation === 'radiancia' && this.h.hp > 0) for (const e of this.alive()) { this.say(`Radiância Interior: ${e.name} sofre ${C.pb(this.h)} de dano Radiante.`, 'spell'); if (await this.damageEnemy(e, [{ amount: C.pb(this.h), type: 'radiante' }], {})) this.onKill(e); if (this.over) return; }
+        if (--hc0.revelationRounds <= 0) { hc0.revelation = false; this.say('A Revelação Celestial termina.', 'sys'); }
+      }
+      for (const e of this.enemies) if (e.cond.amedrontado && e.cond.amedrontado.src === 'mortalha' && this.round >= e.cond.amedrontado.until) delete e.cond.amedrontado;
       if (C.hasFx(this.h, 'selfRestore') && this.h.hp > 0) for (const c of ['adormecido', 'amedrontado', 'envenenado']) if (this.hc.cond[c]) { delete this.hc.cond[c]; this.say(`Autorrestauração: ${R.CONDITIONS[c].name} termina.`, 'good'); }
       this.P.lock();
       // fim do turno: alvos atormentados expiram, ações lendárias
@@ -325,7 +333,7 @@
         this.say(`Sorte do Próprio Sombrio: +${x} → ${total} (${ok ? 'sucesso' : 'falha'}).`, ok ? 'good' : 'bad');
       }
       // Matador de Magos: Mente Protegida
-      if (!ok && ['int', 'sab', 'car'].includes(ab) && C.hasFx(h, 'guardedMind') && !hc.guarded) { hc.guarded = true; ok = true; this.say('Mente Protegida: você transforma a falha em sucesso!', 'good'); }
+      if (!ok && ['int', 'sab', 'car'].includes(ab) && C.hasFx(h, 'guardedMind') && C.res(h, 'mente_protegida') > 0) { C.spend(h, 'mente_protegida'); ok = true; this.say('Mente Protegida: você transforma a falha em sucesso!', 'good'); }
       if (!ok && C.res(h, 'indomavel') > 0 && dc - total <= h.level + 10) {
         C.spend(h, 'indomavel');
         const r2 = U.die(20);
@@ -339,7 +347,8 @@
     async skillCheck(sk, dc, label, advX) {
       const h = this.h, hc = this.hc;
       const bonus = C.skillBonus(h, sk);
-      const adv = this.useLuck || advX || !!hc.sb.advD20;
+      // Forma Grande (Golias): Vantagem em testes de Força
+      const adv = this.useLuck || advX || !!hc.sb.advD20 || (hc.large && R.SKILLS[sk] && R.SKILLS[sk].ab === 'for');
       delete hc.sb.advD20;
       const r = this.d20(adv, hc.cond.envenenado || hc.cond.amedrontado, true);
       if (C.hasFx(h, 'reliableTalent') && (h.skills || []).includes(sk) && r.nat < 10) r.nat = 10;
@@ -406,7 +415,7 @@
       this.busy = true;
       try {
         const target = this.enemy(targetUid) || this.alive()[0];
-        if (opts.breath) await this.breathWeapon();
+        if (opts.breath) await this.breathWeapon(target);
         else await this.weaponAttack(target, opts);
       } finally { this.busy = false; }
       this.afterHeroAction();
@@ -578,9 +587,15 @@
       const ds = C.fxVals(h, 'dreadfulStrike')[0];
       if (ds && !t.once.dread && C.res(h, 'golpe_terrivel') > 0) { C.spend(h, 'golpe_terrivel'); t.once.dread = true; addExtra(ds, 'psiquico', 'Golpe Terrível'); }
       // Revelação Celestial
-      if (hc.revelation && !t.once.revelation) { parts.push({ amount: C.pb(h), type: 'radiante', label: 'Revelação Celestial' }); t.once.revelation = true; }
+      if (hc.revelation && !t.once.revelation) { parts.push({ amount: C.pb(h), type: hc.revelation === 'mortalha' ? 'necrotico' : 'radiante', label: 'Revelação Celestial' }); t.once.revelation = true; }
       // Golias (Fogo)
-      if (C.species(h).hooks.giantFire && C.res(h, 'gigante') > 0 && !t.once.giant) { C.spend(h, 'gigante'); addExtra('1d10', 'fogo', 'Queimadura Gigante'); t.once.giant = true; }
+      const gi = C.giant(h);
+      if (gi && C.res(h, 'gigante') > 0 && !t.once.giant && ['fogo', 'gelo', 'colina'].includes(gi.id)) {
+        const big = ['Enorme', 'Imenso'].includes(target.def.size);
+        if (gi.id === 'fogo') { C.spend(h, 'gigante'); t.once.giant = true; addExtra('1d10', 'fogo', 'Queimadura do Fogo'); }
+        else if (gi.id === 'gelo') { C.spend(h, 'gigante'); t.once.giant = true; addExtra('1d6', 'frio', 'Frio do Gelo'); target.cond.lento = { src: 'hero' }; }
+        else if (gi.id === 'colina' && !big && !(target.def.condImm || []).includes('caido') && !target.cond.caido) { C.spend(h, 'gigante'); t.once.giant = true; target.cond.caido = { src: 'hero' }; this.say(`Tombo da Colina: ${target.name} cai!`, 'good'); }
+      }
       // passivos de arma
       const w = prof.weapon;
       if (w && w.def.passive) {
@@ -793,17 +808,23 @@
       }
     }
 
-    async breathWeapon() {
+    async breathWeapon(targetUid) {
       const h = this.h;
       if (C.res(h, 'sopro') <= 0) return;
+      // Cone de 4,5 m ou linha de 9 m (Livro do Jogador 2024). No combate do jogo, sem grade:
+      // o cone alcança o alvo e até dois inimigos próximos; a linha, o alvo e um inimigo atrás dele.
+      const shape = (this.alive().length > 1 && this.P.ask) ? await this.P.ask({ title: 'Arma de Sopro', text: 'Escolha a forma da exalação.', options: [{ id: 'cone', label: 'Cone de 4,5 m (até 3 inimigos próximos)' }, { id: 'linha', label: 'Linha de 9 m (até 2 inimigos em fila)' }] }) : 'cone';
+      if (!shape || shape === 'no') return;
       C.spend(h, 'sopro');
-      const type = h.ancestry || 'fogo';
-      const dice = `${h.level >= 11 ? 3 : h.level >= 5 ? 2 : 1}d10`;
+      const type = C.ancestryType(h);
+      const dice = `${h.level >= 17 ? 4 : h.level >= 11 ? 3 : h.level >= 5 ? 2 : 1}d10`;
       const dc = 8 + C.mod(h, 'con') + C.pb(h);
       await this.P.anim({ actor: 'hero', kind: 'breath', type });
       const roll = rollDice(dice);
       await this.P.rollDamage({ who: 'hero', label: `Arma de Sopro (TR Des CD ${dc})`, parts: [{ amount: roll.total, type, dice: roll }], total: roll.total });
-      for (const e of this.alive()) {
+      const first = this.enemy(targetUid) && !this.enemy(targetUid).dead ? this.enemy(targetUid) : this.alive()[0];
+      const hit = [first, ...this.alive().filter((e) => e !== first)].slice(0, shape === 'linha' ? 2 : 3);
+      for (const e of hit) {
         const ok = this.enemySave(e, 'des', dc);
         await this.showEnemySave(e, 'des', ok, dc, 'Arma de Sopro');
         const amt = ok.ok ? Math.floor(roll.total / 2) : roll.total;
@@ -1196,7 +1217,7 @@
       const sp = S.SPELLS[spellId], h = this.h;
       if (sp.level === 0) return [0];
       const out = [];
-      const free = (spellId === 'marca_cacador' && C.res(h, 'marca_gratis') > 0) || (h.mi && h.mi.spell === spellId && C.res(h, 'mi_spell') > 0);
+      const free = (spellId === 'marca_cacador' && C.res(h, 'marca_gratis') > 0) || (h.mi && h.mi.spell === spellId && C.res(h, 'mi_spell') > 0) || C.res(h, 'sp_' + spellId) > 0;
       if (free) out.push('free');
       C.slotsLeft(h).forEach((n, i) => { if (n > 0 && i + 1 >= sp.level) out.push(i + 1); });
       return out;
@@ -1238,7 +1259,7 @@
         else if (isBonus) t.bonus--; else t.action--;
         let lvl = sp.level;
         if (slot === 'free') {
-          if (spellId === 'marca_cacador') C.spend(h, 'marca_gratis'); else C.spend(h, 'mi_spell');
+          if (spellId === 'marca_cacador') C.spend(h, 'marca_gratis'); else if (C.res(h, 'sp_' + spellId) > 0) C.spend(h, 'sp_' + spellId); else C.spend(h, 'mi_spell');
         } else if (slot > 0) { this.useSlot(slot); lvl = slot; t.once.slotSpell = true; }
         if (sp.conc) this.startConc(spellId, slot === 'free' ? sp.level : slot || sp.level);
         const target = this.enemy(targetUid) || this.alive()[0];
@@ -1697,7 +1718,7 @@
     async classAbility(id, targetUid) {
       if (!this.canAct()) return;
       const h = this.h, hc = this.hc, t = this.turn;
-      const needBonus = ['furia', 'folego', 'impor', 'adrenalina', 'inata', 'mira', 'esconder_b', 'artes', 'rajada', 'paciente', 'revelacao', 'arma_espiritual', 'forma'].includes(id);
+      const needBonus = ['furia', 'folego', 'impor', 'adrenalina', 'inata', 'mira', 'esconder_b', 'artes', 'rajada', 'paciente', 'revelacao', 'arma_espiritual', 'forma', 'salto_nuvens', 'forma_grande'].includes(id);
       const needAction = ['centelha', 'centelha_dano', 'maos_curativas'].includes(id);
       if (needBonus && t.bonus <= 0) return;
       if (needAction && t.action <= 0) return;
@@ -1812,9 +1833,32 @@
         }
         if (id === 'revelacao') {
           if (h.level < 3 || hc.revelation || (h.used || {}).revelacao) return;
-          C.spend(h, 'revelacao'); t.bonus--; hc.revelation = true;
-          await this.P.anim({ actor: 'hero', kind: 'buff', type: 'radiante' });
-          this.say(`Revelação Celestial: +${C.pb(h)} Radiante uma vez por turno.`, 'good');
+          const form = this.P.ask ? await this.P.ask({ title: 'Revelação Celestial', text: 'Escolha a transformação (1 minuto).', options: [{ id: 'asas', label: 'Asas Celestiais (Deslocamento de Voo)' }, { id: 'radiancia', label: 'Radiância Interior (dano Radiante ao redor no fim de cada turno seu)' }, { id: 'mortalha', label: 'Mortalha Necrótica (TR de Carisma ou Amedrontado)' }] }) : 'asas';
+          if (!form || form === 'no') return;
+          C.spend(h, 'revelacao'); t.bonus--; hc.revelation = form; hc.revelationRounds = 10;
+          await this.P.anim({ actor: 'hero', kind: 'buff', type: form === 'mortalha' ? 'necrotico' : 'radiante' });
+          this.say(`Revelação Celestial (${{ asas: 'Asas Celestiais', radiancia: 'Radiância Interior', mortalha: 'Mortalha Necrótica' }[form]}): +${C.pb(h)} de dano ${form === 'mortalha' ? 'Necrótico' : 'Radiante'} uma vez por turno.`, 'good');
+          if (form === 'mortalha') {
+            const dc = 8 + C.mod(h, 'car') + C.pb(h);
+            for (const e of this.alive()) {
+              if ((e.def.condImm || []).includes('amedrontado')) continue;
+              const ok = this.enemySave(e, 'car', dc); await this.showEnemySave(e, 'car', ok, dc, 'Mortalha Necrótica');
+              if (!ok.ok) e.cond.amedrontado = { src: 'mortalha', until: this.round + 1 };
+            }
+          }
+        }
+        if (id === 'salto_nuvens') {
+          const gi = C.giant(h); if (!gi || gi.id !== 'nuvem' || C.res(h, 'gigante') <= 0) return;
+          C.spend(h, 'gigante'); t.bonus--;
+          await this.P.anim({ actor: 'hero', kind: 'buff', type: 'energia' });
+          this.say('Salto das Nuvens: você se teletransporta 9 m para longe dos inimigos e escapa!', 'good');
+          return this.finish('flee');
+        }
+        if (id === 'forma_grande') {
+          if (h.species !== 'golias' || h.level < 5 || hc.large || C.res(h, 'forma_grande') <= 0) return;
+          C.spend(h, 'forma_grande'); t.bonus--; hc.large = true;
+          await this.P.anim({ actor: 'hero', kind: 'buff', type: 'concussao' });
+          this.say('Forma Grande: você cresce até o tamanho Grande (Vantagem em testes de Força).', 'good');
         }
         if (id === 'forma') {
           if (C.res(h, 'forma') <= 0) return;
@@ -1946,13 +1990,26 @@
     }
 
     // dano no herói; retorna dano efetivo
+    // Refletir Golpes (tipo físico Gordo) — mecânica própria do jogo, não é regra de D&D: chance de devolver parte do
+    // dano corpo a corpo realmente sofrido a quem atacou; no máximo uma vez por rodada e nunca refletindo um reflexo.
+    async reflectBlow(taken, parts, opts) {
+      const cfg = E.C.REFLECT, h = this.h, hc = this.hc, src = opts.src;
+      if (!cfg || !(taken > 0) || !opts.attack || !opts.melee || opts.reflected || !src || src.dead || h.hp <= 0) return 0;
+      if (!h.look || h.look.build !== 'gordo' || hc.reflectRound === this.round) return 0;
+      if (Math.random() >= cfg.chance) return 0;
+      hc.reflectRound = this.round;
+      const amount = Math.max(1, Math.floor(taken * cfg.fraction));
+      this.say(`Refletir Golpes! ${h.name} absorve o impacto com o corpo e devolve ${amount} de dano a ${src.name}.`, 'good');
+      if (this.P.reflect) await this.P.reflect(src.uid);
+      if (await this.damageEnemy(src, [{ amount, type: (parts[0] && parts[0].type) || 'concussao' }], { reflected: true })) this.onKill(src);
+      return amount;
+    }
     async damageHero(parts, opts = {}) {
       const h = this.h, hc = this.hc;
       let total = 0;
       for (const p of parts) {
         let amt = p.amount;
-        const res = [...(C.species(h).hooks.resist || [])];
-        if (h.species === 'draconato' && h.ancestry) res.push(h.ancestry);
+        const res = C.speciesResist(h);
         if (hc.raging) res.push('concussao', 'cortante', 'perfurante');
         res.push(...C.fxArr(h, 'resist'));
         if (hc.raging && C.hasFx(h, 'rageResistAll') && !['energia', 'necrotico', 'psiquico', 'radiante'].includes(p.type)) res.push(p.type);
@@ -1996,6 +2053,12 @@
       }
       // Escudo do Pensamento (Grande Antigo 10): quem causa dano Psíquico sofre o mesmo
       if (opts.src && !opts.src.dead && C.hasFx(h, 'thoughtShield')) { const psy = parts.filter((p) => p.type === 'psiquico').reduce((a, p) => a + Math.floor(p.amount / 2), 0); if (psy > 0) { this.say(`Escudo do Pensamento: ${opts.src.name} sofre ${psy} de dano Psíquico.`, 'good'); if (await this.damageEnemy(opts.src, [{ amount: psy, type: 'psiquico' }], {})) this.onKill(opts.src); } }
+      // Golias: Resistência da Pedra (reduz 1d12 + CON) ou Trovão da Tempestade (1d8 Trovejante em quem causou o dano)
+      const gi = C.giant(h);
+      if (gi && total > 0 && !this.reactionUsed && h.hp > 0 && C.res(h, 'gigante') > 0) {
+        if (gi.id === 'pedra' && total >= 4) { C.spend(h, 'gigante'); this.reactionUsed = true; const red = Math.max(0, U.die(12) + C.mod(h, 'con')); total = Math.max(0, total - red); this.say(`Resistência da Pedra reduz o dano em ${red}.`, 'good'); }
+        else if (gi.id === 'tempestade' && opts.src && !opts.src.dead) { C.spend(h, 'gigante'); this.reactionUsed = true; const x = rollDice('1d8'); this.say(`Trovão da Tempestade: ${opts.src.name} sofre ${x.total} de dano Trovejante.`, 'good'); if (await this.damageEnemy(opts.src, [{ amount: x.total, type: 'trovejante' }], {})) this.onKill(opts.src); }
+      }
       if (total <= 0) return 0;
       let rest = total;
       // Proteção Arcana (Abjurador) absorve antes dos PV temporários
@@ -2006,6 +2069,7 @@
       for (const p of parts) this.P.float('hero', p.amount, p.type, { crit: opts.crit });
       await this.P.hit('hero', opts.crit);
       delete hc.cond.adormecido;
+      await this.reflectBlow(rest, parts, opts);
       // Fuga Nebulosa (Arquifada 6): Reação ao sofrer dano — Passo Nebuloso com Passo Aterrador
       if (h.hp > 0 && h.hp < C.maxHp(h) / 2 && opts.src && !opts.src.dead && C.hasFx(h, 'mistyEscape') && C.res(h, 'passo_feerico') > 0 && !this.reactionUsed) {
         C.spend(h, 'passo_feerico'); this.reactionUsed = true;
@@ -2377,7 +2441,7 @@
       const total2 = parts.reduce((a, p) => a + p.amount, 0);
       await this.P.rollDamage({ who: 'enemy', label: crit ? `CRÍTICO de ${e.name}!` : `${atk.n} de ${e.name}`, parts, total: total2, crit, quick: true });
       hc.hitsBy[e.uid] = true;
-      const dealt = await this.damageHero(parts, { crit, attack: true, src: e });
+      const dealt = await this.damageHero(parts, { crit, attack: true, src: e, melee: atk.r !== 'dist' });
       this.say(`${e.name} acerta ${atk.n}: ${dealt} de dano.`, 'hurt');
       if (this.over || h.hp <= 0) return;
       // Armadura de Agathys e Escudo de Fogo

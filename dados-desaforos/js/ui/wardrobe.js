@@ -266,6 +266,7 @@
         if (E.Sim && E.Sim.BALANCE) {
           const fat = E.Sim.BALANCE.fat, pct = n => Math.round(n * 100);
           d.appendChild(U.h(`<small class="muted">Gordo: corrida ${pct(1-fat.run)}% mais lenta, fome ${pct(fat.hunger-1)}% mais rápida, salto ${pct(1-fat.jump)}% menor e descida com paraquedas ${pct(fat.glideDescent-1)}% mais rápida. Seus atributos não mudam.</small>`));
+        if (E.C && E.C.REFLECT) d.appendChild(U.h(`<small class="muted">Refletir Golpes (mecânica do jogo, não é regra de D&amp;D): ${Math.round(E.C.REFLECT.chance * 100)}% de chance de devolver ${Math.round(E.C.REFLECT.fraction * 100)}% do dano corpo a corpo recebido ao atacante, no máximo uma vez por rodada.</small>`));
         }
         const hl = U.h(`<div class="ap-lab">Altura: <b>${Math.round(L.height * 100)}%</b></div>`);
         d.appendChild(hl);

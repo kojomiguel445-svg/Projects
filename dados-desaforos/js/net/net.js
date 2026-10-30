@@ -63,7 +63,7 @@
   NET.heroSummary = () => {
     const h = E.Store.hero(); if (!h) return null;
     const wi = E.SP.heroWeaponInfo(h);
-    return { name: h.name, cls: h.cls, species: h.species, level: h.level, title: E.Life ? E.Life.title(h) : '', look: E.CH.normalize(h.look, h.cls, h.species), weapon: Object.assign({}, wi, { type: E.SP.heroWeaponType(h) }) };
+    return { name: h.name, cls: h.cls, species: h.species, level: h.level, title: E.Life ? E.Life.title(h) : '', look: E.CH.normalize(h.look, h.cls, h.species), weapon: Object.assign({}, wi, { type: E.Zones ? E.Zones.weaponType(h) : E.SP.heroWeaponType(h) }), sheathed: !!(E.Zones && E.Zones.safe) };
   };
   NET.send = (obj) => { if (NET.ws && NET.ws.readyState === 1) NET.ws.send(JSON.stringify(obj)); };
   NET.hello = () => { const hero = NET.heroSummary(); if (!hero) return; const w = E.WG.world; NET.send({ t: 'hello', hero, profile: E.Adv ? E.Adv.summary() : {}, region: w ? w.id : E.state.world.region, x: w ? w.hero.x : 0, z: w ? w.hero.z : 0 }); };

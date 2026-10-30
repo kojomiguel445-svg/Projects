@@ -6,6 +6,9 @@
   G.boot = async () => {
     await E.Icons.preload();
     E.Store.load();
+    // Saves antigos: escolhas de espécie da edição 2024 e características por nível (ver C.migrate)
+    for (const h of E.state.heroes || []) if (h && !h.deleted) { try { C.migrate(h); } catch (e) { console.error(e); } }
+    E.Store.save();
     document.body.classList.toggle('touch', U.isTouch());
     document.body.classList.toggle('reduced', !!E.state.settings.reducedMotion);
     try {
@@ -19,7 +22,8 @@
     U.on('world:near', (l) => E.HUD.setNear(l));
     U.on('world:frame', () => E.HUD.frame());
     U.on('world:aggro', () => E.Audio.sfx('aggro'));
-    U.on('world:encounter', (camp) => G.startBattle(camp.enc.monsters, { camp }));
+    // Em área protegida (vila, Aurenna, interiores) não há combate: a arma está guardada.
+    U.on('world:encounter', (camp) => { if (E.Zones && E.Zones.here().safe) { E.WG.locked = false; return; } G.startBattle(camp.enc.monsters, { camp }); });
     U.on('quests:changed', () => { E.HUD.update(); if (E.WG.world) E.WG.world.refreshNpcMarkers(); });
     // com qualquer tela aberta o herói fica parado (e os inimigos não atacam)
     U.on('ui:screen', (n) => { if (n > 0) E.WG.locked = true; else if (!E.BattleUI.current && !document.getElementById('dialog')) E.WG.locked = false; });
@@ -72,6 +76,8 @@
     E.Audio.music(E.WG.world.B.night ? 'noite' : 'calma');
     G.regionTitle();
     if (!fresh && E.state.seenVersion !== E.Title.VERSION) { await U.wait(1200); await G.whatsNew(); }
+    // escolhas da edição 2024 que faltavam no save (linhagem, ancestralidade, talento de origem)
+    if (!fresh && (h.pendingChoices || []).length && E.Creator.resolvePending) { await U.wait(500); await E.Creator.resolvePending(h); }
     // heróis antigos (nível 3+) escolhem a subclasse uma vez
     if (!fresh && h.level >= E.H.SUB_LEVEL && !h.subChosen && !h.subAsked) { await U.wait(400); await E.Sheet.subclass(h); }
     if (E.RuleChoices) await E.RuleChoices.resolve(h);
@@ -86,11 +92,12 @@
   G.whatsNew = async () => {
     E.state.seenVersion = E.Title.VERSION; E.Store.save();
     const html = `<div class="whatsnew"><ul>
-      <li><b>Regras e fontes:</b> correções verificadas no SRD 5.2.1 para CA, proficiência, magias, condições e progressão. A ficha mostra a composição dos bônus e distingue regras autorais. As lacunas da revisão estão identificadas nas fontes.</li>
-      <li><b>Movimento com mouse:</b> clique no chão para caminhar contornando obstáculos; WASD cancela a rota. Segure o botão direito e arraste para girar a câmera. Os controles de toque continuam disponíveis.</li>
-      <li><b>Experiência no HUD:</b> a barra mostra XP e o próximo nível sem abrir a ficha.</li>
-      <li><b>Covil de Ignarax:</b> os dragões saíram dos encontros comuns. Explore o covil, observe o desafio e decida quando lutar.</li>
-      <li><b>Cassino:</b> encontre a mesa de pôquer e o balcão de Nara para penhorar armas elegíveis, conferir os termos e resgatá-las depois. Somente moeda fictícia do jogo.</li>
+      <li><b>Regras do Livro do Jogador 2024 conferidas:</b> as 10 espécies (sem Meio-Elfo e Meio-Orc), atributos vindos do antecedente, Draconato com sopro em cone ou linha, ancestral que muda a cor das escamas e Voo Dracônico, linhagens dos Elfos e Gnomos, legados do Tiferino, ancestrais gigantes do Golias e Revelação Celestial do Aasimar. A ficha mostra de onde vem cada ponto da CA (regra ou jogo). Personagens antigos foram migrados e, quando falta uma escolha, o jogo pergunta.</li>
+      <li><b>Cozinhar de verdade:</b> no fogão você controla a chama e mexe na hora certa; na fogueira vira o espeto e tira do fogo no ponto — ou queima. O prato sai Mal preparado, Normal, Bem preparado ou Excelente e mata mais ou menos a fome. A fome agora cai mais devagar (cerca de 50 minutos explorando) e o ritmo pode ser ajustado em Ajustes.</li>
+      <li><b>Barra rápida:</b> 9 espaços abaixo da vida e da fome (teclas 1–9). O 1 é a sua arma; os outros guardam atalhos para comidas e poções da mochila — aperte de novo para comer ou beber. Botão direito troca o item. A troca de personagem passou para F1–F3.</li>
+      <li><b>Áreas protegidas:</b> nas vilas, em Aurenna e dentro de lojas e casas a arma vai para a bainha e ninguém briga.</li>
+      <li><b>Tipo físico Gordo:</b> visual próprio, fome um pouco mais rápida e chance de Refletir Golpes corpo a corpo (mecânica do jogo, não é regra de D&amp;D).</li>
+      <li><b>Também na 5.13:</b> clique no chão para andar contornando obstáculos, botão direito gira a câmera, XP no HUD, covil de Ignarax, pôquer e balcão de penhores de Nara no cassino.</li>
     </ul></div>`;
     await UI.modal({ title: `✦ Novidades da versão ${E.Title.VERSION}`, html, buttons: [{ label: 'Ver o Oráculo', value: 'wish' }, { label: 'Bora jogar!', value: true, cls: 'primary' }] }).then((v) => { if (v === 'wish') E.Wish.open(); });
   };

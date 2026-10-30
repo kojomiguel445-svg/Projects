@@ -54,3 +54,20 @@ de produção 5.3.1 (`dpl_B1hjBGYCHBUraYPjSFCMqfxEdFXA`), conferido por SHA-1 (c
   Loja própria: vendas automáticas pelo preço (`E.Vendor.visit/tick/summary`), painel único
   (`js/ui/vendor.js`), aluguel 30 po/dia (80 nas cidades), funcionários mais baratos (atendente = mais
   visitantes). Testes: `tests/plan-workday.json`, `tests/plan-shop.json`.
+- [x] 5.12.0: auditoria D&D 2024 por fontes (SRD 5.2, CC-BY, pelo pacote npm `@archivist-gg/dnd5e`; Aasimar
+  pelo Livro do Jogador 2024, ausente do SRD; o PDF de 2014 só serviu para diferenças históricas).
+  Espécies em `js/data/heroes.js` (tamanhos, linhagens de Elfo/Gnomo, 10 ancestrais dracônicos com cor,
+  legados do Tiferino, ancestrais gigantes do Golias, Revelação Celestial); `C.lineage/legacy/dragon/giant/
+  speed/darkvision/speciesResist/speciesSpells`; estilo de luta não aplica mais o bônus duas vezes;
+  `C.syncProgression` (Especialização do Ladino/Bardo, Erudito do Mago); `C.acBreakdown` separa regra e
+  jogo; `C.migrate` converte salvamentos antigos e marca `pendingChoices` (resolvidas por
+  `E.Creator.resolvePending`). Fome: `HUNGER_RATE` menor, `settings.hungerRate` (Lento/Normal/Rápido),
+  Gordo ×1,25. Culinária: `D.RECIPES`, qualidade (`_mal/_bem/_exc`), sessão `E.Sim.cookBegin/cookInput/
+  cookTick/cookFinish`, tela `js/ui/cooking.js`, artes `js/gfx/foodart.js`. Barra rápida `js/ui/hotbar.js`
+  (h.hotbar, só atalhos para a mochila; espaço 1 = arma equipada). Zonas seguras `js/engine/zones.js`
+  (interiores, centro das vilas, área urbana de Aurenna): arma na bainha, sem encontros, estado enviado
+  no `Net.hello`. Gordo: `CH.BUILDS.gordo` e `Battle.reflectBlow` (`C.REFLECT` = 8% / 25%, uma vez por
+  rodada, só corpo a corpo, sem refletir reflexo). Pendências: clique no chão (`groundRay/walkTo`),
+  botão direito gira a câmera, nado rápido com Shift (9 de vigor/s; nado normal sem custo), isca equipada
+  (`E.Life.equipBait`, `d.baitSel`), penhores `js/engine/pawn.js` (E.state.pawn, operação atômica),
+  dragões em ninhos nas grutas (`M.DRAGON_NESTS`, `addDragonNest`). Troca de personagem: F1–F3.

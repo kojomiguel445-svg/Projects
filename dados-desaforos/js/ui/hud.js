@@ -44,7 +44,7 @@
       <div class="area-banner" aria-hidden="true"><b></b><small></small></div>
       <div class="uid"></div>
       <div class="prompts"></div>
-      <div class="hud-bottom"><div class="hp-name"><span class="lv"></span><span class="nm"></span><span class="hp-num"></span></div><div class="bar hpbar"><i class="hp"></i><i class="temp"></i></div><button class="survival-food hunger-bar" data-a="food" title="Fome e alimentação">${E.Icons ? E.Icons.html('cooking', { decorative: true }) : ''}<i role="progressbar" aria-label="Saciedade" aria-valuemin="0" aria-valuemax="100"><b></b></i><span></span></button><div class="xp-hud"><div class="xp-meta"><span class="xp-caption"><span class="xp-level"></span>XP</span><span class="xp-feedback" role="status" aria-live="polite" aria-atomic="true"></span><span class="xp-total"></span></div><div class="bar xp" role="progressbar" aria-label="Experiência até o próximo nível" aria-valuemin="0" aria-valuemax="100"><i></i></div></div></div>
+      <div class="hud-bottom"><div class="hp-name"><span class="lv"></span><span class="nm"></span><span class="hp-num"></span></div><div class="bar hpbar"><i class="hp"></i><i class="temp"></i></div><button class="survival-food hunger-bar" data-a="food" title="Fome e alimentação">${E.Icons ? E.Icons.html('cooking', { decorative: true }) : ''}<i role="progressbar" aria-label="Saciedade" aria-valuemin="0" aria-valuemax="100"><b></b></i><span></span></button><div class="xp-hud"><div class="xp-meta"><span class="xp-caption"><span class="xp-level"></span>XP</span><span class="xp-feedback" role="status" aria-live="polite" aria-atomic="true"></span><span class="xp-total"></span></div><div class="bar xp" role="progressbar" aria-label="Experiência até o próximo nível" aria-valuemin="0" aria-valuemax="100"><i></i></div></div><div class="hotbar" role="toolbar" aria-label="Barra rápida"></div></div>
       <div class="ia-mark" aria-hidden="true"><i></i></div>
       <div class="joy" aria-hidden="true"><i></i></div>
       <div class="mobile-actions"><button class="icon-btn" data-a="jump" aria-label="Pular">${UI.ICONS.jump}</button><button class="icon-btn act" data-a="act" aria-label="Interagir">${UI.ICONS.hand}</button></div>
@@ -60,6 +60,7 @@
     refs.wayfinding = el.querySelector('.landmark-wayfinding');
     for (const [key, selector] of Object.entries({ xpHud: '.xp-hud', xpBar: '.bar.xp', xpLevel: '.xp-level', xpTotal: '.xp-total', xpFeedback: '.xp-feedback' })) refs[key] = el.querySelector(selector);
     refs.landmarks = cityLandmarks.map((landmark) => { const node = refs.wayfinding.querySelector(`[data-landmark="${landmark.service}"]`); return { ...landmark, node, metric: node.querySelector('small'), arrow: node.querySelector('.landmark-arrow') }; });
+    if (E.Hotbar) E.Hotbar.mount(el.querySelector('.hotbar'));
     el.querySelector('.minimap').onclick = () => E.Wonders.regionMap();
     el.querySelector('.tracker').onclick = () => E.Journal.quests();
     el.querySelector('[data-a=wish]').onclick = () => E.Wish.open();
@@ -97,7 +98,7 @@
     const key = list.map((h) => `${h.id}:${h.hp}:${C.maxHp(h)}:${h.name}:${h.level}:${JSON.stringify(h.look)}`).join('|') + '#' + (active && active.id);
     if (key === partyKey && !force) return; partyKey = key;
     box.classList.toggle('solo', list.length < 2);
-    box.innerHTML = list.map((h, i) => `<button class="pt ${active && h.id === active.id ? 'on' : ''}" data-hero="${h.id}" title="${U.esc(h.name)} · Nv. ${h.level}" style="--el:${E.Portrait ? E.Portrait.element(h) : '#ece5d8'}"><span class="pt-name">${U.esc(h.name)}<i class="pt-hp"><b style="width:${Math.max(0, Math.min(100, h.hp / C.maxHp(h) * 100))}%"></b></i></span><span class="pt-face" style="background-image:url(${face(h)})"><i class="pt-cd"></i></span><span class="pt-key">${i + 1}</span></button>`).join('');
+    box.innerHTML = list.map((h, i) => `<button class="pt ${active && h.id === active.id ? 'on' : ''}" data-hero="${h.id}" title="${U.esc(h.name)} · Nv. ${h.level}" style="--el:${E.Portrait ? E.Portrait.element(h) : '#ece5d8'}"><span class="pt-name">${U.esc(h.name)}<i class="pt-hp"><b style="width:${Math.max(0, Math.min(100, h.hp / C.maxHp(h) * 100))}%"></b></i></span><span class="pt-face" style="background-image:url(${face(h)})"><i class="pt-cd"></i></span><span class="pt-key">F${i + 1}</span></button>`).join('');
   };
   U.on('party:changed', () => HUD.party(true));
   // Troca no próprio lugar: o mundo continua carregado; cada personagem mantém seus dados e empregos.
@@ -124,9 +125,10 @@
     b.classList.add('show'); clearTimeout(bannerTimer); bannerTimer = setTimeout(() => b.classList.remove('show'), 3800);
   };
   addEventListener('keydown', (event) => {
-    if (!el || event.repeat || !/^Digit[1-3]$/.test(event.code) || event.target && /INPUT|TEXTAREA|SELECT/.test(event.target.tagName)) return;
+    // F1–F3 trocam de personagem; as teclas 1–9 ficam com a barra rápida.
+    if (!el || event.repeat || !/^F[1-3]$/.test(event.code) || event.target && /INPUT|TEXTAREA|SELECT/.test(event.target.tagName)) return;
     if (E.WG.mode() !== 'world' || E.WG.locked || E.UI.anyOpen() || document.querySelector('.modal-bg') || (E.WorldServices && E.WorldServices.active)) return;
-    const h = partyList()[+event.code.slice(5) - 1]; if (h) { event.preventDefault(); HUD.switchHero(h.id); }
+    event.preventDefault(); const h = partyList()[+event.code.slice(1) - 1]; if (h) HUD.switchHero(h.id);
   });
   HUD.online = (on, n) => { if (!el) return; const b = el.querySelector('.online-btn'); b.classList.toggle('on', on); b.querySelector('.ob-n').textContent = on ? n : ''; HUD.coop(); };
   // faixa do cooperativo: de quem é o mundo e quem está nele (P1…P4)
@@ -210,6 +212,7 @@
     syncXp(h);
     HUD.tracker();
     HUD.syncSim(true);
+    if (E.Hotbar) E.Hotbar.render();
   };
   // The small calendar/nutrition row updates four times a second, not every animation frame.
   HUD.syncSim = (force = false) => {

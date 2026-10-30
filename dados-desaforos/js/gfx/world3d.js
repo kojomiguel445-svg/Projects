@@ -1175,7 +1175,7 @@
       const h = E.Store.hero() || { cls: 'guerreiro', species: 'humano', look: { skin: '#e3b892', hair: '#3a2a20', hairStyle: 0, outfit: '#e08a3c' }, equip: {} };
       const pos = E.state.world.pos && E.state.world.region === this.id ? E.state.world.pos : this.spawn;
       this.hero = { x: pos.x, z: pos.z, y: this.groundAt(pos.x, pos.z), vy: 0, jump: 0, dir: 1, moving: false, frameT: 0, frame: 0 };
-      this.heroSprite = this.makeSprite(E.SP.hero(h, 'idle0', E.SP.heroWeaponType(h)), WG.heroHeight(h));
+      this.heroSprite = this.makeSprite(E.SP.hero(h, 'idle0', E.Zones ? E.Zones.weaponType(h, this) : E.SP.heroWeaponType(h)), WG.heroHeight(h));
       this.scene.add(this.heroSprite);
       this.heroShadow = this.addShadow(0, 0, 0, 0.55);
       this.glider = new THREE.Sprite(new THREE.SpriteMaterial({ map: gliderTex(), transparent: true, depthWrite: false }));
@@ -1188,7 +1188,7 @@
     // quadros de pesca com a vara que o herói tem agora (a vara é desenhada no sprite, presa no punho)
     fishFrames(h = E.Store.hero()) {
       if (!h || !this.heroFrames) return;
-      const rod = (h.life && h.life.rod) || 0, wt = E.SP.heroWeaponType(h);
+      const rod = (h.life && h.life.rod) || 0, wt = E.Zones ? E.Zones.weaponType(h, this) : E.SP.heroWeaponType(h);
       this.heroFrames.fish = Object.fromEntries(['fcast0', 'fcast1', 'fhold', 'fbite', 'freel0', 'freel1', 'fcatch'].flatMap((k) => [[k, E.SP.hero(h, k + ':' + rod, wt)], ['s' + k, E.SP.hero(h, 's' + k + ':' + rod, wt)]]));
     }
     // Eco (espírito guardião) flutuando atrás do herói
@@ -1207,7 +1207,7 @@
     }
     refreshHeroFrames() {
       const h = E.Store.hero() || { cls: 'guerreiro', species: 'humano', look: { skin: '#e3b892', hair: '#3a2a20', hairStyle: 0, outfit: '#e08a3c' }, equip: {} };
-      const wt = E.SP.heroWeaponType(h);
+      const wt = E.Zones ? E.Zones.weaponType(h, this) : E.SP.heroWeaponType(h);
       const F = (f) => E.SP.hero(h, f, wt);
       this.heroFrames = { idle: [F('idle0'), F('idle1')], sit: [F('sit0'), F('sit1')], walk: Array.from({ length: 12 }, (_, i) => F('w' + i)), crouch: F('jump0'), up: F('jump1'), fall: F('jump2'), land: F('land'), swim: Array.from({ length: 8 }, (_, i) => F('swim' + i)), swimFast: Array.from({ length: 8 }, (_, i) => F('swimfast' + i)), fish: null };
       this.fishFrames(h);
@@ -1518,6 +1518,8 @@
       this.heroSprite.material.map = tex(cv);
       const hh = this.heroSprite.userData.h * (cv._k || 1); // quadros de pesca são maiores (cabe a vara)
       this.heroSprite.center.y = cv._cy ?? 0.02;
+      // comer, beber ou guardar a arma: três pequenos 'mastigados' (barra rápida e zonas seguras)
+      if (this.heroEatT > 0) { this.heroEatT -= dt; const k = Math.abs(Math.sin((.6 - this.heroEatT) / .6 * Math.PI * 3)); sx *= 1 + .04 * k; sy *= 1 - .06 * k; }
       this.heroSprite.scale.set(hh * cv.width / cv.height * hr.dir * sx, hh * sy, 1);
       this.heroSprite.position.set(hr.x, hr.y + hr.jump + softBob, hr.z);
       this.heroShadow.position.set(hr.x, hr.y + 0.05, hr.z);
@@ -1626,7 +1628,7 @@
         if (c.dead) continue;
         const d = Math.hypot(hr.x - c.x, hr.z - c.z);
         const wasAggro = c.aggro;
-        c.aggro = !WG.locked && d < 9 && !E.state.settings.peaceful;
+        c.aggro = !WG.locked && d < 9 && !E.state.settings.peaceful && !(E.Zones && E.Zones.safe);
         if (c.aggro && !wasAggro) U.emit('world:aggro', c);
         c.alert.visible = c.aggro;
         let cx = 0, cz = 0;
@@ -2144,6 +2146,7 @@
     if (['world', 'arena', 'interior'].includes(mode)) {
       const actor = mode === 'interior' && E.Interior && E.Interior.current ? E.Interior.current : WG.world && WG.world.hero;
       if (E.Sim && E.Sim.tick) E.Sim.tick(Math.min(1, Math.max(0, elapsed / 1000)), { mode, frameToken: now, moving: !!(actor && actor.moving), sprinting: !!(actor && (actor.sprinting || actor.fastSwimming)), world: WG.world });
+      if (E.Zones) E.Zones.tick(mode, WG.world);
       if (mode !== 'arena' && E.Vendor && E.Vendor.tick) E.Vendor.tick(Math.min(1, Math.max(0, elapsed / 1000)));
       if (mode !== 'arena' && E.Business && E.Business.tick) E.Business.tick(Math.min(1, Math.max(0, elapsed / 1000)));
       if (mode !== 'arena' && E.CasinoBusiness && E.CasinoBusiness.tick) E.CasinoBusiness.tick(Math.min(1, Math.max(0, elapsed / 1000)));

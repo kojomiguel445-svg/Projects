@@ -41,6 +41,17 @@
   C.pb = (h) => R.profBonus(h.level);
   C.cls = (h) => H.CLASSES[h.cls];
   C.species = (h) => H.SPECIES[h.species];
+  // Escolhas de espécie (2024): linhagem élfica/gnômica, legado tiferino, ancestralidade dracônica e gigante.
+  C.lineage = (h) => { const sp = C.species(h); return sp && sp.lineages && h.lineage ? sp.lineages[h.lineage] || null : null; };
+  C.legacy = (h) => { const sp = C.species(h); return sp && sp.legacies ? sp.legacies[h.legacy] || null : null; };
+  C.dragon = (h) => { const sp = C.species(h); if (!sp || !sp.ancestries) return null; const id = H.OLD_ANCESTRY[h.ancestry] || h.ancestry; return sp.ancestries[id] ? Object.assign({ id }, sp.ancestries[id]) : null; };
+  C.ancestryType = (h) => { const d = C.dragon(h); return d ? d.type : 'fogo'; };
+  C.giant = (h) => { const sp = C.species(h); return sp && sp.giants && h.giant ? Object.assign({ id: h.giant }, sp.giants[h.giant]) : null; };
+  C.speed = (h) => { const l = C.lineage(h); return (l && l.speed) || C.species(h).speed; };
+  C.darkvision = (h) => { const l = C.lineage(h); return (l && l.dark) || C.species(h).dark; };
+  C.speciesResist = (h) => { const out = [...(C.species(h).hooks.resist || [])], lg = C.legacy(h); if (lg) out.push(lg.resist); if (C.dragon(h)) out.push(C.ancestryType(h)); return out; };
+  // Magias de linhagem/legado que existem no combate do jogo, liberadas pelo nível do personagem.
+  C.speciesSpells = (h) => { const src = C.legacy(h) || C.lineage(h); return src && src.spells ? src.spells.filter(([lv, id]) => h.level >= lv && S.SPELLS[id]).map(([, id]) => id) : []; };
   // ---------------- subclasses (escolhidas no nível 3) ----------------
   C.subId = (h) => h.sub || (h.level >= H.SUB_LEVEL ? H.SUB_DEFAULT[h.cls] : null);
   C.sub = (h) => { const id = C.subId(h); return id ? (H.SUBCLASSES[h.cls] || {})[id] || null : null; };
@@ -171,6 +182,8 @@
     return { total: parts.reduce((n, p) => n + p.value, 0), formula, parts };
   };
   C.ac = (h) => C.acBreakdown(h).total;
+  // Refletir Golpes do tipo físico Gordo (mecânica do jogo, não é regra de D&D): ajuste aqui chance e fração.
+  C.REFLECT = { chance: 0.08, fraction: 0.25 };
 
   // ---------------- iniciativa / testes ----------------
   C.initiative = (h) => {
@@ -291,6 +304,8 @@
     const id = typeof spellOrId === 'string' ? spellOrId : Object.keys(S.SPELLS).find((key) => S.SPELLS[key] === spellOrId);
     const spell = id ? S.SPELLS[id] : null;
     const caster = C.caster(h), fallback = caster ? caster.ab : h.mi && R.AB[h.mi.ab] ? h.mi.ab : 'int';
+    // Magias de espécie (linhagem élfica/gnômica, legado tiferino) usam o atributo escolhido com a linhagem (PHB 2024).
+    if (id && h.lineageAb && R.AB[h.lineageAb] && (C.speciesSpells(h).includes(id) || (C.legacy(h) && C.legacy(h).cantrip === id))) return { id, ability: h.lineageAb, origin: 'species', ambiguous: false, options: ['species'], selected: 'species', stored: null };
     const featOwns = !!(id && h.mi && R.AB[h.mi.ab] && (h.mi.spell === id || (h.mi.cantrips || []).includes(id)));
     const classOwns = !!(spell && caster && (((h.cantrips || []).includes(id) || (h.prepared || []).includes(id))
       || (h.cls === 'paladino' && h.level >= 2 && id === 'golpe_divino') || (h.cls === 'patrulheiro' && id === 'marca_cacador')
@@ -335,7 +350,8 @@
     if (h.mi) list.push(...(h.mi.cantrips || []), h.mi.spell);
     if (h.cls === 'paladino' && h.level >= 2 && !list.includes('golpe_divino')) list.push('golpe_divino');
     if (h.cls === 'patrulheiro' && !list.includes('marca_cacador')) list.push('marca_cacador');
-    if (C.species(h).hooks.cantrip && !list.includes(C.species(h).hooks.cantrip)) list.push(C.species(h).hooks.cantrip);
+    const lg = C.legacy(h); if (lg && S.SPELLS[lg.cantrip]) list.push(lg.cantrip);
+    list.push(...C.speciesSpells(h));
     // magias da subclasse (sempre preparadas)
     for (const g of C.fxVals(h, 'grantSpells')) for (const [lv, ...ids] of g) if (h.level >= lv) for (const id of ids) if (S.SPELLS[id] && (S.SPELLS[id].level <= Math.max(0, C.maxSpellLevel(h)) || S.SPELLS[id].level === 0)) list.push(id);
     return [...new Set(list.filter(Boolean))];
@@ -399,7 +415,10 @@
     if (sp.relentless) r.implacavel = 1;
     if (sp.adrenaline) r.adrenalina = pb;
     if (sp.healingHands) r.maos_curativas = 1;
-    if (sp.giantFire) r.gigante = pb;
+    if (sp.giant && h.giant) r.gigante = pb;
+    if (sp.giant && L >= 5) r.forma_grande = 1;
+    if (sp.breath && L >= 5) r.voo_draconico = 1;
+    for (const id of C.speciesSpells(h)) r['sp_' + id] = 1;
     if (C.hasFeat(h, 'sortudo')) r.sorte = pb;
     if (h.mi && h.mi.spell) r.mi_spell = 1;
     // recursos da subclasse e dos talentos
@@ -653,13 +672,28 @@
     while (h.prepared.length < pm && avail.length) h.prepared.push(avail.shift());
   };
 
+  // Migração das escolhas de espécie de saves antigos: preserva o que o personagem já usava e pede só o que faltar.
+  C.migrate = (h) => {
+    const sp = C.species(h); if (!sp) return [];
+    const pending = [];
+    if (sp.ancestries && H.OLD_ANCESTRY[h.ancestry]) h.ancestry = H.OLD_ANCESTRY[h.ancestry];
+    if (sp.ancestries && !C.dragon(h)) pending.push('ancestry');
+    if (sp.giants && !h.giant) h.giant = 'fogo';       // a versão anterior só tinha a dádiva do Gigante do Fogo
+    if (sp.legacies && !h.legacy) h.legacy = 'infernal'; // a versão anterior só tinha o legado Infernal
+    if (sp.lineages && !C.lineage(h)) pending.push('lineage');
+    const extra = (h.feats || [])[1];
+    if (h.species === 'humano' && extra && H.FEATS[extra] && H.FEATS[extra].general) pending.push('feat');
+    h.pendingChoices = pending;
+    return pending;
+  };
+
   // ---------------- criação ----------------
   C.create = (o) => {
     const cls = H.CLASSES[o.cls], sp = H.SPECIES[o.species], bg = H.BACKGROUNDS[o.background];
     const extra = o.species === 'humano' && H.FEATS[o.extraFeat] && !H.FEATS[o.extraFeat].general && (o.extraFeat !== bg.feat || o.extraFeat === 'habilidoso') ? o.extraFeat : null;
     const h = {
       id: U.uid(), name: o.name || 'Viajante', cls: o.cls, species: o.species, background: o.background,
-      ancestry: o.ancestry || null,
+      ancestry: o.ancestry || null, lineage: o.lineage || null, legacy: o.legacy || null, giant: o.giant || null, size: o.size || null, lineageAb: o.lineageAb || null,
       base: o.base, bgBonus: o.bgBonus, asi: {},
       level: 1, xp: 0, hp: 1, tempHp: 0, hdUsed: 0, slotsUsed: [], used: {},
       skills: [...new Set([...(bg.skills || []), ...(o.skills || [])])],

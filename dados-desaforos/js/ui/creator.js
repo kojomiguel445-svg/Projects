@@ -14,7 +14,7 @@
   const stepList = () => STEPS.filter((s) => s !== 'Magias' || needsSpells());
 
   CR.open = () => {
-    c = { cls: 'guerreiro', background: 'soldado', species: 'humano', ancestry: 'fogo', method: 'padrao', base: C.suggestArray('guerreiro'), pb: { for: 8, des: 8, con: 8, int: 8, sab: 8, car: 8 }, bgBonus: null, skills: [], extra: [], cantrips: [], prepared: [], fightingStyle: 'grande', extraFeat: 'vigoroso', look: Object.assign(E.CH.defaultLook('guerreiro', 'humano'), { skin: H.SPECIES.humano.look.skin[1] }), name: U.pick(NAMES) };
+    c = { cls: 'guerreiro', background: 'soldado', species: 'humano', ancestry: 'vermelho', method: 'padrao', base: C.suggestArray('guerreiro'), pb: { for: 8, des: 8, con: 8, int: 8, sab: 8, car: 8 }, bgBonus: null, skills: [], extra: [], cantrips: [], prepared: [], fightingStyle: 'grande', extraFeat: 'vigoroso', look: Object.assign(E.CH.defaultLook('guerreiro', 'humano'), { skin: H.SPECIES.humano.look.skin[1] }), name: U.pick(NAMES) };
     step = 0;
     el = U.h(`<section class="screen paper" data-noesc="1"><div class="creator">
       <div class="stage"><img class="pv" alt=""><div class="stxt"><div class="sname"></div><div class="ssub"></div></div></div>
@@ -115,26 +115,50 @@
     body.querySelector('.detail').innerHTML = `<h4>${bg.name}</h4><div>${bg.blurb}</div><div class="kv"><span><b>Atributos:</b> ${bg.abilities.map((a) => R.AB[a].name).join(', ')}</span><span><b>Perícias:</b> ${bg.skills.map((s) => R.SKILLS[s].name).join(', ')}</span></div><p><b>Talento de Origem — ${H.FEATS[bg.feat].name}:</b> ${H.FEATS[bg.feat].desc}</p>`;
   }
 
+  // Padrões ao trocar de espécie: a primeira opção de cada escolha (o jogador pode mudar).
+  function speciesDefaults() {
+    const s = H.SPECIES[c.species];
+    c.size = s.sizes ? s.sizes[0] : null; c.look.height = 1;
+    c.lineage = s.lineages ? Object.keys(s.lineages)[0] : null;
+    c.legacy = s.legacies ? Object.keys(s.legacies)[0] : null;
+    c.giant = s.giants ? Object.keys(s.giants)[0] : null;
+    if (s.ancestries) { c.ancestry = 'vermelho'; c.look.skin = s.ancestries.vermelho.color; }
+    const base = c.method === 'padrao' ? c.base : c.pb;
+    c.lineageAb = ['int', 'sab', 'car'].sort((a, b) => (base[b] || 0) - (base[a] || 0))[0];
+    if (c.extraFeat && H.FEATS[c.extraFeat] && H.FEATS[c.extraFeat].general) c.extraFeat = null;
+  }
   function stSpecies(body) {
+    if (c.lineage === undefined) speciesDefaults();
     body.innerHTML = `<h3>Escolha sua Espécie</h3><p class="lead">A espécie concede traços especiais (em 2024 ela não altera atributos — isso vem do antecedente).</p><div class="pick-grid"></div><div class="detail"></div>`;
     const grid = body.querySelector('.pick-grid');
     for (const [id, s] of Object.entries(H.SPECIES)) {
       const b = U.h(`<button class="pick ${c.species === id ? 'on' : ''}"><div class="pn">${s.name}</div><div class="pd">${s.size} · ${String(s.speed).replace('.', ',')} m${s.dark ? ` · Visão no Escuro ${s.dark} m` : ''}</div></button>`);
-      b.onclick = () => { c.species = id; c.look.skin = s.look.skin[0]; c.look.beard = id === 'anao'; c.extra = []; render(); };
+      b.onclick = () => { c.species = id; c.look.skin = s.look.skin[0]; c.look.beard = id === 'anao'; c.extra = []; speciesDefaults(); render(); };
       grid.appendChild(b);
     }
     const s = H.SPECIES[c.species];
     const det = body.querySelector('.detail');
     det.innerHTML = `<h4>${s.name}</h4><div>${s.blurb}</div><ul>${s.traits.map(([n, d]) => `<li><b>${n}:</b> ${d}</li>`).join('')}</ul>`;
-    if (c.species === 'draconato') {
-      const box = U.h('<div style="margin-top:10px"><b>Ancestralidade:</b><div class="checks" style="margin-top:6px"></div></div>');
-      for (const [t, n] of Object.entries(s.ancestries)) {
-        const b = U.h(`<button class="check ${c.ancestry === t ? 'on' : ''}"><i>${c.ancestry === t ? '✓' : ''}</i>${n}</button>`);
-        b.onclick = () => { c.ancestry = t; render(); };
+    // Escolhas da espécie (2024): cada uma muda regras reais do personagem.
+    const choices = (title, entries, cur, pick) => {
+      const box = U.h(`<div style="margin-top:10px"><b>${title}:</b><div class="checks" style="margin-top:6px"></div></div>`);
+      for (const [id, label, tip, color] of entries) {
+        const b = U.h(`<button class="check ${cur === id ? 'on' : ''}" title="${U.esc(tip || '')}"><i ${color ? `style="background:${color};border-color:${color}"` : ''}>${cur === id ? '✓' : ''}</i>${U.esc(label)}</button>`);
+        b.onclick = () => { pick(id); render(); };
         box.querySelector('.checks').appendChild(b);
       }
       det.appendChild(box);
+      return box;
+    };
+    const lvText = (o) => [o.l1 ? `Nível 1: ${o.l1}` : '', o.l3 ? `Nível 3: ${o.l3}` : '', o.l5 ? `Nível 5: ${o.l5}` : ''].filter(Boolean).join(' · ');
+    if (s.sizes) choices('Tamanho', s.sizes.map((z) => [z, z]), c.size, (z) => { c.size = z; c.look.height = z === 'Pequeno' ? .8 : 1; });
+    if (s.ancestries) {
+      choices('Ancestralidade Dracônica', Object.entries(s.ancestries).map(([id, a]) => [id, `${a.name} (${E.R.DAMAGE[a.type] ? E.R.DAMAGE[a.type].name : a.type})`, '', a.color]), c.ancestry, (id) => { c.ancestry = id; c.look.skin = s.ancestries[id].color; });
     }
+    if (s.giants) { const box = choices(s.giantLabel, Object.entries(s.giants).map(([id, g]) => [id, g.name, g.desc]), c.giant, (id) => { c.giant = id; }); box.appendChild(U.h(`<small>${U.esc(s.giants[c.giant].desc)}</small>`)); }
+    if (s.lineages) { const box = choices(s.lineageLabel, Object.entries(s.lineages).map(([id, l]) => [id, l.name, lvText(l)]), c.lineage, (id) => { c.lineage = id; }); box.appendChild(U.h(`<small>${U.esc(lvText(s.lineages[c.lineage]))}</small>`)); }
+    if (s.legacies) { const box = choices(s.legacyLabel, Object.entries(s.legacies).map(([id, l]) => [id, l.name, lvText(l)]), c.legacy, (id) => { c.legacy = id; }); box.appendChild(U.h(`<small>${U.esc(lvText(s.legacies[c.legacy]))}</small>`)); }
+    if ((s.lineages || s.legacies) && !H.CLASSES[c.cls].caster) choices('Habilidade de conjuração da linhagem', ['int', 'sab', 'car'].map((a) => [a, R.AB[a].name]), c.lineageAb, (a) => { c.lineageAb = a; });
     if (c.species === 'humano') {
       const box = U.h('<div style="margin-top:10px"><b>Versátil — Talento de Origem extra:</b><div class="checks" style="margin-top:6px"></div></div>');
       for (const [id, f] of CR.originFeatOptions(c.background)) {
@@ -269,6 +293,7 @@
     const base = c.method === 'padrao' ? c.base : c.pb;
     const h = C.create({
       name: c.name.trim(), cls: c.cls, species: c.species, background: c.background, ancestry: c.species === 'draconato' ? c.ancestry : null,
+      lineage: c.lineage, legacy: c.legacy, giant: c.giant, size: c.size, lineageAb: H.CLASSES[c.cls].caster ? null : c.lineageAb,
       base: { ...base }, bgBonus: { ...c.bgBonus }, skills: [...c.skills, ...c.extra], cantrips: [...c.cantrips], prepared: [...c.prepared],
       fightingStyle: H.CLASSES[c.cls].fightingStyleAt === 1 ? c.fightingStyle : null, extraFeat: c.species === 'humano' ? c.extraFeat : null, look: { ...c.look },
     });
@@ -282,5 +307,21 @@
     E.Game.enterWorld(true);
   }
 
+  // Escolhas que a edição 2024 exige e que saves antigos não tinham. Nada é retirado antes de o jogador escolher.
+  CR.resolvePending = async (h) => {
+    const sp = H.SPECIES[h.species];
+    for (const k of (h.pendingChoices || []).slice()) {
+      let pick = null;
+      if (k === 'lineage' && sp.lineages) pick = await UI.choose({ title: `${sp.lineageLabel} · regras 2024`, text: `${h.name} precisa escolher uma ${sp.lineageLabel.toLowerCase()} (ela define truque e magias dos níveis 3 e 5):<br>${Object.values(sp.lineages).map((l) => `<b>${l.name}</b> — ${U.esc(l.l1)}${l.l3 ? ` Nível 3: ${l.l3}; nível 5: ${l.l5}.` : ''}`).join('<br>')}`, options: Object.entries(sp.lineages).map(([id, l]) => ({ id, label: l.name })) });
+      if (k === 'ancestry' && sp.ancestries) pick = await UI.choose({ title: 'Ancestralidade Dracônica · regras 2024', text: `${h.name} precisa escolher o dragão ancestral (dano do sopro e resistência).`, options: Object.entries(sp.ancestries).map(([id, a]) => ({ id, label: `${a.name} (${E.R.DAMAGE[a.type] ? E.R.DAMAGE[a.type].name : a.type})` })) });
+      if (k === 'feat') pick = await UI.choose({ title: 'Versátil · Talento de Origem', text: `O talento extra de ${h.name} (${H.FEATS[h.feats[1]].name}) é um talento geral, que só existe a partir do nível 4. Escolha um Talento de Origem para substituí-lo.`, options: Object.entries(H.FEATS).filter(([id, f]) => !f.general && (id !== h.feats[0] || id === 'habilidoso')).map(([id, f]) => ({ id, label: f.name })) });
+      if (!pick || pick === 'no') continue;
+      if (k === 'lineage') h.lineage = pick;
+      if (k === 'ancestry') { h.ancestry = pick; h.look = Object.assign({}, h.look, { skin: sp.ancestries[pick].color }); }
+      if (k === 'feat') h.feats[1] = pick;
+      h.pendingChoices = h.pendingChoices.filter((x) => x !== k);
+    }
+    E.Store.save(); if (E.WG.world) E.WG.world.refreshHeroFrames(); if (E.HUD) E.HUD.update();
+  };
   E.Creator = CR;
 })();
